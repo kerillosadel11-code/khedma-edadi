@@ -81,8 +81,8 @@ function normPhone(raw){
   return /^01[0125]\d{8}$/.test(d)?d:null;
 }
 const toEmail=x=>{if(x.includes('@'))return x;const p=normPhone(x);return p?p+'@'+EMAIL_DOMAIN:null};
-async function fn(body){
-  const {data,error}=await sb.functions.invoke('create-user',{body});
+async function fn(body,name='create-user'){
+  const {data,error}=await sb.functions.invoke(name,{body});
   if(error){let m=error.message;try{const j=await error.context.json();if(j.error)m=j.error}catch(_){}return{error:m}}
   return data;
 }
@@ -112,12 +112,42 @@ function pwScreen(){
   <input id="n2" type="password" placeholder="أكّد الباسورد" autocomplete="new-password" dir="ltr">
   <button class="p" data-a="setpw">حفظ والدخول</button><p class="err" id="err"></p><a href="#" data-a="out">خروج</a></main>`;
 }
+const joinTok=()=>{const m=location.hash.match(/^#join=([0-9a-fA-F]{32,128})$/);return m?m[1].toLowerCase():null};
+const rnd=()=>[...crypto.getRandomValues(new Uint8Array(24))].map(b=>b.toString(16).padStart(2,'0')).join('');
+const sha=async t=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+const joinWrap=h=>`<main class="card login"><img src="logo.png" alt="" style="width:100%;height:auto;display:block;margin-bottom:12px">${h}</main>`;
+async function joinScreen(t){
+  app.innerHTML=joinWrap('<h1>دعوة للانضمام</h1><p>بنتأكد من الدعوة...</p>');
+  const x=await fn({action:'peek',token:t},'accept-invite');
+  if(x.error)return app.innerHTML=joinWrap(`<h1>الدعوة مش شغّالة</h1><p class="err">${esc(x.error)}</p><a href="#" data-a="joinhome">الدخول للتطبيق</a>`);
+  const who=x.role==='secretary'?'أمين خدمة '+(SEC[x.section]||''):'خادم في فصل '+esc(x.class_name||'');
+  app.innerHTML=joinWrap(`<h1>أهلاً بيك في خدمة إعدادي</h1><p>دعوة للانضمام كـ <b>${who}</b></p>
+  <input id="jn" placeholder="الاسم بالكامل"><input id="jp" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
+  <input id="j1" type="password" placeholder="اختار باسورد (8 حروف على الأقل)" autocomplete="new-password" dir="ltr"><input id="j2" type="password" placeholder="أكّد الباسورد" autocomplete="new-password" dir="ltr">
+  <button class="p" data-a="joinGo">انضمام</button><p class="err" id="err"></p>${x.role==='servant'?'<p class="empty">بعد التسجيل، حسابك هيستنى موافقة أمين الخدمة.</p>':''}`);
+}
+async function joinGo(){
+  const t=joinTok(),er=document.getElementById('err'),n=v('jn'),ph=normPhone(v('jp')),p1=document.getElementById('j1').value,p2=document.getElementById('j2').value;
+  if(!t)return;
+  if(!n)return er.textContent='اكتب اسمك.';
+  if(!ph)return er.textContent='رقم التليفون مش صحيح (مثال: 01012345678).';
+  if(p1.length<8)return er.textContent='الباسورد لازم يكون 8 حروف على الأقل.';
+  if(p1!==p2)return er.textContent='الباسورد مش متطابق.';
+  const b=document.querySelector('[data-a=joinGo]');b.disabled=true;er.textContent='';
+  const x=await fn({action:'accept',token:t,name:n,phone:ph,password:p1},'accept-invite');
+  b.disabled=false;
+  if(x.error)return er.textContent=x.error;
+  history.replaceState(null,'',location.pathname);
+  if(!x.pending){await sb.auth.signOut();const {error}=await sb.auth.signInWithPassword({email:ph+'@'+EMAIL_DOMAIN,password:p1});if(!error)return boot();return login()}
+  app.innerHTML=joinWrap(`<h1>تم التسجيل ✅</h1><p>رقم الدخول بتاعك: <b dir="ltr">${esc(x.login)}</b></p><p>حسابك دلوقتي مستني موافقة أمين الخدمة. أول ما يوافق تقدر تدخل بنفس الرقم والباسورد اللي اخترتهم.</p><a href="#" data-a="joinhome">صفحة الدخول</a>`);
+}
 async function boot(){
+  const jt=joinTok();if(jt)return joinScreen(jt);
   const {data:{user}}=await sb.auth.getUser();
   if(!user)return login();
   if(user.user_metadata&&user.user_metadata.must_change)return pwScreen();
   const {data:p}=await sb.from('profiles').select('*').eq('id',user.id).single();
-  if(!p||!p.active){await sb.auth.signOut();return login()}
+  if(!p||!p.active){const pend=p&&p.pending;await sb.auth.signOut();login();if(pend){const e=document.getElementById('err');if(e)e.textContent='حسابك لسه مستني موافقة أمين الخدمة.'}return}
   S.p=p;
   if(p.role==='admin'||p.role==='secretary'||p.role==='servant'){await load();render()}
   else{await loadParent();app.innerHTML=head()+vParent()}
@@ -146,6 +176,7 @@ async function load(){
     const r=await Promise.all([sb.from('classes').select('*').order('created_at'),sb.from('servees').select('*').order('full_name'),sb.from('class_servants').select('*')]);
     r.forEach(ok);[S.classes,S.servees,S.cs]=r.map(x=>x.data||[]);S.profiles=[];S.pl=[];
   }
+  S.inv=[];if(canManage()){const ri=await sb.from('invites').select('*').order('created_at',{ascending:false});S.inv=ri.error?[]:(ri.data||[])}
   await Promise.all([loadAtt(),loadPhotos()]);
 }
 async function loadAdmin(){
@@ -161,8 +192,8 @@ function render(){
   const adm=canManage();
   if(S.cards)return app.innerHTML=head()+vCards();
   if(!adm)S.tab='att';
-  const T=adm?[['classes','الفصول'],['servees','المخدومين'],['people','المستخدمين'],['add','مستخدم جديد'],['att','التحضير']]:[['att','التحضير']];
-  app.innerHTML=head()+`<nav>${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}</nav><main>${{classes:vClasses,servees:vServees,people:vPeople,add:vAdd,att:vAtt}[S.tab]()}</main>`;
+  const T=adm?[['classes','الفصول'],['servees','المخدومين'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','التحضير']]:[['att','التحضير']];
+  app.innerHTML=head()+`<nav>${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}</nav><main>${{classes:vClasses,servees:vServees,people:vPeople,add:vAdd,inv:vInv,att:vAtt}[S.tab]()}</main>`;
 }
 function vClasses(){
   return `<div class="card"><h2>إضافة فصل</h2><input id="cn" placeholder="اسم الفصل (مثال: أولى إعدادي)"><input id="cs" placeholder="المرحلة (اختياري)">${isSec()?`<select id="csec" disabled><option>${SEC[S.p.section]}</option></select>`:`<select id="csec"><option value="">اختار القسم</option><option value="boys">بنين</option><option value="girls">بنات</option></select>`}<button class="p" data-a="addClass">إضافة الفصل</button></div>
@@ -246,10 +277,44 @@ function vAdd(){
   <div id="ue" style="display:none"><select id="use"><option value="">اختار المخدوم</option>${opts(S.servees,s=>s.full_name)}</select></div>
   <button class="p" data-a="addUser">إنشاء الحساب</button><p class="empty">هيتعمل باسورد مؤقت يتغيّر أول دخول. لو ولي الأمر عنده أكتر من ابن، اربط الباقي من تبويب المستخدمين.</p></div>`;
 }
+function invLinkCard(){
+  const c=S.invLink;if(!c)return'';
+  const wa='https://wa.me/?text='+encodeURIComponent(c.msg);
+  return `<div class="card" style="border-color:var(--gold)"><h2>${esc(c.title)}</h2><p dir="ltr" style="word-break:break-all;margin:0 0 8px;font-size:13px">${esc(c.url)}</p>
+  <a target="_blank" rel="noopener" href="${wa}" style="display:block;text-align:center;padding:11px;border-radius:8px;background:#25d366;color:#fff;font-weight:600;text-decoration:none;margin-bottom:8px">إرسال على واتساب</a>
+  <button class="s" data-a="copyInv">نسخ اللينك</button> <button class="s" data-a="dismissInv">تم</button>
+  <p class="empty">اللينك مش هيظهر تاني بعد ما تقفل الكارت. لو ضاع اعمل لينك جديد.</p></div>`;
+}
+function vInv(){
+  const adm=isAdmin(),now=Date.now();
+  const act=(S.inv||[]).filter(i=>!i.revoked&&i.uses<i.max_uses&&new Date(i.expires_at).getTime()>now);
+  const lbl=i=>i.role==='secretary'?'أمين خدمة '+(SEC[i.section]||''):'خادم · '+cname(i.class_id);
+  return invLinkCard()+`<div class="card"><h2>${adm?'دعوة جديدة':'دعوة خدام'}</h2>
+  ${adm?`<select id="ir" data-a="invrole"><option value="secretary">أمين خدمة</option><option value="servant">خادم</option></select>
+  <div id="isec"><select id="is"><option value="">اختار القسم</option><option value="boys">بنين</option><option value="girls">بنات</option></select></div>`:''}
+  <div id="icl" ${adm?'style="display:none"':''}><select id="ic"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
+  <button class="p" data-a="mkInv">عمل لينك الدعوة</button>
+  <p class="empty">${adm?'لينك الأمين لمرة واحدة. ':''}لينك الخدام صالح 7 أيام ولحد 30 خادم، وكل خادم بيسجّل بياناته بنفسه وحسابه بيستنى موافقتك.</p></div>
+  <div class="card"><h2>الدعوات الشغّالة (${act.length})</h2>${act.map(i=>`<div class="row"><div>${esc(lbl(i))}<small>استُخدم ${i.uses} من ${i.max_uses} · ينتهي ${new Date(i.expires_at).toLocaleDateString('ar-EG')}</small></div><button class="s d" data-a="revInv" data-id="${i.id}">إلغاء</button></div>`).join('')||'<div class="empty">مفيش دعوات شغّالة.</div>'}</div>`;
+}
+async function mkInv(){
+  const adm=isAdmin(),role=adm?v('ir'):'servant';
+  const row={role,created_by:S.p.id,expires_at:new Date(Date.now()+7*864e5).toISOString(),max_uses:role==='secretary'?1:30};
+  let title,msg;
+  if(role==='secretary'){if(!v('is'))return toast('اختار القسم');row.section=v('is');title='دعوة أمين خدمة '+SEC[row.section]}
+  else{if(!v('ic'))return toast('اختار الفصل');row.class_id=v('ic');const c=S.classes.find(x=>x.id===row.class_id);row.section=c?c.section:null;title='دعوة خدام · '+(c?c.name:'')}
+  const tok=rnd();row.token_hash=await sha(tok);
+  const r=await sb.from('invites').insert(row);if(!ok(r))return;
+  const url=location.origin+location.pathname+'#join='+tok;
+  msg=role==='secretary'
+    ?`أهلاً 👋\nدعوة للانضمام كأمين خدمة ${SEC[row.section]} في تطبيق خدمة إعدادي.\nافتح اللينك واكتب بياناتك واختار باسورد:\n${url}\nاللينك صالح 7 أيام ولمرة واحدة.`
+    :`أهلاً 👋\nدعوة للانضمام كخادم في ${title.replace('دعوة خدام · ','فصل ')} في تطبيق خدمة إعدادي.\nافتح اللينك واكتب بياناتك واختار باسورد، وبعدها استنى موافقة أمين الخدمة:\n${url}\nاللينك صالح 7 أيام.`;
+  S.invLink={url,title,msg};await load();render();
+}
 function vPeople(){
   const sv=S.profiles.filter(p=>p.role==='servant'),pr=S.profiles.filter(p=>p.role==='parent');
   return credCard()+`<div class="card"><h2>المستخدمين (${S.profiles.length})</h2><p class="empty">الحسابات الجديدة بتتعمل من تبويب "مستخدم جديد". هنا تعمل باسورد مؤقت جديد أو توقّف الحساب${isAdmin()?' أو تغيّر الدور':''}.</p>
-  ${S.profiles.filter(p=>isAdmin()||(p.id!==S.p.id&&(p.role==='servant'||p.role==='parent'))).map(p=>`<div class="row ${p.active?'':'off'}"><div>${esc(p.full_name||'بدون اسم')}${p.role==='secretary'?badge(p.section):''}${p.phone?`<small dir="ltr" style="text-align:right">${esc(p.phone)}</small>`:''}${isSec()?`<small>${esc(ROLES[p.role]||'')}</small>`:''}</div><div class="acts"><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button>${p.id!==S.p.id?`<button class="s" data-a="togUser" data-id="${p.id}">${p.active?'إيقاف':'تفعيل'}</button>`:''}${isAdmin()?`<select data-a="role" data-id="${p.id}" style="margin:0;width:auto">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${p.role===k?' selected':''}>${n}</option>`).join('')}</select>`:''}</div></div>`).join('')}</div>
+  ${S.profiles.filter(p=>isAdmin()||(p.id!==S.p.id&&(p.role==='servant'||p.role==='parent'))).map(p=>`<div class="row ${p.active?'':'off'}"><div>${esc(p.full_name||'بدون اسم')}${p.role==='secretary'?badge(p.section):''}${p.pending&&!p.active?'<span class="bd" style="background:#fde9b8">مستني موافقة</span>':''}${p.phone?`<small dir="ltr" style="text-align:right">${esc(p.phone)}</small>`:''}${isSec()?`<small>${esc(ROLES[p.role]||'')}</small>`:''}</div><div class="acts"><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button>${p.id!==S.p.id?`<button class="s${p.pending&&!p.active?' on':''}" data-a="togUser" data-id="${p.id}">${p.pending&&!p.active?'موافقة':(p.active?'إيقاف':'تفعيل')}</button>`:''}${isAdmin()?`<select data-a="role" data-id="${p.id}" style="margin:0;width:auto">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${p.role===k?' selected':''}>${n}</option>`).join('')}</select>`:''}</div></div>`).join('')}</div>
   <div class="card"><h2>ربط خادم بفصل</h2><select id="ls">${opts(sv,p=>p.full_name||'بدون اسم')}</select><select id="lc">${opts(S.classes,cLabel)}</select><button class="p" data-a="addCS">ربط</button>
   ${S.cs.map(x=>`<div class="row"><div>${esc(pname(x.servant_id))}<small>${esc(cname(x.class_id))}</small></div><button class="s d" data-a="delCS" data-id="${x.class_id}|${x.servant_id}">فك</button></div>`).join('')}</div>
   <div class="card"><h2>ربط ولي أمر بمخدوم</h2><select id="lp">${opts(pr,p=>p.full_name||'بدون اسم')}</select><select id="le">${opts(S.servees,s=>s.full_name)}</select><button class="p" data-a="addPL">ربط</button>
@@ -262,7 +327,7 @@ async function run(a,id){
   else if(a==='addServee'){if(!v('sn'))return toast('اكتب اسم المخدوم');r=await sb.from('servees').insert({full_name:v('sn'),phone:v('sp')||null,birth_date:v('sb')||null,class_id:v('sc')||null,address:v('sa')||null,notes:v('sno')||null})}
   else if(a==='delServee'){if(!confirm('حذف المخدوم نهائيًا مع حضوره ونقاطه؟'))return;r=await sb.from('servees').delete().eq('id',id)}
   else if(a==='togServee'){const s=S.servees.find(x=>x.id===id);r=await sb.from('servees').update({active:!s.active}).eq('id',id)}
-  else if(a==='togUser'){const u=S.profiles.find(x=>x.id===id);if(!u)return;r=await sb.from('profiles').update({active:!u.active}).eq('id',id)}
+  else if(a==='togUser'){const u=S.profiles.find(x=>x.id===id);if(!u)return;r=await sb.from('profiles').update(u.pending&&!u.active?{active:true,pending:false}:{active:!u.active}).eq('id',id)}
   else if(a==='addCS'){if(!v('ls')||!v('lc'))return toast('اختار الخادم والفصل');r=await sb.from('class_servants').insert({servant_id:v('ls'),class_id:v('lc')})}
   else if(a==='delCS'){const[c,s]=id.split('|');r=await sb.from('class_servants').delete().eq('class_id',c).eq('servant_id',s)}
   else if(a==='addPL'){if(!v('lp')||!v('le'))return toast('اختار ولي الأمر والمخدوم');r=await sb.from('parent_links').insert({parent_id:v('lp'),servee_id:v('le')})}
@@ -327,6 +392,12 @@ app.addEventListener('click',async e=>{
   if(a==='dismiss'){S.created=null;return render()}
   if(a==='out'){await sb.auth.signOut();return login()}
   if(a==='tab'){S.tab=id;return render()}
+  if(a==='joinGo')return joinGo();
+  if(a==='joinhome'){history.replaceState(null,'',location.pathname);return boot()}
+  if(a==='mkInv')return mkInv();
+  if(a==='copyInv'){try{await navigator.clipboard.writeText(S.invLink.url);toast('اتنسخ')}catch(_){toast('انسخ اللينك يدويًا')}return}
+  if(a==='dismissInv'){S.invLink=null;return render()}
+  if(a==='revInv'){if(!confirm('إلغاء الدعوة دي؟'))return;const r=await sb.from('invites').update({revoked:true}).eq('id',id);if(!ok(r))return;await load();render();return toast('اتلغت')}
   run(a,id);
 });
 app.addEventListener('change',async e=>{
@@ -336,6 +407,7 @@ app.addEventListener('change',async e=>{
     document.getElementById('usc').style.display=b.value==='secretary'?'':'none';
     document.getElementById('ue').style.display=b.value==='parent'?'':'none';return;
   }
+  if(b.dataset.a==='invrole'){document.getElementById('isec').style.display=b.value==='secretary'?'':'none';document.getElementById('icl').style.display=b.value==='servant'?'':'none';return}
   if(b.dataset.a==='attClass'){S.ac=b.value;return render()}
   if(b.dataset.a==='attDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='filter'){S.f=b.value;return render()}
