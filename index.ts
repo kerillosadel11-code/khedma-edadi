@@ -19,8 +19,8 @@ const json = (b: unknown, s = 200) =>
 
 function normPhone(raw: unknown): string | null {
   let d = String(raw ?? "")
-    .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x660))
-    .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 0x6f0))
+    .replace(/[\u0660-\u0669]/g, (c) => String(c.charCodeAt(0) - 0x660))
+    .replace(/[\u06F0-\u06F9]/g, (c) => String(c.charCodeAt(0) - 0x6f0))
     .replace(/\D/g, "");
   if (d.startsWith("0020")) d = "0" + d.slice(4);
   else if (d.startsWith("20") && d.length === 12) d = "0" + d.slice(2);
