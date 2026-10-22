@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17302b">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>خدمة إعدادي</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&display=swap">
+<style>
+:root{--bg:#f3f5f2;--ink:#17302b;--mut:#5d6f6a;--line:#d5ddd8;--card:#fff;--gold:#d9a441;--red:#a33b2e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 "Noto Kufi Arabic",Tahoma,system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{background:var(--ink);color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+header b{font-size:18px}header span{color:var(--gold);font-size:14px}
+nav{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0}
+nav button{flex:1;border:0;background:none;padding:12px 4px;font:inherit;font-weight:600;color:var(--mut);border-bottom:3px solid transparent}
+nav button.on{color:var(--ink);border-color:var(--gold)}
+main{max-width:720px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.login{max-width:380px;margin:12vh auto 0}
+.login h1{margin:0 0 4px;font-size:26px}.login p{color:var(--mut);margin:0 0 16px}
+h2{font-size:17px;margin:0 0 10px}
+input,select,textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);margin-bottom:8px}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+button.p{width:100%;padding:11px;border:0;border-radius:8px;background:var(--ink);color:#fff;font:inherit;font-weight:600}
+button.s{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 10px;font:inherit;font-size:14px;color:var(--ink)}
+button.d{color:var(--red)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.row small{display:block;color:var(--mut);font-size:13px}
+.acts{display:flex;gap:6px;flex-shrink:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.err{color:var(--red);min-height:1.5em;margin:8px 0 0}
+.off{opacity:.55}
+.empty{color:var(--mut);padding:8px 0}
+#t{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;display:none;z-index:9;max-width:90%}
+</style>
+</head>
+<body>
+<div id="app"></div><div id="t"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+const sb=supabase.createClient('https://radvrgthxxtesjitzkil.supabase.co','sb_publishable_UFK-e5F6zuI2qZ2P5KVjiw_LrE33N_k');
+const S={tab:'classes',f:''},app=document.getElementById('app');
+const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const v=id=>document.getElementById(id).value.trim();
+const ROLES={admin:'أدمن',servant:'خادم',parent:'ولي أمر'};
+function toast(m){const t=document.getElementById('t');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3000)}
+const ok=r=>{if(r.error){toast('حصل خطأ: '+r.error.message);return false}return true};
+const opts=(a,l,sel)=>a.map(x=>`<option value="${x.id}"${x.id===sel?' selected':''}>${esc(l(x))}</option>`).join('');
+
+function login(){
+  app.innerHTML=`<main class="card login"><img src="logo.png" alt="كاتدرائية الشهيد العظيم مار مينا" style="width:100%;height:auto;display:block;margin-bottom:12px"><h1>خدمة إعدادي</h1><p>سجّل دخولك للمتابعة</p>
+  <input id="em" type="email" placeholder="الإيميل" autocomplete="username" dir="ltr">
+  <input id="pw" type="password" placeholder="الباسورد" autocomplete="current-password" dir="ltr">
+  <button class="p" data-a="login">دخول</button><p class="err" id="err"></p></main>`;
+}
+async function boot(){
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user)return login();
+  const {data:p}=await sb.from('profiles').select('*').eq('id',user.id).single();
+  if(!p||!p.active){await sb.auth.signOut();return login()}
+  S.p=p;
+  if(p.role==='admin'){await load();render()}
+  else app.innerHTML=head()+`<main><div class="card"><h2>أهلاً ${esc(p.full_name)}</h2><p>صفحتك كـ${ROLES[p.role]} هتتجهز في الخطوة الجاية.</p></div></main>`;
+}
+const head=()=>`<header><b>خدمة إعدادي</b><span>${esc(S.p.full_name)} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>`;
+async function load(){
+  const r=await Promise.all([sb.from('classes').select('*').order('created_at'),sb.from('servees').select('*').order('full_name'),sb.from('profiles').select('*').order('full_name'),sb.from('class_servants').select('*'),sb.from('parent_links').select('*')]);
+  r.forEach(ok);
+  [S.classes,S.servees,S.profiles,S.cs,S.pl]=r.map(x=>x.data||[]);
+}
+const cname=id=>(S.classes.find(c=>c.id===id)||{}).name||'بدون فصل';
+const pname=id=>(S.profiles.find(c=>c.id===id)||{}).full_name||'؟';
+const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
+
+function render(){
+  const T=[['classes','الفصول'],['servees','المخدومين'],['people','المستخدمين']];
+  app.innerHTML=head()+`<nav>${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}</nav><main>${{classes:vClasses,servees:vServees,people:vPeople}[S.tab]()}</main>`;
+}
+function vClasses(){
+  return `<div class="card"><h2>إضافة فصل</h2><input id="cn" placeholder="اسم الفصل (مثال: أولى إعدادي)"><input id="cs" placeholder="المرحلة (اختياري)"><button class="p" data-a="addClass">إضافة الفصل</button></div>
+  <div class="card"><h2>الفصول (${S.classes.length})</h2>${S.classes.map(c=>`<div class="row"><div>${esc(c.name)}<small>${esc(c.stage||'')} ${S.servees.filter(s=>s.class_id===c.id).length} مخدوم</small></div><div class="acts"><button class="s d" data-a="delClass" data-id="${c.id}">حذف</button></div></div>`).join('')||'<div class="empty">لسه مفيش فصول. أضف أول فصل من فوق.</div>'}</div>`;
+}
+function vServees(){
+  const L=S.servees.filter(s=>!S.f||s.class_id===S.f);
+  return `<div class="card"><h2>إضافة مخدوم</h2><input id="sn" placeholder="الاسم بالكامل"><div class="two"><input id="sp" type="tel" placeholder="التليفون" dir="ltr"><input id="sb" type="date" aria-label="تاريخ الميلاد"></div>
+  <select id="sc"><option value="">اختار الفصل</option>${opts(S.classes,c=>c.name)}</select><input id="sa" placeholder="العنوان (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
+  <div class="card"><h2>المخدومين (${L.length})</h2><select id="ff" data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,c=>c.name,S.f)}</select>
+  ${L.map(s=>`<div class="row ${s.active?'':'off'}"><div>${esc(s.full_name)}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}</small></div><div class="acts"><button class="s" data-a="togServee" data-id="${s.id}">${s.active?'إيقاف':'تفعيل'}</button><button class="s d" data-a="delServee" data-id="${s.id}">حذف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين هنا لسه.</div>'}</div>`;
+}
+function vPeople(){
+  const sv=S.profiles.filter(p=>p.role==='servant'),pr=S.profiles.filter(p=>p.role==='parent');
+  return `<div class="card"><h2>المستخدمين (${S.profiles.length})</h2><p class="empty">الحسابات الجديدة بتتعمل من Authentication في Supabase وبتظهر هنا كولي أمر. غيّر دورها من هنا.</p>
+  ${S.profiles.map(p=>`<div class="row ${p.active?'':'off'}"><div>${esc(p.full_name||'بدون اسم')}</div><div class="acts"><select data-a="role" data-id="${p.id}" style="margin:0;width:auto">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${p.role===k?' selected':''}>${n}</option>`).join('')}</select></div></div>`).join('')}</div>
+  <div class="card"><h2>ربط خادم بفصل</h2><select id="ls">${opts(sv,p=>p.full_name||'بدون اسم')}</select><select id="lc">${opts(S.classes,c=>c.name)}</select><button class="p" data-a="addCS">ربط</button>
+  ${S.cs.map(x=>`<div class="row"><div>${esc(pname(x.servant_id))}<small>${esc(cname(x.class_id))}</small></div><button class="s d" data-a="delCS" data-id="${x.class_id}|${x.servant_id}">فك</button></div>`).join('')}</div>
+  <div class="card"><h2>ربط ولي أمر بمخدوم</h2><select id="lp">${opts(pr,p=>p.full_name||'بدون اسم')}</select><select id="le">${opts(S.servees,s=>s.full_name)}</select><button class="p" data-a="addPL">ربط</button>
+  ${S.pl.map(x=>`<div class="row"><div>${esc(pname(x.parent_id))}<small>${esc(sname(x.servee_id))}</small></div><button class="s d" data-a="delPL" data-id="${x.parent_id}|${x.servee_id}">فك</button></div>`).join('')}</div>`;
+}
+async function run(a,id){
+  let r;
+  if(a==='addClass'){if(!v('cn'))return toast('اكتب اسم الفصل');r=await sb.from('classes').insert({name:v('cn'),stage:v('cs')||null})}
+  else if(a==='delClass'){if(!confirm('حذف الفصل؟ المخدومين اللي فيه هيفضلوا من غير فصل.'))return;r=await sb.from('classes').delete().eq('id',id)}
+  else if(a==='addServee'){if(!v('sn'))return toast('اكتب اسم المخدوم');r=await sb.from('servees').insert({full_name:v('sn'),phone:v('sp')||null,birth_date:v('sb')||null,class_id:v('sc')||null,address:v('sa')||null,notes:v('sno')||null})}
+  else if(a==='delServee'){if(!confirm('حذف المخدوم نهائيًا مع حضوره ونقاطه؟'))return;r=await sb.from('servees').delete().eq('id',id)}
+  else if(a==='togServee'){const s=S.servees.find(x=>x.id===id);r=await sb.from('servees').update({active:!s.active}).eq('id',id)}
+  else if(a==='addCS'){if(!v('ls')||!v('lc'))return toast('اختار الخادم والفصل');r=await sb.from('class_servants').insert({servant_id:v('ls'),class_id:v('lc')})}
+  else if(a==='delCS'){const[c,s]=id.split('|');r=await sb.from('class_servants').delete().eq('class_id',c).eq('servant_id',s)}
+  else if(a==='addPL'){if(!v('lp')||!v('le'))return toast('اختار ولي الأمر والمخدوم');r=await sb.from('parent_links').insert({parent_id:v('lp'),servee_id:v('le')})}
+  else if(a==='delPL'){const[p,s]=id.split('|');r=await sb.from('parent_links').delete().eq('parent_id',p).eq('servee_id',s)}
+  if(r&&!ok(r))return;
+  await load();render();toast('تم');
+}
+app.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-a]');if(!b||b.tagName==='SELECT')return;
+  const a=b.dataset.a,id=b.dataset.id;e.preventDefault();
+  if(a==='login'){
+    const {error}=await sb.auth.signInWithPassword({email:v('em'),password:document.getElementById('pw').value});
+    if(error)return document.getElementById('err').textContent='الإيميل أو الباسورد غلط، جرّب تاني.';
+    return boot();
+  }
+  if(a==='out'){await sb.auth.signOut();return login()}
+  if(a==='tab'){S.tab=id;return render()}
+  run(a,id);
+});
+app.addEventListener('change',async e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;
+  if(b.dataset.a==='filter'){S.f=b.value;return render()}
+  if(b.dataset.a==='role'){
+    if(b.dataset.id===S.p.id&&b.value!=='admin'&&!confirm('هتشيل الأدمن من حسابك. متأكد؟'))return render();
+    if(!ok(await sb.from('profiles').update({role:b.value}).eq('id',b.dataset.id)))return;
+    await load();render();toast('تم');
+  }
+});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+boot();
+</script>
+</body>
+</html>
