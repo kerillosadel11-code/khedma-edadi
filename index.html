@@ -16,6 +16,7 @@ header{background:var(--ink);color:#fff;padding:12px 16px;display:flex;align-ite
 header b{font-size:18px}header span{color:var(--gold);font-size:14px}
 nav{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0}
 nav button{flex:1;border:0;background:none;padding:12px 4px;font:inherit;font-weight:600;color:var(--mut);border-bottom:3px solid transparent}
+nav button{font-size:14px}
 nav button.on{color:var(--ink);border-color:var(--gold)}
 main{max-width:720px;margin:0 auto;padding:16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
@@ -35,12 +36,30 @@ button.d{color:var(--red)}
 .err{color:var(--red);min-height:1.5em;margin:8px 0 0}
 .off{opacity:.55}
 .empty{color:var(--mut);padding:8px 0}
+nav{overflow-x:auto}nav button{flex:1 0 auto;padding:12px 10px;white-space:nowrap}
+.acts{flex-wrap:wrap;justify-content:flex-end}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.av{border-radius:50%;object-fit:cover;background:var(--line);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700}
+.s.on{background:var(--ink);color:#fff;border-color:var(--ink)}.s.on.bad{background:var(--red);border-color:var(--red)}
+.cnt{display:flex;gap:14px;color:var(--mut);font-size:14px;margin:4px 0 8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.idc{background:#fff;border:2px solid var(--ink);border-radius:12px;padding:10px;break-inside:avoid;text-align:center}
+.idh{background:var(--ink);color:#fff;border-radius:6px;font-size:13px;padding:2px 6px;margin-bottom:8px}
+.idb{display:flex;align-items:center;gap:10px;text-align:right}.idb small{display:block;color:var(--mut)}
+.code{display:block;font-weight:700;letter-spacing:1px;direction:ltr;text-align:right}
+.idq img{width:150px;height:150px;image-rendering:pixelated;margin-top:6px}
+#scan{position:fixed;inset:0;background:#000;z-index:20;display:flex;flex-direction:column}
+#scan video{flex:1;min-height:0;width:100%;object-fit:cover}
+#sres{background:#fff;padding:12px;min-height:120px}
+@media print{header,nav,.np,#t{display:none!important}body{background:#fff}.cards{grid-template-columns:repeat(2,1fr)}}
 #t{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;display:none;z-index:9;max-width:90%}
 </style>
 </head>
 <body>
-<div id="app"></div><div id="t"></div>
+<div id="app"></div><div id="t"></div><input type="file" id="pf" accept="image/*" hidden>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 const sb=supabase.createClient('https://radvrgthxxtesjitzkil.supabase.co','sb_publishable_UFK-e5F6zuI2qZ2P5KVjiw_LrE33N_k');
 const S={tab:'classes',f:''},app=document.getElementById('app');
@@ -49,25 +68,81 @@ const v=id=>document.getElementById(id).value.trim();
 const ROLES={admin:'أدمن',servant:'خادم',parent:'ولي أمر'};
 function toast(m){const t=document.getElementById('t');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3000)}
 const ok=r=>{if(r.error){toast('حصل خطأ: '+r.error.message);return false}return true};
+const EMAIL_DOMAIN='khedma.app';
+function normPhone(raw){
+  let d=String(raw||'').replace(/[٠-٩]/g,c=>c.charCodeAt(0)-0x660).replace(/[۰-۹]/g,c=>c.charCodeAt(0)-0x6f0).replace(/\D/g,'');
+  if(d.startsWith('0020'))d='0'+d.slice(4);else if(d.startsWith('20')&&d.length===12)d='0'+d.slice(2);else if(d.length===10&&d[0]==='1')d='0'+d;
+  return /^01[0125]\d{8}$/.test(d)?d:null;
+}
+const toEmail=x=>{if(x.includes('@'))return x;const p=normPhone(x);return p?p+'@'+EMAIL_DOMAIN:null};
+async function fn(body){
+  const {data,error}=await sb.functions.invoke('create-user',{body});
+  if(error){let m=error.message;try{const j=await error.context.json();if(j.error)m=j.error}catch(_){}return{error:m}}
+  return data;
+}
+const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+S.date=today();S.photos={};S.att=[];
+const av=(s,z=44)=>{const u=S.photos[s.id];return u?`<img class="av" src="${u}" alt="" style="width:${z}px;height:${z}px">`:`<span class="av" style="width:${z}px;height:${z}px;font-size:${Math.round(z/2.4)}px">${esc((s.full_name||'؟').trim().charAt(0))}</span>`};
+function qrImg(code){if(!code)return'';const q=qrcode(0,'M');q.addData(code);q.make();return `<img src="${q.createDataURL(4,4)}" alt="QR">`}
+const rpcErr=e=>({NOT_FOUND:'الكود ده مش معروف',FORBIDDEN:'المخدوم ده مش في فصلك',INACTIVE:'المخدوم ده موقوف'}[e.message]||e.message);
+async function loadAtt(){const r=await sb.from('attendance_days').select('servee_id,status').eq('att_date',S.date);if(ok(r))S.att=r.data||[]}
+async function loadPhotos(){
+  const ps=S.servees.filter(x=>x.photo_path);S.photos={};if(!ps.length)return;
+  const {data}=await sb.storage.from('servee-photos').createSignedUrls(ps.map(x=>x.photo_path),3600);
+  (data||[]).forEach(d=>{const x=ps.find(y=>y.photo_path===d.path);if(x&&d.signedUrl)S.photos[x.id]=d.signedUrl});
+}
+const acid=()=>S.classes.some(c=>c.id===S.ac)?S.ac:(S.classes[0]||{}).id;
 const opts=(a,l,sel)=>a.map(x=>`<option value="${x.id}"${x.id===sel?' selected':''}>${esc(l(x))}</option>`).join('');
 
 function login(){
   app.innerHTML=`<main class="card login"><img src="logo.png" alt="كاتدرائية الشهيد العظيم مار مينا" style="width:100%;height:auto;display:block;margin-bottom:12px"><h1>خدمة إعدادي</h1><p>سجّل دخولك للمتابعة</p>
-  <input id="em" type="email" placeholder="الإيميل" autocomplete="username" dir="ltr">
+  <input id="em" type="text" inputmode="tel" placeholder="رقم التليفون" autocomplete="username" dir="ltr">
   <input id="pw" type="password" placeholder="الباسورد" autocomplete="current-password" dir="ltr">
   <button class="p" data-a="login">دخول</button><p class="err" id="err"></p></main>`;
+}
+function pwScreen(){
+  app.innerHTML=`<main class="card login"><h1>غيّر الباسورد</h1><p>ده أول دخول ليك. اختار باسورد جديد تفتكره.</p>
+  <input id="n1" type="password" placeholder="الباسورد الجديد (8 حروف على الأقل)" autocomplete="new-password" dir="ltr">
+  <input id="n2" type="password" placeholder="أكّد الباسورد" autocomplete="new-password" dir="ltr">
+  <button class="p" data-a="setpw">حفظ والدخول</button><p class="err" id="err"></p><a href="#" data-a="out">خروج</a></main>`;
 }
 async function boot(){
   const {data:{user}}=await sb.auth.getUser();
   if(!user)return login();
+  if(user.user_metadata&&user.user_metadata.must_change)return pwScreen();
   const {data:p}=await sb.from('profiles').select('*').eq('id',user.id).single();
   if(!p||!p.active){await sb.auth.signOut();return login()}
   S.p=p;
-  if(p.role==='admin'){await load();render()}
-  else app.innerHTML=head()+`<main><div class="card"><h2>أهلاً ${esc(p.full_name)}</h2><p>صفحتك كـ${ROLES[p.role]} هتتجهز في الخطوة الجاية.</p></div></main>`;
+  if(p.role==='admin'||p.role==='servant'){await load();render()}
+  else{await loadParent();app.innerHTML=head()+vParent()}
+}
+async function loadParent(){
+  const l=await sb.from('parent_links').select('servee_id').eq('parent_id',S.p.id);ok(l);
+  const ids=(l.data||[]).map(x=>x.servee_id);S.hist=[];
+  if(!ids.length){S.servees=[];S.classes=[];S.photos={};return}
+  const r=await Promise.all([sb.from('servees').select('*').in('id',ids).order('full_name'),sb.from('classes').select('*'),sb.from('attendance_days').select('servee_id,att_date,status').in('servee_id',ids).order('att_date',{ascending:false}).limit(500)]);
+  r.forEach(ok);[S.servees,S.classes,S.hist]=r.map(x=>x.data||[]);
+  await loadPhotos();
+}
+const fdate=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
+function vParent(){
+  if(!S.servees.length)return `<main><div class="card"><h2>أهلاً ${esc(S.p.full_name)}</h2><div class="empty">لسه مفيش ابن مربوط بحسابك. كلّم أبونا يربطه.</div></div></main>`;
+  return `<main><h2 style="margin:0 0 10px">أهلاً ${esc(S.p.full_name)}</h2>`+S.servees.map(x=>{
+    const H=S.hist.filter(h=>h.servee_id===x.id),P=H.filter(h=>h.status==='present').length,B=H.length-P,pc=H.length?Math.round(P*100/H.length):0;
+    return `<div class="card"><div class="who">${av(x,64)}<div><b style="font-size:18px">${esc(x.full_name)}</b><small>${esc(cname(x.class_id))}</small></div></div>
+    <div class="cnt" style="margin-top:12px"><span>حاضر ${P}</span><span>غايب ${B}</span>${H.length?`<span>نسبة الحضور ${pc}%</span>`:''}</div>
+    <h2 style="margin-top:8px">آخر الأسابيع</h2>${H.slice(0,12).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':'var(--red)'}">${h.status==='present'?'حاضر':'غايب'}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`}).join('')+`</main>`;
 }
 const head=()=>`<header><b>خدمة إعدادي</b><span>${esc(S.p.full_name)} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>`;
 async function load(){
+  if(S.p.role==='admin')await loadAdmin();
+  else{
+    const r=await Promise.all([sb.from('classes').select('*').order('created_at'),sb.from('servees').select('*').order('full_name'),sb.from('class_servants').select('*')]);
+    r.forEach(ok);[S.classes,S.servees,S.cs]=r.map(x=>x.data||[]);S.profiles=[];S.pl=[];
+  }
+  await Promise.all([loadAtt(),loadPhotos()]);
+}
+async function loadAdmin(){
   const r=await Promise.all([sb.from('classes').select('*').order('created_at'),sb.from('servees').select('*').order('full_name'),sb.from('profiles').select('*').order('full_name'),sb.from('class_servants').select('*'),sb.from('parent_links').select('*')]);
   r.forEach(ok);
   [S.classes,S.servees,S.profiles,S.cs,S.pl]=r.map(x=>x.data||[]);
@@ -77,8 +152,11 @@ const pname=id=>(S.profiles.find(c=>c.id===id)||{}).full_name||'؟';
 const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
 
 function render(){
-  const T=[['classes','الفصول'],['servees','المخدومين'],['people','المستخدمين']];
-  app.innerHTML=head()+`<nav>${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}</nav><main>${{classes:vClasses,servees:vServees,people:vPeople}[S.tab]()}</main>`;
+  const adm=S.p.role==='admin';
+  if(S.cards)return app.innerHTML=head()+vCards();
+  if(!adm)S.tab='att';
+  const T=adm?[['classes','الفصول'],['servees','المخدومين'],['people','المستخدمين'],['add','مستخدم جديد'],['att','التحضير']]:[['att','التحضير']];
+  app.innerHTML=head()+`<nav>${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}</nav><main>${{classes:vClasses,servees:vServees,people:vPeople,add:vAdd,att:vAtt}[S.tab]()}</main>`;
 }
 function vClasses(){
   return `<div class="card"><h2>إضافة فصل</h2><input id="cn" placeholder="اسم الفصل (مثال: أولى إعدادي)"><input id="cs" placeholder="المرحلة (اختياري)"><button class="p" data-a="addClass">إضافة الفصل</button></div>
@@ -88,13 +166,83 @@ function vServees(){
   const L=S.servees.filter(s=>!S.f||s.class_id===S.f);
   return `<div class="card"><h2>إضافة مخدوم</h2><input id="sn" placeholder="الاسم بالكامل"><div class="two"><input id="sp" type="tel" placeholder="التليفون" dir="ltr"><input id="sb" type="date" aria-label="تاريخ الميلاد"></div>
   <select id="sc"><option value="">اختار الفصل</option>${opts(S.classes,c=>c.name)}</select><input id="sa" placeholder="العنوان (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
-  <div class="card"><h2>المخدومين (${L.length})</h2><select id="ff" data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,c=>c.name,S.f)}</select>
-  ${L.map(s=>`<div class="row ${s.active?'':'off'}"><div>${esc(s.full_name)}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}</small></div><div class="acts"><button class="s" data-a="togServee" data-id="${s.id}">${s.active?'إيقاف':'تفعيل'}</button><button class="s d" data-a="delServee" data-id="${s.id}">حذف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين هنا لسه.</div>'}</div>`;
+  <div class="card"><h2>المخدومين (${L.length})</h2><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button><select id="ff" data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,c=>c.name,S.f)}</select>
+  ${L.map(s=>`<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}</small></div></div><div class="acts"><button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button><button class="s" data-a="togServee" data-id="${s.id}">${s.active?'إيقاف':'تفعيل'}</button><button class="s d" data-a="delServee" data-id="${s.id}">حذف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين هنا لسه.</div>'}</div>`;
+}
+function vAtt(){
+  if(!S.classes.length)return '<div class="card"><div class="empty">مفيش فصل مربوط بيك لسه. اطلب من أبونا يربطك بفصل.</div></div>';
+  const cid=acid(),L=S.servees.filter(x=>x.class_id===cid&&x.active),A=Object.fromEntries(S.att.map(a=>[a.servee_id,a.status]));
+  const P=L.filter(x=>A[x.id]==='present').length,B=L.filter(x=>A[x.id]==='absent').length;
+  return `<div class="card"><h2>التحضير</h2>
+  <select data-a="attClass">${opts(S.classes,c=>c.name,cid)}</select><input type="date" data-a="attDate" value="${S.date}" max="${today()}">
+  <button class="p" data-a="scan">مسح كارت QR</button>
+  <div class="cnt"><span>حاضر ${P}</span><span>غايب ${B}</span><span>لسه ${L.length-P-B}</span></div>
+  <button class="s" data-a="restAbs">سجّل الباقي غياب</button></div>
+  <div class="card"><h2>المخدومين (${L.length})</h2>${L.map(x=>`<div class="row"><div class="who">${av(x)}<div>${esc(x.full_name)}</div></div><div class="acts"><button class="s ${A[x.id]==='present'?'on':''}" data-a="mark" data-id="${x.id}|present">حاضر</button><button class="s ${A[x.id]==='absent'?'on bad':''}" data-a="mark" data-id="${x.id}|absent">غايب</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`;
+}
+function vCards(){
+  const L=S.cards.map(id=>S.servees.find(x=>x.id===id)).filter(Boolean);
+  return `<main><div class="np" style="display:flex;gap:8px;margin-bottom:12px"><button class="p" data-a="print">طباعة</button><button class="p" style="background:#fff;color:var(--ink);border:1px solid var(--line)" data-a="back">رجوع</button></div>
+  <div class="cards">${L.map(x=>`<div class="idc"><div class="idh">خدمة إعدادي · مار مينا</div><div class="idb">${av(x,72)}<div><b>${esc(x.full_name)}</b><small>${esc(cname(x.class_id))}</small><span class="code">${esc(x.code||'')}</span></div></div><div class="idq">${qrImg(x.code)}</div></div>`).join('')||'<div class="empty">مفيش كروت.</div>'}</div></main>`;
+}
+let scanStream=null,scanOn=false,busy=false,lastCode='',lastAt=0;
+async function openScan(){
+  const o=document.createElement('div');o.id='scan';
+  o.innerHTML='<video id="sv" playsinline muted></video><canvas id="sc" hidden></canvas><div id="sres"><p class="empty">وجّه الكاميرا على كارت المخدوم.</p><button class="p" id="sx">إغلاق</button></div>';
+  document.body.appendChild(o);document.getElementById('sx').onclick=closeScan;
+  try{scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})}
+  catch(_){closeScan();return toast('مقدرتش أفتح الكاميرا. اسمح بالكاميرا من إعدادات المتصفح.')}
+  const vd=document.getElementById('sv');vd.srcObject=scanStream;await vd.play();scanOn=true;tick();
+}
+async function closeScan(){
+  scanOn=false;if(scanStream)scanStream.getTracks().forEach(t=>t.stop());scanStream=null;
+  const o=document.getElementById('scan');if(o)o.remove();
+  await loadAtt();render();
+}
+function tick(){
+  if(!scanOn)return;
+  const vd=document.getElementById('sv'),cv=document.getElementById('sc');
+  if(vd&&vd.readyState===4&&!busy){
+    const w=480,h=Math.round(w*vd.videoHeight/vd.videoWidth);cv.width=w;cv.height=h;
+    const cx=cv.getContext('2d',{willReadFrequently:true});cx.drawImage(vd,0,0,w,h);
+    const q=jsQR(cx.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'dontInvert'});
+    if(q&&q.data&&(q.data!==lastCode||Date.now()-lastAt>4000)){lastCode=q.data;lastAt=Date.now();onScan(q.data)}
+  }
+  requestAnimationFrame(tick);
+}
+async function onScan(code){
+  busy=true;const res=document.getElementById('sres');
+  const btn='<button class="p" id="sx">إغلاق</button>';
+  const {data,error}=await sb.rpc('kh_checkin',{p_code:code,p_date:S.date});
+  if(error){res.innerHTML=`<p class="err" style="font-weight:700">${esc(rpcErr(error))}</p>${btn}`;navigator.vibrate&&navigator.vibrate([80,60,80])}
+  else{
+    let u='';if(data.photo_path){const g=await sb.storage.from('servee-photos').createSignedUrl(data.photo_path,300);u=g.data?g.data.signedUrl:''}
+    const img=u?`<img class="av" src="${u}" style="width:72px;height:72px">`:`<span class="av" style="width:72px;height:72px;font-size:30px">${esc(data.name.charAt(0))}</span>`;
+    res.innerHTML=`<div class="who">${img}<div><b style="font-size:18px">${esc(data.name)}</b><small>${esc(data.class_name||'')}</small><span style="color:#1b7a43;font-weight:700">${data.already?'متسجّل حاضر قبل كده':'✓ تم تسجيل الحضور'}</span></div></div>${btn}`;
+    navigator.vibrate&&navigator.vibrate(60);
+  }
+  document.getElementById('sx').onclick=closeScan;busy=false;
+}
+function credCard(){
+  const c=S.created;if(!c)return'';
+  const url=location.origin+location.pathname;
+  const msg=`أهلاً ${c.name} 👋\nحسابك في تطبيق خدمة إعدادي جاهز.\nرقم الدخول: ${c.login}\nالباسورد المؤقت: ${c.password}\nالرابط: ${url}\nهتغيّر الباسورد أول مرة تدخل.`;
+  const wa=c.phone?`<a target="_blank" rel="noopener" href="https://wa.me/20${c.phone.slice(1)}?text=${encodeURIComponent(msg)}" style="display:block;text-align:center;padding:11px;border-radius:8px;background:#25d366;color:#fff;font-weight:600;text-decoration:none;margin-bottom:8px">إرسال على واتساب</a>`:'';
+  return `<div class="card" style="border-color:var(--gold)"><h2>${esc(c.name)}</h2>
+  <p style="margin:0 0 8px">رقم الدخول: <b dir="ltr">${esc(c.login)}</b><br>الباسورد المؤقت: <b dir="ltr" style="font-size:20px;letter-spacing:1px">${esc(c.password)}</b></p>
+  ${c.warning?`<p class="err">${esc(c.warning)}</p>`:''}<p class="empty">الباسورد مش هيظهر تاني بعد ما تقفل الكارت، ابعته دلوقتي.</p>${wa}<button class="s" data-a="dismiss">تم</button></div>`;
+}
+function vAdd(){
+  return credCard()+`<div class="card"><h2>إضافة مستخدم</h2><input id="un" placeholder="الاسم بالكامل"><input id="up" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
+  <select id="ur" data-a="newrole">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${k==='servant'?' selected':''}>${n}</option>`).join('')}</select>
+  <div id="uc"><select id="ucl"><option value="">اختار فصل الخادم</option>${opts(S.classes,c=>c.name)}</select></div>
+  <div id="ue" style="display:none"><select id="use"><option value="">اختار المخدوم</option>${opts(S.servees,s=>s.full_name)}</select></div>
+  <button class="p" data-a="addUser">إنشاء الحساب</button><p class="empty">هيتعمل باسورد مؤقت يتغيّر أول دخول. لو ولي الأمر عنده أكتر من ابن، اربط الباقي من تبويب المستخدمين.</p></div>`;
 }
 function vPeople(){
   const sv=S.profiles.filter(p=>p.role==='servant'),pr=S.profiles.filter(p=>p.role==='parent');
-  return `<div class="card"><h2>المستخدمين (${S.profiles.length})</h2><p class="empty">الحسابات الجديدة بتتعمل من Authentication في Supabase وبتظهر هنا كولي أمر. غيّر دورها من هنا.</p>
-  ${S.profiles.map(p=>`<div class="row ${p.active?'':'off'}"><div>${esc(p.full_name||'بدون اسم')}</div><div class="acts"><select data-a="role" data-id="${p.id}" style="margin:0;width:auto">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${p.role===k?' selected':''}>${n}</option>`).join('')}</select></div></div>`).join('')}</div>
+  return credCard()+`<div class="card"><h2>المستخدمين (${S.profiles.length})</h2><p class="empty">الحسابات الجديدة بتتعمل من تبويب "مستخدم جديد". هنا تغيّر الدور أو تعمل باسورد مؤقت جديد.</p>
+  ${S.profiles.map(p=>`<div class="row ${p.active?'':'off'}"><div>${esc(p.full_name||'بدون اسم')}${p.phone?`<small dir="ltr" style="text-align:right">${esc(p.phone)}</small>`:''}</div><div class="acts"><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button><select data-a="role" data-id="${p.id}" style="margin:0;width:auto">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${p.role===k?' selected':''}>${n}</option>`).join('')}</select></div></div>`).join('')}</div>
   <div class="card"><h2>ربط خادم بفصل</h2><select id="ls">${opts(sv,p=>p.full_name||'بدون اسم')}</select><select id="lc">${opts(S.classes,c=>c.name)}</select><button class="p" data-a="addCS">ربط</button>
   ${S.cs.map(x=>`<div class="row"><div>${esc(pname(x.servant_id))}<small>${esc(cname(x.class_id))}</small></div><button class="s d" data-a="delCS" data-id="${x.class_id}|${x.servant_id}">فك</button></div>`).join('')}</div>
   <div class="card"><h2>ربط ولي أمر بمخدوم</h2><select id="lp">${opts(pr,p=>p.full_name||'بدون اسم')}</select><select id="le">${opts(S.servees,s=>s.full_name)}</select><button class="p" data-a="addPL">ربط</button>
@@ -111,6 +259,24 @@ async function run(a,id){
   else if(a==='delCS'){const[c,s]=id.split('|');r=await sb.from('class_servants').delete().eq('class_id',c).eq('servant_id',s)}
   else if(a==='addPL'){if(!v('lp')||!v('le'))return toast('اختار ولي الأمر والمخدوم');r=await sb.from('parent_links').insert({parent_id:v('lp'),servee_id:v('le')})}
   else if(a==='delPL'){const[p,s]=id.split('|');r=await sb.from('parent_links').delete().eq('parent_id',p).eq('servee_id',s)}
+  else if(a==='addUser'){
+    const role=v('ur'),ph=normPhone(v('up'));
+    if(!v('un'))return toast('اكتب الاسم');
+    if(!ph)return toast('رقم التليفون مش صحيح (مثال: 01012345678)');
+    if(role==='servant'&&!v('ucl'))return toast('اختار فصل الخادم');
+    if(role==='parent'&&!v('use'))return toast('اختار المخدوم');
+    const btn=document.querySelector('[data-a=addUser]');btn.disabled=true;
+    const x=await fn({name:v('un'),phone:ph,role,class_id:role==='servant'?v('ucl'):null,servee_id:role==='parent'?v('use'):null});
+    btn.disabled=false;
+    if(x.error)return toast(x.error);
+    S.created=x;
+  }
+  else if(a==='resetPw'){
+    if(!confirm('هيتعمل باسورد مؤقت جديد والباسورد القديم هيبطل. متأكد؟'))return;
+    const x=await fn({action:'reset',user_id:id});
+    if(x.error)return toast(x.error);
+    S.created=x;
+  }
   if(r&&!ok(r))return;
   await load();render();toast('تم');
 }
@@ -118,22 +284,70 @@ app.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b||b.tagName==='SELECT')return;
   const a=b.dataset.a,id=b.dataset.id;e.preventDefault();
   if(a==='login'){
-    const {error}=await sb.auth.signInWithPassword({email:v('em'),password:document.getElementById('pw').value});
-    if(error)return document.getElementById('err').textContent='الإيميل أو الباسورد غلط، جرّب تاني.';
+    const em=toEmail(v('em'));
+    const {error}=em?await sb.auth.signInWithPassword({email:em,password:document.getElementById('pw').value}):{error:1};
+    if(error)return document.getElementById('err').textContent='الرقم أو الباسورد غلط، جرّب تاني.';
     return boot();
   }
+  if(a==='setpw'){
+    const n1=document.getElementById('n1').value,n2=document.getElementById('n2').value,er=document.getElementById('err');
+    if(n1.length<8)return er.textContent='الباسورد لازم يكون 8 حروف على الأقل.';
+    if(n1!==n2)return er.textContent='الباسورد مش متطابق.';
+    const {error}=await sb.auth.updateUser({password:n1,data:{must_change:false}});
+    if(error)return er.textContent='حصل خطأ: '+error.message;
+    return boot();
+  }
+  if(a==='scan')return openScan();
+  if(a==='mark'){
+    const[sid,st]=id.split('|'),cur=(S.att.find(x=>x.servee_id===sid)||{}).status;
+    const {error}=await sb.rpc('kh_mark',{p_servee:sid,p_date:S.date,p_status:cur===st?'clear':st});
+    if(error)return toast(rpcErr(error));
+    await loadAtt();return render();
+  }
+  if(a==='restAbs'){
+    if(!confirm('تسجيل كل اللي لسه ما اتحضروش كغايبين؟'))return;
+    const {data,error}=await sb.rpc('kh_mark_rest',{p_class:acid(),p_date:S.date});
+    if(error)return toast(rpcErr(error));
+    await loadAtt();render();return toast('اتسجّل غياب '+data+' مخدوم');
+  }
+  if(a==='cards'){S.cards=S.servees.filter(x=>x.active&&(!S.f||x.class_id===S.f)).map(x=>x.id);return render()}
+  if(a==='card'){S.cards=[id];return render()}
+  if(a==='back'){S.cards=null;return render()}
+  if(a==='print')return window.print();
+  if(a==='photo'){S.pu=id;return document.getElementById('pf').click()}
+  if(a==='dismiss'){S.created=null;return render()}
   if(a==='out'){await sb.auth.signOut();return login()}
   if(a==='tab'){S.tab=id;return render()}
   run(a,id);
 });
 app.addEventListener('change',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;
+  if(b.dataset.a==='newrole'){
+    document.getElementById('uc').style.display=b.value==='servant'?'':'none';
+    document.getElementById('ue').style.display=b.value==='parent'?'':'none';return;
+  }
+  if(b.dataset.a==='attClass'){S.ac=b.value;return render()}
+  if(b.dataset.a==='attDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='filter'){S.f=b.value;return render()}
   if(b.dataset.a==='role'){
     if(b.dataset.id===S.p.id&&b.value!=='admin'&&!confirm('هتشيل الأدمن من حسابك. متأكد؟'))return render();
     if(!ok(await sb.from('profiles').update({role:b.value}).eq('id',b.dataset.id)))return;
     await load();render();toast('تم');
   }
+});
+document.getElementById('pf').addEventListener('change',async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f||!S.pu)return;
+  toast('بنرفع الصورة...');
+  try{
+    const im=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(f)});
+    const z=400,cv=document.createElement('canvas');cv.width=cv.height=z;const m=Math.min(im.width,im.height);
+    cv.getContext('2d').drawImage(im,(im.width-m)/2,(im.height-m)/2,m,m,0,0,z,z);
+    const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.85)),path=S.pu+'.jpg';
+    let r=await sb.storage.from('servee-photos').upload(path,blob,{upsert:true,contentType:'image/jpeg'});
+    if(!ok(r))return;
+    r=await sb.from('servees').update({photo_path:path}).eq('id',S.pu);if(!ok(r))return;
+    await load();render();toast('تم رفع الصورة');
+  }catch(_){toast('الصورة دي مش مقبولة، جرّب صورة تانية')}
 });
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
 boot();
