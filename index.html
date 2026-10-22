@@ -31,6 +31,7 @@ button.d{color:var(--red)}
 .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-top:1px solid var(--line)}
 .row:first-of-type{border-top:0}
 .row small{display:block;color:var(--mut);font-size:13px}
+.bd{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;background:#eee;color:#555;margin-inline-start:6px;vertical-align:middle}
 .acts{display:flex;gap:6px;flex-shrink:0}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .err{color:var(--red);min-height:1.5em;margin:8px 0 0}
@@ -65,7 +66,12 @@ const sb=supabase.createClient('https://radvrgthxxtesjitzkil.supabase.co','sb_pu
 const S={tab:'classes',f:''},app=document.getElementById('app');
 const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const v=id=>document.getElementById(id).value.trim();
-const ROLES={admin:'أدمن',servant:'خادم',parent:'ولي أمر'};
+const ROLES={admin:'أدمن',secretary:'أمين خدمة',servant:'خادم',parent:'ولي أمر'};
+const SEC={boys:'بنين',girls:'بنات'};
+const isAdmin=()=>S.p&&S.p.role==='admin',isSec=()=>S.p&&S.p.role==='secretary',canManage=()=>isAdmin()||isSec();
+const roleLabel=p=>(ROLES[p.role]||p.role)+((p.role==='secretary'&&p.section)?' '+SEC[p.section]:'');
+const badge=sc=>sc&&SEC[sc]?`<span class="bd">${SEC[sc]}</span>`:'';
+const cLabel=c=>c.name+(isAdmin()&&c.section?' · '+SEC[c.section]:'');
 function toast(m){const t=document.getElementById('t');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3000)}
 const ok=r=>{if(r.error){toast('حصل خطأ: '+r.error.message);return false}return true};
 const EMAIL_DOMAIN='khedma.app';
@@ -113,7 +119,7 @@ async function boot(){
   const {data:p}=await sb.from('profiles').select('*').eq('id',user.id).single();
   if(!p||!p.active){await sb.auth.signOut();return login()}
   S.p=p;
-  if(p.role==='admin'||p.role==='servant'){await load();render()}
+  if(p.role==='admin'||p.role==='secretary'||p.role==='servant'){await load();render()}
   else{await loadParent();app.innerHTML=head()+vParent()}
 }
 async function loadParent(){
@@ -133,9 +139,9 @@ function vParent(){
     <div class="cnt" style="margin-top:12px"><span>حاضر ${P}</span><span>غايب ${B}</span>${H.length?`<span>نسبة الحضور ${pc}%</span>`:''}</div>
     <h2 style="margin-top:8px">آخر الأسابيع</h2>${H.slice(0,12).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':'var(--red)'}">${h.status==='present'?'حاضر':'غايب'}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`}).join('')+`</main>`;
 }
-const head=()=>`<header><b>خدمة إعدادي</b><span>${esc(S.p.full_name)} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>`;
+const head=()=>`<header><b>خدمة إعدادي</b><span>${esc(S.p.full_name)} · ${esc(roleLabel(S.p))} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>`;
 async function load(){
-  if(S.p.role==='admin')await loadAdmin();
+  if(canManage())await loadAdmin();
   else{
     const r=await Promise.all([sb.from('classes').select('*').order('created_at'),sb.from('servees').select('*').order('full_name'),sb.from('class_servants').select('*')]);
     r.forEach(ok);[S.classes,S.servees,S.cs]=r.map(x=>x.data||[]);S.profiles=[];S.pl=[];
@@ -147,34 +153,34 @@ async function loadAdmin(){
   r.forEach(ok);
   [S.classes,S.servees,S.profiles,S.cs,S.pl]=r.map(x=>x.data||[]);
 }
-const cname=id=>(S.classes.find(c=>c.id===id)||{}).name||'بدون فصل';
+const cname=id=>{const c=S.classes.find(c=>c.id===id);return c?cLabel(c):'بدون فصل'};
 const pname=id=>(S.profiles.find(c=>c.id===id)||{}).full_name||'؟';
 const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
 
 function render(){
-  const adm=S.p.role==='admin';
+  const adm=canManage();
   if(S.cards)return app.innerHTML=head()+vCards();
   if(!adm)S.tab='att';
   const T=adm?[['classes','الفصول'],['servees','المخدومين'],['people','المستخدمين'],['add','مستخدم جديد'],['att','التحضير']]:[['att','التحضير']];
   app.innerHTML=head()+`<nav>${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}</nav><main>${{classes:vClasses,servees:vServees,people:vPeople,add:vAdd,att:vAtt}[S.tab]()}</main>`;
 }
 function vClasses(){
-  return `<div class="card"><h2>إضافة فصل</h2><input id="cn" placeholder="اسم الفصل (مثال: أولى إعدادي)"><input id="cs" placeholder="المرحلة (اختياري)"><button class="p" data-a="addClass">إضافة الفصل</button></div>
-  <div class="card"><h2>الفصول (${S.classes.length})</h2>${S.classes.map(c=>`<div class="row"><div>${esc(c.name)}<small>${esc(c.stage||'')} ${S.servees.filter(s=>s.class_id===c.id).length} مخدوم</small></div><div class="acts"><button class="s d" data-a="delClass" data-id="${c.id}">حذف</button></div></div>`).join('')||'<div class="empty">لسه مفيش فصول. أضف أول فصل من فوق.</div>'}</div>`;
+  return `<div class="card"><h2>إضافة فصل</h2><input id="cn" placeholder="اسم الفصل (مثال: أولى إعدادي)"><input id="cs" placeholder="المرحلة (اختياري)">${isSec()?`<select id="csec" disabled><option>${SEC[S.p.section]}</option></select>`:`<select id="csec"><option value="">اختار القسم</option><option value="boys">بنين</option><option value="girls">بنات</option></select>`}<button class="p" data-a="addClass">إضافة الفصل</button></div>
+  <div class="card"><h2>الفصول (${S.classes.length})</h2>${S.classes.map(c=>`<div class="row"><div>${esc(c.name)}${badge(c.section)}<small>${esc(c.stage||'')} ${S.servees.filter(s=>s.class_id===c.id).length} مخدوم</small></div><div class="acts"><button class="s d" data-a="delClass" data-id="${c.id}">حذف</button></div></div>`).join('')||'<div class="empty">لسه مفيش فصول. أضف أول فصل من فوق.</div>'}</div>`;
 }
 function vServees(){
-  const L=S.servees.filter(s=>!S.f||s.class_id===S.f);
+  const L=S.servees.filter(s=>(!S.f||s.class_id===S.f)&&(!S.sf||s.section===S.sf));
   return `<div class="card"><h2>إضافة مخدوم</h2><input id="sn" placeholder="الاسم بالكامل"><div class="two"><input id="sp" type="tel" placeholder="التليفون" dir="ltr"><input id="sb" type="date" aria-label="تاريخ الميلاد"></div>
-  <select id="sc"><option value="">اختار الفصل</option>${opts(S.classes,c=>c.name)}</select><input id="sa" placeholder="العنوان (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
-  <div class="card"><h2>المخدومين (${L.length})</h2><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button><select id="ff" data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,c=>c.name,S.f)}</select>
-  ${L.map(s=>`<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}</small></div></div><div class="acts"><button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button><button class="s" data-a="togServee" data-id="${s.id}">${s.active?'إيقاف':'تفعيل'}</button><button class="s d" data-a="delServee" data-id="${s.id}">حذف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين هنا لسه.</div>'}</div>`;
+  <select id="sc"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><input id="sa" placeholder="العنوان (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
+  <div class="card"><h2>المخدومين (${L.length})</h2><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button>${isAdmin()?`<select id="fs" data-a="sfilter"><option value="">الكل (بنين وبنات)</option><option value="boys"${S.sf==='boys'?' selected':''}>بنين</option><option value="girls"${S.sf==='girls'?' selected':''}>بنات</option></select>`:''}<select id="ff" data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select>
+  ${L.map(s=>`<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}${badge(s.section)}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}</small></div></div><div class="acts"><button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button><button class="s" data-a="togServee" data-id="${s.id}">${s.active?'إيقاف':'تفعيل'}</button><button class="s d" data-a="delServee" data-id="${s.id}">حذف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين هنا لسه.</div>'}</div>`;
 }
 function vAtt(){
   if(!S.classes.length)return '<div class="card"><div class="empty">مفيش فصل مربوط بيك لسه. اطلب من أبونا يربطك بفصل.</div></div>';
   const cid=acid(),L=S.servees.filter(x=>x.class_id===cid&&x.active),A=Object.fromEntries(S.att.map(a=>[a.servee_id,a.status]));
   const P=L.filter(x=>A[x.id]==='present').length,B=L.filter(x=>A[x.id]==='absent').length;
   return `<div class="card"><h2>التحضير</h2>
-  <select data-a="attClass">${opts(S.classes,c=>c.name,cid)}</select><input type="date" data-a="attDate" value="${S.date}" max="${today()}">
+  <select data-a="attClass">${opts(S.classes,cLabel,cid)}</select><input type="date" data-a="attDate" value="${S.date}" max="${today()}">
   <button class="p" data-a="scan">مسح كارت QR</button>
   <div class="cnt"><span>حاضر ${P}</span><span>غايب ${B}</span><span>لسه ${L.length-P-B}</span></div>
   <button class="s" data-a="restAbs">سجّل الباقي غياب</button></div>
@@ -234,27 +240,29 @@ function credCard(){
 }
 function vAdd(){
   return credCard()+`<div class="card"><h2>إضافة مستخدم</h2><input id="un" placeholder="الاسم بالكامل"><input id="up" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
-  <select id="ur" data-a="newrole">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${k==='servant'?' selected':''}>${n}</option>`).join('')}</select>
-  <div id="uc"><select id="ucl"><option value="">اختار فصل الخادم</option>${opts(S.classes,c=>c.name)}</select></div>
+  <select id="ur" data-a="newrole">${Object.entries(ROLES).filter(([k])=>isAdmin()||k==='servant'||k==='parent').map(([k,n])=>`<option value="${k}"${k==='servant'?' selected':''}>${n}</option>`).join('')}</select>
+  <div id="usc" style="display:none"><select id="usec"><option value="">اختار قسم أمين الخدمة</option><option value="boys">بنين</option><option value="girls">بنات</option></select></div>
+  <div id="uc"><select id="ucl"><option value="">اختار فصل الخادم</option>${opts(S.classes,cLabel)}</select></div>
   <div id="ue" style="display:none"><select id="use"><option value="">اختار المخدوم</option>${opts(S.servees,s=>s.full_name)}</select></div>
   <button class="p" data-a="addUser">إنشاء الحساب</button><p class="empty">هيتعمل باسورد مؤقت يتغيّر أول دخول. لو ولي الأمر عنده أكتر من ابن، اربط الباقي من تبويب المستخدمين.</p></div>`;
 }
 function vPeople(){
   const sv=S.profiles.filter(p=>p.role==='servant'),pr=S.profiles.filter(p=>p.role==='parent');
-  return credCard()+`<div class="card"><h2>المستخدمين (${S.profiles.length})</h2><p class="empty">الحسابات الجديدة بتتعمل من تبويب "مستخدم جديد". هنا تغيّر الدور أو تعمل باسورد مؤقت جديد.</p>
-  ${S.profiles.map(p=>`<div class="row ${p.active?'':'off'}"><div>${esc(p.full_name||'بدون اسم')}${p.phone?`<small dir="ltr" style="text-align:right">${esc(p.phone)}</small>`:''}</div><div class="acts"><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button><select data-a="role" data-id="${p.id}" style="margin:0;width:auto">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${p.role===k?' selected':''}>${n}</option>`).join('')}</select></div></div>`).join('')}</div>
-  <div class="card"><h2>ربط خادم بفصل</h2><select id="ls">${opts(sv,p=>p.full_name||'بدون اسم')}</select><select id="lc">${opts(S.classes,c=>c.name)}</select><button class="p" data-a="addCS">ربط</button>
+  return credCard()+`<div class="card"><h2>المستخدمين (${S.profiles.length})</h2><p class="empty">الحسابات الجديدة بتتعمل من تبويب "مستخدم جديد". هنا تعمل باسورد مؤقت جديد أو توقّف الحساب${isAdmin()?' أو تغيّر الدور':''}.</p>
+  ${S.profiles.filter(p=>isAdmin()||(p.id!==S.p.id&&(p.role==='servant'||p.role==='parent'))).map(p=>`<div class="row ${p.active?'':'off'}"><div>${esc(p.full_name||'بدون اسم')}${p.role==='secretary'?badge(p.section):''}${p.phone?`<small dir="ltr" style="text-align:right">${esc(p.phone)}</small>`:''}${isSec()?`<small>${esc(ROLES[p.role]||'')}</small>`:''}</div><div class="acts"><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button>${p.id!==S.p.id?`<button class="s" data-a="togUser" data-id="${p.id}">${p.active?'إيقاف':'تفعيل'}</button>`:''}${isAdmin()?`<select data-a="role" data-id="${p.id}" style="margin:0;width:auto">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${p.role===k?' selected':''}>${n}</option>`).join('')}</select>`:''}</div></div>`).join('')}</div>
+  <div class="card"><h2>ربط خادم بفصل</h2><select id="ls">${opts(sv,p=>p.full_name||'بدون اسم')}</select><select id="lc">${opts(S.classes,cLabel)}</select><button class="p" data-a="addCS">ربط</button>
   ${S.cs.map(x=>`<div class="row"><div>${esc(pname(x.servant_id))}<small>${esc(cname(x.class_id))}</small></div><button class="s d" data-a="delCS" data-id="${x.class_id}|${x.servant_id}">فك</button></div>`).join('')}</div>
   <div class="card"><h2>ربط ولي أمر بمخدوم</h2><select id="lp">${opts(pr,p=>p.full_name||'بدون اسم')}</select><select id="le">${opts(S.servees,s=>s.full_name)}</select><button class="p" data-a="addPL">ربط</button>
   ${S.pl.map(x=>`<div class="row"><div>${esc(pname(x.parent_id))}<small>${esc(sname(x.servee_id))}</small></div><button class="s d" data-a="delPL" data-id="${x.parent_id}|${x.servee_id}">فك</button></div>`).join('')}</div>`;
 }
 async function run(a,id){
   let r;
-  if(a==='addClass'){if(!v('cn'))return toast('اكتب اسم الفصل');r=await sb.from('classes').insert({name:v('cn'),stage:v('cs')||null})}
+  if(a==='addClass'){if(!v('cn'))return toast('اكتب اسم الفصل');if(isAdmin()&&!v('csec'))return toast('اختار قسم الفصل');r=await sb.from('classes').insert({name:v('cn'),stage:v('cs')||null,section:isSec()?S.p.section:v('csec')})}
   else if(a==='delClass'){if(!confirm('حذف الفصل؟ المخدومين اللي فيه هيفضلوا من غير فصل.'))return;r=await sb.from('classes').delete().eq('id',id)}
   else if(a==='addServee'){if(!v('sn'))return toast('اكتب اسم المخدوم');r=await sb.from('servees').insert({full_name:v('sn'),phone:v('sp')||null,birth_date:v('sb')||null,class_id:v('sc')||null,address:v('sa')||null,notes:v('sno')||null})}
   else if(a==='delServee'){if(!confirm('حذف المخدوم نهائيًا مع حضوره ونقاطه؟'))return;r=await sb.from('servees').delete().eq('id',id)}
   else if(a==='togServee'){const s=S.servees.find(x=>x.id===id);r=await sb.from('servees').update({active:!s.active}).eq('id',id)}
+  else if(a==='togUser'){const u=S.profiles.find(x=>x.id===id);if(!u)return;r=await sb.from('profiles').update({active:!u.active}).eq('id',id)}
   else if(a==='addCS'){if(!v('ls')||!v('lc'))return toast('اختار الخادم والفصل');r=await sb.from('class_servants').insert({servant_id:v('ls'),class_id:v('lc')})}
   else if(a==='delCS'){const[c,s]=id.split('|');r=await sb.from('class_servants').delete().eq('class_id',c).eq('servant_id',s)}
   else if(a==='addPL'){if(!v('lp')||!v('le'))return toast('اختار ولي الأمر والمخدوم');r=await sb.from('parent_links').insert({parent_id:v('lp'),servee_id:v('le')})}
@@ -265,8 +273,9 @@ async function run(a,id){
     if(!ph)return toast('رقم التليفون مش صحيح (مثال: 01012345678)');
     if(role==='servant'&&!v('ucl'))return toast('اختار فصل الخادم');
     if(role==='parent'&&!v('use'))return toast('اختار المخدوم');
+    if(role==='secretary'&&!v('usec'))return toast('اختار قسم أمين الخدمة');
     const btn=document.querySelector('[data-a=addUser]');btn.disabled=true;
-    const x=await fn({name:v('un'),phone:ph,role,class_id:role==='servant'?v('ucl'):null,servee_id:role==='parent'?v('use'):null});
+    const x=await fn({name:v('un'),phone:ph,role,class_id:role==='servant'?v('ucl'):null,servee_id:role==='parent'?v('use'):null,section:role==='secretary'?v('usec'):null});
     btn.disabled=false;
     if(x.error)return toast(x.error);
     S.created=x;
@@ -310,7 +319,7 @@ app.addEventListener('click',async e=>{
     if(error)return toast(rpcErr(error));
     await loadAtt();render();return toast('اتسجّل غياب '+data+' مخدوم');
   }
-  if(a==='cards'){S.cards=S.servees.filter(x=>x.active&&(!S.f||x.class_id===S.f)).map(x=>x.id);return render()}
+  if(a==='cards'){S.cards=S.servees.filter(x=>x.active&&(!S.f||x.class_id===S.f)&&(!S.sf||x.section===S.sf)).map(x=>x.id);return render()}
   if(a==='card'){S.cards=[id];return render()}
   if(a==='back'){S.cards=null;return render()}
   if(a==='print')return window.print();
@@ -324,14 +333,18 @@ app.addEventListener('change',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;
   if(b.dataset.a==='newrole'){
     document.getElementById('uc').style.display=b.value==='servant'?'':'none';
+    document.getElementById('usc').style.display=b.value==='secretary'?'':'none';
     document.getElementById('ue').style.display=b.value==='parent'?'':'none';return;
   }
   if(b.dataset.a==='attClass'){S.ac=b.value;return render()}
   if(b.dataset.a==='attDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='filter'){S.f=b.value;return render()}
+  if(b.dataset.a==='sfilter'){S.sf=b.value;S.f='';return render()}
   if(b.dataset.a==='role'){
     if(b.dataset.id===S.p.id&&b.value!=='admin'&&!confirm('هتشيل الأدمن من حسابك. متأكد؟'))return render();
-    if(!ok(await sb.from('profiles').update({role:b.value}).eq('id',b.dataset.id)))return;
+    let upd={role:b.value};
+    if(b.value==='secretary'){const t=(prompt('قسم أمين الخدمة؟ اكتب: بنين أو بنات')||'').trim();const m={'بنين':'boys','بنات':'girls'}[t];if(!m){toast('لازم تحدد القسم (بنين أو بنات)');return render()}upd.section=m}
+    if(!ok(await sb.from('profiles').update(upd).eq('id',b.dataset.id)))return;
     await load();render();toast('تم');
   }
 });
