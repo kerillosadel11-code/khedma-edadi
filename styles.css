@@ -59,3 +59,8 @@ nav.bn button.on i{filter:none;opacity:1}
 body:has(nav.bn){padding-right:var(--sw)}
 @media (max-width:480px){:root{--sw:70px}nav.bn button{font-size:11px;padding:7px 2px}nav.bn button i{font-size:20px}}
 @media print{body:has(nav.bn){padding-right:0}}
+
+.pfl{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.chip{display:inline-block;min-width:54px;text-align:center;font-size:12px;padding:3px 6px;border-radius:8px;border:1px solid var(--line)}
+.chip.ok{background:#e3f4ea;color:#1b7a43;border-color:#b9e2c9}
+.chip.no{background:#f9e3df;color:var(--red);border-color:#efc3bc}
