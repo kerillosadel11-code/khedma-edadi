@@ -175,9 +175,10 @@ window.render=function(){
   const nav=document.querySelector('nav');
   if(nav){
     if(fin)nav.querySelectorAll('button.on').forEach(x=>x.classList.remove('on'));
-    const bt=document.createElement('button');bt.dataset.a='tab';bt.dataset.id='fin';bt.textContent='الحسابات';
+    const bt=document.createElement('button');bt.dataset.a='tab';bt.dataset.id='fin';bt.innerHTML='<i aria-hidden="true">💰</i><span>الحسابات</span>';
     if(fin)bt.className='on';
     nav.appendChild(bt);
+    const on=nav.querySelector('.on');if(on)on.scrollIntoView({inline:'center',block:'nearest'});
   }
   if(fin){
     const m=document.querySelector('main');if(m)m.innerHTML=vFin();
