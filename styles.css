@@ -49,10 +49,13 @@ nav{overflow-x:auto}nav button{flex:1 0 auto;padding:12px 10px;white-space:nowra
 .srvd{padding-bottom:10px}.srvd h3{font-size:14px;margin:12px 0 4px;color:var(--mut)}
 .srvd .cnt a{color:var(--gold,#b8892b);font-weight:700;text-decoration:none}
 
-nav.bn{justify-content:flex-start;overflow-x:auto;overflow-y:hidden;position:fixed;top:auto;bottom:0;left:0;right:0;z-index:8;border-top:1px solid var(--line);border-bottom:0;background:#fff;padding-bottom:env(safe-area-inset-bottom);gap:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-nav.bn::-webkit-scrollbar{display:none}
-nav.bn button{flex:0 0 auto;min-width:72px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:0;padding:6px 12px 8px;font-size:12px;line-height:1.4;white-space:nowrap;text-align:center;border-bottom:0;border-top:3px solid transparent}
-nav.bn button i{font-style:normal;font-size:20px;line-height:1.3;filter:grayscale(.6);opacity:.8}
-nav.bn button.on{border-top-color:var(--gold);color:var(--ink)}
+/* شريط جانبي (على يمين الشاشة) */
+:root{--sw:92px}
+nav.bn{position:fixed;top:0;bottom:0;right:0;left:auto;width:var(--sw);z-index:8;display:flex;flex-direction:column;justify-content:flex-start;gap:2px;overflow-x:hidden;overflow-y:auto;background:#fff;border:0;border-left:1px solid var(--line);padding:6px 0 calc(8px + env(safe-area-inset-bottom));scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+nav.bn button{flex:0 0 auto;width:100%;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:0;padding:8px 4px;font-size:12px;line-height:1.4;white-space:normal;text-align:center;border:0;border-right:3px solid transparent}
+nav.bn button i{font-style:normal;font-size:22px;line-height:1.3;filter:grayscale(.6);opacity:.8}
+nav.bn button.on{border-right-color:var(--gold);background:#faf8f1;color:var(--ink)}
 nav.bn button.on i{filter:none;opacity:1}
-main:has(+nav.bn){padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+body:has(nav.bn){padding-right:var(--sw)}
+@media (max-width:480px){:root{--sw:70px}nav.bn button{font-size:11px;padding:7px 2px}nav.bn button i{font-size:20px}}
+@media print{body:has(nav.bn){padding-right:0}}
