@@ -1,4 +1,4 @@
-const C='khedma-v11';
+const C='khedma-v12';
 self.addEventListener('install',e=>{self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>clients.claim()))});
 self.addEventListener('fetch',e=>{

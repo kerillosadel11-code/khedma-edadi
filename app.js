@@ -136,12 +136,14 @@ const cname=id=>{const c=S.classes.find(c=>c.id===id);return c?cLabel(c):'بدو
 const pname=id=>(S.profiles.find(c=>c.id===id)||{}).full_name||'؟';
 const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
 
+const NAVIC={home:'🏠',classes:'🏫',servees:'🧒',srv:'🤝',people:'👥',add:'➕',inv:'💬',att:'✅',sat:'🙋',prep:'📖',follow:'📞',comp:'🏆',ann:'📢',rep:'📊',audit:'🛡️',notif:'🔔'};
 function render(){
   const adm=canManage();
   if(S.cards)return app.innerHTML=head()+vCards();
   if(!adm&&!['att','prep','sat','follow','comp','notif'].includes(S.tab))S.tab='att';
   const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل']]:[]):[['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['sat','حضوري']];
-  app.innerHTML=head()+`<nav>${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}</nav><main>${{classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn}[S.tab]()}</main>`;
+  app.innerHTML=head()+`<main>${{classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn}[S.tab]()}</main><nav class="bn">${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${n}</span></button>`).join('')}</nav>`;
+  const on=document.querySelector('nav.bn .on');if(on)on.scrollIntoView({inline:'center',block:'nearest'});
 }
 function vClasses(){
   const ec=S.classes.find(c=>c.id===S.edc);
