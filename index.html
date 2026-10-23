@@ -121,11 +121,11 @@ async function joinScreen(t){
   app.innerHTML=joinWrap('<h1>دعوة للانضمام</h1><p>بنتأكد من الدعوة...</p>');
   const x=await fn({action:'peek',token:t},'accept-invite');
   if(x.error)return app.innerHTML=joinWrap(`<h1>الدعوة مش شغّالة</h1><p class="err">${esc(x.error)}</p><a href="#" data-a="joinhome">الدخول للتطبيق</a>`);
-  const who=x.role==='secretary'?'أمين خدمة '+(SEC[x.section]||''):'خادم في فصل '+esc(x.class_name||'');
+  const who=x.role==='secretary'?'أمين خدمة '+(SEC[x.section]||''):x.role==='parent'?'ولي أمر '+esc(x.servee_name||''):'خادم في فصل '+esc(x.class_name||'');
   app.innerHTML=joinWrap(`<h1>أهلاً بيك في خدمة إعدادي</h1><p>دعوة للانضمام كـ <b>${who}</b></p>
   <input id="jn" placeholder="الاسم بالكامل"><input id="jp" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
   <input id="j1" type="password" placeholder="اختار باسورد (8 حروف على الأقل)" autocomplete="new-password" dir="ltr"><input id="j2" type="password" placeholder="أكّد الباسورد" autocomplete="new-password" dir="ltr">
-  <button class="p" data-a="joinGo">انضمام</button><p class="err" id="err"></p>${x.role==='servant'?'<p class="empty">بعد التسجيل، حسابك هيستنى موافقة أمين الخدمة.</p>':''}`);
+  <button class="p" data-a="joinGo">انضمام</button><p class="err" id="err"></p>${x.role==='servant'?'<p class="empty">بعد التسجيل، حسابك هيستنى موافقة أمين الخدمة.</p>':x.role==='parent'?'<p class="empty">بعد التسجيل هتدخل على طول وتتابع حضور ابنك.</p>':''}`);
 }
 async function joinGo(){
   const t=joinTok(),er=document.getElementById('err'),n=v('jn'),ph=normPhone(v('jp')),p1=document.getElementById('j1').value,p2=document.getElementById('j2').value;
@@ -159,6 +159,8 @@ async function loadParent(){
   if(!ids.length){S.servees=[];S.classes=[];S.photos={};return}
   const r=await Promise.all([sb.from('servees').select('*').in('id',ids).order('full_name'),sb.from('classes').select('*'),sb.from('attendance_days').select('servee_id,att_date,status').in('servee_id',ids).order('att_date',{ascending:false}).limit(500)]);
   r.forEach(ok);[S.servees,S.classes,S.hist]=r.map(x=>x.data||[]);
+  const pt=await sb.from('servee_points').select('servee_id,total_points').in('servee_id',ids);
+  S.pts=pt.error?{}:Object.fromEntries((pt.data||[]).map(x=>[x.servee_id,x.total_points]));
   await loadPhotos();
 }
 const fdate=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
@@ -167,7 +169,7 @@ function vParent(){
   return `<main><h2 style="margin:0 0 10px">أهلاً ${esc(S.p.full_name)}</h2>`+S.servees.map(x=>{
     const H=S.hist.filter(h=>h.servee_id===x.id),P=H.filter(h=>h.status==='present').length,B=H.length-P,pc=H.length?Math.round(P*100/H.length):0;
     return `<div class="card"><div class="who">${av(x,64)}<div><b style="font-size:18px">${esc(x.full_name)}</b><small>${esc(cname(x.class_id))}</small></div></div>
-    <div class="cnt" style="margin-top:12px"><span>حاضر ${P}</span><span>غايب ${B}</span>${H.length?`<span>نسبة الحضور ${pc}%</span>`:''}</div>
+    <div class="cnt" style="margin-top:12px"><span>حاضر ${P}</span><span>غايب ${B}</span>${H.length?`<span>نسبة الحضور ${pc}%</span>`:''}${(S.pts||{})[x.id]>0?`<span>النقاط ${S.pts[x.id]}</span>`:''}</div>
     <h2 style="margin-top:8px">آخر الأسابيع</h2>${H.slice(0,12).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':'var(--red)'}">${h.status==='present'?'حاضر':'غايب'}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`}).join('')+`</main>`;
 }
 const head=()=>`<header><b>خدمة إعدادي</b><span>${esc(S.p.full_name)} · ${esc(roleLabel(S.p))} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>`;
@@ -213,7 +215,7 @@ function svFiltered(){
   return S.servees.filter(s=>(!S.f||s.class_id===S.f)&&(!S.sf||s.section===S.sf)&&(S.st==='all'||(S.st==='arch'?!s.active:s.active))&&(!q||nz(s.full_name).includes(q)||(s.phone||'').includes(S.q.trim())||nz(s.code).includes(q)));
 }
 function svRow(s){
-  return `<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}${badge(s.section)}${s.active?'':'<span class="bd" style="background:#f3d6d2">مؤرشف</span>'}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}${!s.active&&s.archive_reason?' · '+esc(s.archive_reason):''}</small></div></div><div class="acts"><button class="s" data-a="editServee" data-id="${s.id}">تعديل</button><button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button>${s.active?`<button class="s" data-a="archServee" data-id="${s.id}">أرشفة</button>`:`<button class="s on" data-a="restServee" data-id="${s.id}">استرجاع</button>`}${isAdmin()?`<button class="s d" data-a="delServee" data-id="${s.id}">حذف</button>`:''}</div></div>`;
+  return `<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}${badge(s.section)}${s.active?'':'<span class="bd" style="background:#f3d6d2">مؤرشف</span>'}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}${!s.active&&s.archive_reason?' · '+esc(s.archive_reason):''}</small></div></div><div class="acts"><button class="s" data-a="editServee" data-id="${s.id}">تعديل</button>${canManage()&&s.active?`<button class="s" data-a="parInv" data-id="${s.id}">دعوة ولي أمر</button>`:''}<button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button>${s.active?`<button class="s" data-a="archServee" data-id="${s.id}">أرشفة</button>`:`<button class="s on" data-a="restServee" data-id="${s.id}">استرجاع</button>`}${isAdmin()?`<button class="s d" data-a="delServee" data-id="${s.id}">حذف</button>`:''}</div></div>`;
 }
 function svList(){
   const L=svFiltered();
@@ -442,7 +444,7 @@ function invLinkCard(){
 function vInv(){
   const adm=isAdmin(),now=Date.now();
   const act=(S.inv||[]).filter(i=>!i.revoked&&i.uses<i.max_uses&&new Date(i.expires_at).getTime()>now);
-  const lbl=i=>i.role==='secretary'?'أمين خدمة '+(SEC[i.section]||''):'خادم · '+cname(i.class_id);
+  const lbl=i=>i.role==='secretary'?'أمين خدمة '+(SEC[i.section]||''):i.role==='parent'?'ولي أمر · '+sname(i.servee_id):'خادم · '+cname(i.class_id);
   return invLinkCard()+`<div class="card"><h2>${adm?'دعوة جديدة':'دعوة خدام'}</h2>
   ${adm?`<select id="ir" data-a="invrole"><option value="secretary">أمين خدمة</option><option value="servant">خادم</option></select>
   <div id="isec"><select id="is"><option value="">اختار القسم</option><option value="boys">بنين</option><option value="girls">بنات</option></select></div>`:''}
@@ -450,6 +452,15 @@ function vInv(){
   <button class="p" data-a="mkInv">عمل لينك الدعوة</button>
   <p class="empty">${adm?'لينك الأمين لمرة واحدة. ':''}لينك الخدام صالح 7 أيام ولحد 30 خادم، وكل خادم بيسجّل بياناته بنفسه وحسابه بيستنى موافقتك.</p></div>
   <div class="card"><h2>الدعوات الشغّالة (${act.length})</h2>${act.map(i=>`<div class="row"><div>${esc(lbl(i))}<small>استُخدم ${i.uses} من ${i.max_uses} · ينتهي ${new Date(i.expires_at).toLocaleDateString('ar-EG')}</small></div><button class="s d" data-a="revInv" data-id="${i.id}">إلغاء</button></div>`).join('')||'<div class="empty">مفيش دعوات شغّالة.</div>'}</div>`;
+}
+async function mkParInv(id){
+  const x=S.servees.find(y=>y.id===id);if(!x||!canManage())return;
+  const row={role:'parent',servee_id:id,section:x.section||null,created_by:S.p.id,expires_at:new Date(Date.now()+7*864e5).toISOString(),max_uses:3};
+  const tok=rnd();row.token_hash=await sha(tok);
+  const r=await sb.from('invites').insert(row);if(!ok(r))return;
+  const url=location.origin+location.pathname+'#join='+tok;
+  S.invLink={url,title:'دعوة ولي أمر · '+x.full_name,msg:`أهلاً 👋\nدعوة لحساب ولي أمر ${x.full_name} في تطبيق خدمة إعدادي، علشان تتابع حضوره.\nافتح اللينك واكتب بياناتك واختار باسورد:\n${url}\nاللينك صالح 7 أيام ويكفي لـ 3 أشخاص (أب وأم مثلاً).`};
+  S.tab='inv';await load();render();window.scrollTo(0,0);
 }
 async function mkInv(){
   const adm=isAdmin(),role=adm?v('ir'):'servant';
@@ -553,6 +564,7 @@ app.addEventListener('click',async e=>{
   if(a==='joinGo')return joinGo();
   if(a==='joinhome'){history.replaceState(null,'',location.pathname);return boot()}
   if(a==='mkInv')return mkInv();
+  if(a==='parInv')return mkParInv(id);
   if(a==='copyInv'){try{await navigator.clipboard.writeText(S.invLink.url);toast('اتنسخ')}catch(_){toast('انسخ اللينك يدويًا')}return}
   if(a==='dismissInv'){S.invLink=null;return render()}
   if(a==='revInv'){if(!confirm('إلغاء الدعوة دي؟'))return;const r=await sb.from('invites').update({revoked:true}).eq('id',id);if(!ok(r))return;await load();render();return toast('اتلغت')}

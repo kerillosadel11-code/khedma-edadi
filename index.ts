@@ -41,7 +41,14 @@ async function loadInvite(admin: any, token: unknown) {
     throw new HttpError(BAD);
   }
   let className: string | null = null;
+  let serveeName: string | null = null;
   let section: string | null = inv.section ?? null;
+  if (inv.role === "parent") {
+    const { data: s } = await admin.from("servees").select("full_name,section,active").eq("id", inv.servee_id).maybeSingle();
+    if (!s || !s.active) throw new HttpError(BAD);
+    serveeName = s.full_name;
+    section = s.section ?? section;
+  }
   if (inv.role === "servant") {
     const { data: c } = await admin.from("classes").select("name,section").eq("id", inv.class_id).maybeSingle();
     if (!c) throw new HttpError(BAD);
@@ -55,7 +62,10 @@ async function loadInvite(admin: any, token: unknown) {
   if (inv.role === "servant" && !(by.role === "admin" || (by.role === "secretary" && by.section === section))) {
     throw new HttpError(BAD);
   }
-  return { inv, className, section };
+  if (inv.role === "parent" && !(by.role === "admin" || (by.role === "secretary" && by.section === section))) {
+    throw new HttpError(BAD);
+  }
+  return { inv, className, section, serveeName };
 }
 
 Deno.serve(async (req) => {
@@ -72,10 +82,10 @@ Deno.serve(async (req) => {
     let body: any;
     try { body = await req.json(); } catch { throw new HttpError("بيانات غير صحيحة"); }
 
-    const { inv, className, section } = await loadInvite(admin, body?.token);
+    const { inv, className, section, serveeName } = await loadInvite(admin, body?.token);
 
     if (body?.action === "peek") {
-      return json({ role: inv.role, section, class_name: className });
+      return json({ role: inv.role, section, class_name: className, servee_name: serveeName });
     }
     if (body?.action !== "accept") throw new HttpError("طلب غير صحيح");
 
@@ -116,15 +126,20 @@ Deno.serve(async (req) => {
     const uid = cu.user.id;
 
     try {
-      const isSec = inv.role === "secretary";
-      // الأمين: شغّال على طول. الخادم: في انتظار موافقة أمين الخدمة
+      // الأمين وولي الأمر: شغّالين على طول (اللي عمل الدعوة هو الضامن). الخادم: في انتظار موافقة أمين الخدمة
+      const isServant = inv.role === "servant";
+      const auto = !isServant;
       const { error: pe } = await admin.from("profiles").upsert(
-        { id: uid, full_name: name, phone, role: inv.role, section, active: isSec, pending: !isSec },
+        { id: uid, full_name: name, phone, role: inv.role, section, active: auto, pending: !auto },
         { onConflict: "id" },
       );
       if (pe) throw pe;
-      if (!isSec) {
+      if (isServant) {
         const { error } = await admin.from("class_servants").insert({ servant_id: uid, class_id: inv.class_id });
+        if (error) throw error;
+      }
+      if (inv.role === "parent") {
+        const { error } = await admin.from("parent_links").insert({ parent_id: uid, servee_id: inv.servee_id });
         if (error) throw error;
       }
     } catch (e) {
@@ -134,7 +149,7 @@ Deno.serve(async (req) => {
       throw new HttpError("حصل خطأ أثناء إعداد الحساب ومافيش حاجة اتحفظت. جرّب تاني");
     }
 
-    return json({ ok: true, role: inv.role, login: phone, pending: inv.role !== "secretary" });
+    return json({ ok: true, role: inv.role, login: phone, pending: inv.role === "servant" });
   } catch (e) {
     if (e instanceof HttpError) return json({ error: e.msg }, e.status);
     console.error(e);
