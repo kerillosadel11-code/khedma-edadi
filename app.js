@@ -621,7 +621,7 @@ function fuForm(x){
 }
 /* ===== تنبيه الغياب المتتالي · فصلي · ملف المخدوم · اتصال وواتساب سريع ===== */
 const ABS_TH=3,LK='text-decoration:none;display:inline-block';
-S.mates={};S.pf=null;S.pfPar=null;
+S.mates={};S.cpar={};S.pf=null;S.pfPar=null;
 const waUrl=(ph,msg)=>{const p=normPhone(ph||'');return p?'https://wa.me/20'+p.slice(1)+(msg?'?text='+encodeURIComponent(msg):''):''};
 const fst=n=>String(n||'').trim().split(/\s+/)[0];
 const MSG={
@@ -659,8 +659,8 @@ function absCard(L,max,showAll){
 /* زمايل الخادم في الفصل (دالة سيرفر عشان الخادم ما يقرأش جدول المستخدمين) */
 async function loadMates(cid){
   cid=cid||acid();if(!cid)return;
-  const r=await sb.rpc('kh_class_servants',{p_class:cid});
-  S.mates[cid]=r.error?[]:(r.data||[]);
+  const [r,q]=await Promise.all([sb.rpc('kh_class_servants',{p_class:cid}),sb.rpc('kh_class_parents',{p_class:cid})]);
+  S.mates[cid]=r.error?[]:(r.data||[]);S.cpar[cid]=q.error?null:(q.data||[]);
 }
 /* ---------- شاشة «فصلي» ---------- */
 function vMyClass(){
@@ -673,13 +673,18 @@ function vMyClass(){
     bd=L.filter(x=>x.birth_date).map(x=>({x,...nextBday(x.birth_date)})).filter(o=>o.days<=14).sort((a,b)=>a.days-b.days),
     mates=(S.mates[cid]||[]).filter(m=>m.id!==S.p.id),
     lbl=o=>o.days===0?'النهارده':o.days===1?'بكرة':'بعد '+o.days+' يوم';
+  const par=S.cpar[cid],byP=new Map();
+  (par||[]).forEach(r=>{let g=byP.get(r.parent_id);if(!g){g={name:r.name,phone:r.contact_phone||r.phone,kids:[]};byP.set(r.parent_id,g)}const k=L.find(x=>x.id===r.servee_id);if(k)g.kids.push(k.full_name)});
+  const linked=new Set((par||[]).map(r=>r.servee_id)),noPar=L.filter(x=>!linked.has(x.id));
+  const parCard=`<div class="card"><h2>أولياء الأمور${par?' ('+byP.size+')':''}</h2>${par===null?'<div class="empty">تعذّر تحميل أولياء الأمور.</div>':[...byP.values()].map(g=>`<div class="row"><div>${esc(g.name||'بدون اسم')}<small>ولي أمر: ${g.kids.map(esc).join('، ')}</small><small dir="ltr" style="text-align:right">${esc(g.phone||'')}</small></div><div class="acts">${qc(g.phone,'')}</div></div>`).join('')||'<div class="empty">لسه مفيش ولي أمر مربوط بحساب. اطلب من أمين الخدمة يبعتله دعوة.</div>'}${par&&noPar.length?`<p class="empty" style="margin:8px 0 0;padding:0">من غير ولي أمر مربوط (${noPar.length}): ${noPar.map(x=>esc(x.full_name)).join('، ')}</p>`:''}</div>`;
   return `<div class="card"><h2>فصلي</h2>${S.classes.length>1?`<select data-a="attClass">${opts(S.classes,cLabel,cid)}</select>`:`<b>${esc(cLabel(c))}</b>`}
   <div class="cnt"><span>مخدومين ${L.length}</span>${avg!==null?`<span>متوسط الحضور ${avg}%</span>`:''}<span>${fdate(S.date)}: حاضر ${P} · غايب ${B}</span></div>
   <button class="p" data-a="tab" data-id="att">تسجيل الحضور</button></div>
+  ${parCard}
+  <div class="card"><h2>مخدومين الفصل (${L.length})</h2>${R.map(({x,st})=>`<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small${st.streak>=ABS_TH?' style="color:var(--red)"':''}>${st.pct===null?'لسه مفيش حضور':'حضور '+st.pct+'%'}${st.streak>=1?' · غايب '+st.streak+' ورا بعض':''}</small></div></div><div class="acts">${qc(x.phone,st.streak>=1?MSG.abs(x):'')}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>
   ${absCard(absList(cid),10,false)}
   ${bd.length?`<div class="card"><h2>أعياد ميلاد قريبة (${bd.length})</h2>${bd.map(o=>`<div class="row"><div class="who">${av(o.x,36)}<div>${esc(o.x.full_name)}<small>${lbl(o)}</small></div></div><div class="acts">${qc(o.x.phone,MSG.bd(o.x))}</div></div>`).join('')}</div>`:''}
-  <div class="card"><h2>زمايلي في الفصل (${mates.length})</h2>${mates.map(m=>`<div class="row"><div>${esc(m.name||'بدون اسم')}<small dir="ltr" style="text-align:right">${esc(m.contact_phone||m.phone||'')}</small></div><div class="acts">${qc(m.contact_phone||m.phone,'')}</div></div>`).join('')||'<div class="empty">إنت الخادم الوحيد المربوط بالفصل ده.</div>'}</div>
-  <div class="card"><h2>مخدومين الفصل (${L.length})</h2>${R.map(({x,st})=>`<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small${st.streak>=ABS_TH?' style="color:var(--red)"':''}>${st.pct===null?'لسه مفيش حضور':'حضور '+st.pct+'%'}${st.streak>=1?' · غايب '+st.streak+' ورا بعض':''}</small></div></div><div class="acts">${qc(x.phone,st.streak>=1?MSG.abs(x):'')}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`;
+  <div class="card"><h2>زمايلي في الفصل (${mates.length})</h2>${mates.map(m=>`<div class="row"><div>${esc(m.name||'بدون اسم')}<small dir="ltr" style="text-align:right">${esc(m.contact_phone||m.phone||'')}</small></div><div class="acts">${qc(m.contact_phone||m.phone,'')}</div></div>`).join('')||'<div class="empty">إنت الخادم الوحيد المربوط بالفصل ده.</div>'}</div>`;
 }
 /* ---------- ملف المخدوم ---------- */
 async function openProfile(id){
