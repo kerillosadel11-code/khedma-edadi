@@ -1,4 +1,4 @@
-const C='khedma-v22';
+const C='khedma-v23';
 self.addEventListener('install',e=>{self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>clients.claim()))});
 self.addEventListener('fetch',e=>{
@@ -8,7 +8,7 @@ self.addEventListener('fetch',e=>{
 });
 self.addEventListener('push',e=>{
   let d={};try{d=e.data?e.data.json():{}}catch(_){}
-  e.waitUntil(self.registration.showNotification(d.title||'خدمة إعدادي',{body:d.body||'',icon:'icon-192.png',badge:'icon-192.png',dir:'rtl',lang:'ar'}));
+  e.waitUntil(Promise.all([self.registration.showNotification(d.title||'خدمة إعدادي',{body:d.body||'',icon:'icon-192.png',badge:'icon-192.png',dir:'rtl',lang:'ar'}),self.clients.matchAll({type:'window',includeUncontrolled:true}).then(l=>l.forEach(c=>c.postMessage({type:'push',title:d.title||'',body:d.body||''})))]));
 });
 self.addEventListener('notificationclick',e=>{
   e.notification.close();

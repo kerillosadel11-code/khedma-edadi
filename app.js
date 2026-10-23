@@ -111,7 +111,7 @@ function vParent(){
     <h2 style="margin-top:8px">آخر الأسابيع</h2>${H.slice(0,12).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':'var(--red)'}">${h.status==='present'?'حاضر':'غايب'}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`}).join('')+`</main>`;
 }
 const unread=()=>(S.nt||[]).filter(n=>!n.is_read).length;
-const head=()=>`<header><b>خدمة إعدادي</b><span><a href="#" data-a="bell" style="color:#fff;text-decoration:none" aria-label="الإشعارات">🔔${unread()?` <b style="background:var(--red);border-radius:10px;padding:0 6px;font-size:12px">${unread()}</b>`:''}</a> · ${esc(S.p.full_name)} · ${esc(roleLabel(S.p))} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>${secBar()}`;
+const head=()=>`<header><b>خدمة إعدادي</b><span><a href="#" data-a="bell" style="color:#fff;text-decoration:none" aria-label="الإشعارات">🔔${unread()?` <b style="background:var(--red);border-radius:10px;padding:0 6px;font-size:12px">${unread()}</b>`:''}</a> · <a href="#" data-a="diag" aria-label="فحص الإشعارات" style="color:#fff;text-decoration:none">🩺<i id="pdot" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;background:${S.pushSt==='on'?'#3ecf8e':S.pushSt?'#ff6b5e':'#999'}"></i></a> · ${esc(S.p.full_name)} · ${esc(roleLabel(S.p))} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>${secBar()}`;
 async function load(){
   if(canManage())await loadAdmin();
   else{
@@ -220,7 +220,7 @@ function srvRow(p){
   if(!open)return `<div class="srv">${head}</div>`;
   const st=srvStats(p.id),np=S.lp.filter(x=>x.created_by===p.id).length,free=S.classes.filter(c=>!cl.some(x=>x.id===c.id));
   const det=`<div class="srvd">
-  <div class="cnt">${p.phone?`<span dir="ltr">${esc(p.phone)}</span>`:'<span>مفيش رقم تليفون</span>'}${ph?`<a href="tel:${ph}">اتصال</a><a href="https://wa.me/2${ph}" target="_blank" rel="noopener">واتساب</a>`:''}</div>
+  <div class="cnt">${p.phone?`<span dir="ltr">${esc(p.phone)}</span>`:'<span>مفيش رقم تليفون</span>'}${ph?`<a href="tel:${ph}">اتصال</a><a href="https://wa.me/2${ph}" target="_blank" rel="noopener">واتساب</a>`:''}${nb({u:p.id},p.full_name||'')}</div>
   ${(p.contact_phone||p.birth_date||p.address||p.notes)?`<div class="cnt" style="flex-direction:column;gap:2px">${p.contact_phone?`<span>رقم التواصل: <span dir="ltr">${esc(p.contact_phone)}</span></span>`:''}${p.birth_date?`<span>الميلاد: ${esc(p.birth_date)}</span>`:''}${p.address?`<span>العنوان: ${esc(p.address)}</span>`:''}${p.notes?`<span>ملاحظات: ${esc(p.notes)}</span>`:''}</div>`:''}
   <h3>الفصول المربوط بيها (${cl.length})</h3>
   ${cl.map(c=>`<div class="row"><div>${esc(cLabel(c))}<small>${esc(c.stage||'')} ${S.servees.filter(s=>s.class_id===c.id&&s.active).length} مخدوم · ${S.cs.filter(x=>x.class_id===c.id).length} خادم في الفصل</small></div><button class="s d" data-a="delCS" data-id="${c.id}|${p.id}">فك</button></div>`).join('')||'<div class="empty">لسه مش مربوط بأي فصل.</div>'}
@@ -355,7 +355,7 @@ function vFollow(){
   let form='';
   if(S.fuf){const x=S.servees.find(y=>y.id===S.fuf);if(x)form=fuForm(x)}
   const rows=L.map(({x,st})=>{const ph=normPhone(x.phone||''),lf=lastFu(x.id);
-    const wa=ph?`<a class="s" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="https://wa.me/20${ph.slice(1)}?text=${encodeURIComponent('أهلاً يا '+x.full_name.split(' ')[0]+'، افتقدناك في الاجتماع. ربنا يباركك ويحفظك. خدمة إعدادي')}">واتساب</a>`:'';
+    const wa=ph?`<a class="s" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="https://wa.me/20${ph.slice(1)}?text=${encodeURIComponent('أهلاً يا '+x.full_name.split(' ')[0]+'، افتقدناك في الاجتماع. ربنا يباركك ويحفظك. خدمة إعدادي')}">واتساب</a>`:''+nb({s:x.id,m:MSGP.abs(x)},'أولياء أمور '+x.full_name);
     const tel=ph?`<a class="s" style="text-decoration:none;display:inline-block" href="tel:${ph}">اتصال</a>`:'';
     return `<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))} · غايب ${st.streak} اجتماع ورا بعض${st.last?' · آخر حضور '+fdate(st.last):' · مفيش حضور في الفترة'}</small>${lf?`<small>آخر افتقاد: ${FK[lf.kind]||''} ${fdate(lf.followup_date)} (${FS[lf.status]||''})</small>`:'<small>لسه ما اتفتقدش</small>'}</div></div><div class="acts">${tel}${wa}<button class="s on" data-a="fuOpen" data-id="${x.id}">تسجيل</button></div></div>`}).join('');
   const recent=fu.filter(f=>S.servees.some(x=>x.id===f.servee_id)).slice(0,30);
@@ -419,15 +419,150 @@ async function askPush(){
   if(!o){o=document.createElement('div');o.id='pushAsk';o.style.cssText='position:fixed;inset:0;background:rgba(23,48,43,.96);z-index:20;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto';document.body.appendChild(o)}
   const st=S.pushSt,adm=S.p&&S.p.role==='admin';
   const msg=st==='denied'?'الإشعارات مقفولة للموقع ده. افتح إعدادات الموقع (أيقونة القفل 🔒 جنب الرابط) واختار الإشعارات ثم «السماح»، وبعدين اضغط الزرار تحت.':st==='unsupported'?'المتصفح ده مبيدعمش الإشعارات. على الآيفون: اضغط مشاركة ثم «إضافة إلى الشاشة الرئيسية» وافتح التطبيق من الأيقونة. أو افتح الموقع من Chrome.':'تفعيل الإشعارات شرط لاستخدام التطبيق، عشان توصلك تنبيهات الخدمة والتذكير الأسبوعي. اضغط الزرار وبعدين «السماح».';
-  o.innerHTML='<div class="card" style="max-width:360px;text-align:center;margin:0"><div style="font-size:44px">🔔</div><h2>فعّل الإشعارات</h2><p style="margin:6px 0 14px">'+msg+'</p><button class="p" id="pushGo" style="width:100%">'+(st==='off'?'تفعيل الإشعارات':'فعّلتها، تحقّق تاني')+'</button>'+(adm?'<button class="s" id="pushLater" style="width:100%;margin-top:8px">لاحقاً</button>':'')+'<button class="s" id="pushOut" style="width:100%;margin-top:8px">تسجيل خروج</button></div>';
+  o.innerHTML='<div class="card" style="max-width:360px;text-align:center;margin:0"><div style="font-size:44px">🔔</div><h2>فعّل الإشعارات</h2><p style="margin:6px 0 14px">'+msg+'</p><button class="p" id="pushGo" style="width:100%">'+(st==='off'?'تفعيل الإشعارات':'فعّلتها، تحقّق تاني')+'</button>'+(adm?'<button class="s" id="pushLater" style="width:100%;margin-top:8px">لاحقاً</button>':'')+'<button class="s" id="pushDiag" style="width:100%;margin-top:8px">🩺 افحص المشكلة</button><button class="s" id="pushOut" style="width:100%;margin-top:8px">تسجيل خروج</button></div>';
   document.getElementById('pushGo').onclick=async()=>{if(S.pushSt==='off')await pushEnable();await askPush();if(S.pushSt==='on'&&S.p)paint()};
   const l=document.getElementById('pushLater');if(l)l.onclick=()=>o.remove();
+  document.getElementById('pushDiag').onclick=diagOpen;
   document.getElementById('pushOut').onclick=async()=>{o.remove();await sb.auth.signOut();location.reload()};
+}
+/* ===== فحص وتتبع الإشعارات: متاح لكل مستخدم من 🩺 في الهيدر ===== */
+const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+const dgT=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});
+const dgHost=u=>{try{const h=new URL(u).host;return /fcm|googleapis/.test(h)?'Chrome / أندرويد (Google)':/apple/.test(h)?'سفاري / آيفون (Apple)':/mozilla/.test(h)?'فايرفوكس':/windows|notify/.test(h)?'Edge / ويندوز':h}catch(_){return '؟'}};
+const sameKey=(a,b)=>{if(!a||!b||a.byteLength!==b.byteLength)return false;const x=new Uint8Array(a),y=new Uint8Array(b);for(let i=0;i<x.length;i++)if(x[i]!==y[i])return false;return true};
+const dgRpcErr=e=>{const m=e.message||'';return m==='TOO_SOON'?'استنى 15 ثانية بين كل تجربة والتانية':m==='TOO_MANY'?'بعت كتير في آخر دقيقة، استنى شوية':m==='FORBIDDEN'?'مش مسموح لك تبعت للشخص ده':m==='NOT_FOUND'?'الحساب مش موجود أو موقوف':m==='EMPTY'?'اكتب نص الإشعار':(e.code==='PGRST202'||e.code==='42883'||/Could not find the function|does not exist/i.test(m))?'الدالة مش موجودة على السيرفر: الأدمن يشغّل ملف 17_notifications_tracking.sql':m};
+S.dg=null;
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{const d=S.dg;if(e.data&&e.data.type==='push'&&d&&d.test){d.test.got=true;diagPaint()}});
+async function dgChecks(){
+  const out=[],add=(ok,t,d,fix)=>out.push({ok,t,d:d||'',fix:fix||''});
+  let sub=null,reg=null;
+  add(!!window.isSecureContext,'اتصال آمن (HTTPS)',window.isSecureContext?'':'الصفحة مش على https','افتح التطبيق من الرابط الرسمي (https).');
+  if(isIOS())add(isStandalone(),'التطبيق متثبّت على الشاشة الرئيسية (آيفون)',isStandalone()?'':'مفتوح من سفاري مش من الأيقونة','الآيفون مبيدعمش الإشعارات إلا للتطبيق المتثبّت: في سفاري اضغط مشاركة ثم «إضافة إلى الشاشة الرئيسية»، افتح التطبيق من الأيقونة وفعّل الإشعارات. محتاج iOS 16.4 أو أحدث.');
+  const sup=pushOK();
+  add(sup,'المتصفح بيدعم الإشعارات',sup?'':'مفيش دعم للـ Push في المتصفح ده','استخدم Chrome أو Edge أو Firefox حديث. على الآيفون اتبع الخطوة اللي فوق.');
+  if(!sup)return{out};
+  try{reg=await navigator.serviceWorker.getRegistration()}catch(_){}
+  const swOk=!!(reg&&reg.active);
+  add(swOk,'خدمة التطبيق (Service Worker) شغالة',swOk?'الحالة: '+reg.active.state:'مش مسجّلة أو مش مفعّلة','اقفل التطبيق وافتحه تاني. لو فضل كده امسح بيانات الموقع من إعدادات المتصفح وادخل من جديد.');
+  const perm=Notification.permission;
+  add(perm==='granted'?true:perm==='default'?null:false,'إذن الإشعارات',perm==='granted'?'مسموح':perm==='default'?'لسه ما اتحددش':'مرفوض من المتصفح',perm==='default'?'اضغط «تفعيل / إصلاح الاشتراك» تحت وبعدين «السماح».':'اضغط القفل 🔒 جنب الرابط ← إعدادات الموقع ← الإشعارات ← «سماح». على الموبايل: إعدادات الجهاز ← الإشعارات ← المتصفح أو التطبيق ← تفعيل. وبعدها اضغط «إعادة الفحص».');
+  if(swOk){try{sub=await reg.pushManager.getSubscription()}catch(_){}}
+  add(!!sub,'الجهاز مشترك في الإشعارات',sub?dgHost(sub.endpoint):'مفيش اشتراك على الجهاز ده','اضغط «تفعيل / إصلاح الاشتراك» تحت.');
+  if(sub){
+    let km=null;try{const k=sub.options&&sub.options.applicationServerKey;km=k?sameKey(k,b64u(VAPID_PUBLIC)):null}catch(_){}
+    add(km,'مفتاح الاشتراك مطابق لمفتاح التطبيق',km===null?'المتصفح مش بيكشف المفتاح (مش مشكلة)':km?'':'الاشتراك اتعمل بمفتاح قديم',km===false?'اضغط «تفعيل / إصلاح الاشتراك» عشان يتعمل اشتراك جديد.':'');
+    const q=await sb.from('push_subscriptions').select('id').eq('endpoint',sub.endpoint).limit(1),has=!q.error&&!!(q.data&&q.data.length);
+    add(has,'الاشتراك متسجّل على السيرفر',q.error?q.error.message:(has?'':'الجهاز مشترك بس مش متسجّل في قاعدة البيانات'),q.error?'الأدمن يشغّل ملف 15_push_subscriptions_fix.sql.':'اضغط «تفعيل / إصلاح الاشتراك».');
+  }
+  const n=await sb.from('notifications').select('id',{count:'exact',head:true}).eq('user_id',S.p.id);
+  add(!n.error,'قراءة الإشعارات من التطبيق',n.error?n.error.message:'','الأدمن يراجع صلاحيات جدول notifications (ملف 12).');
+  return{out};
+}
+async function pushRepair(){
+  if(!pushOK())return toast('المتصفح ده مبيدعمش الإشعارات');
+  try{const reg=await navigator.serviceWorker.ready,old=await reg.pushManager.getSubscription();
+    if(old){await sb.from('push_subscriptions').delete().eq('endpoint',old.endpoint);await old.unsubscribe()}}catch(_){}
+  await pushEnable();S.pushSt=await pushState();
+  if(S.pushSt==='on'){const po=document.getElementById('pushAsk');if(po)po.remove()}
+}
+function diagOpen(){
+  let o=document.getElementById('diag');
+  if(!o){o=document.createElement('div');o.id='diag';o.style.cssText='position:fixed;inset:0;background:rgba(23,48,43,.96);z-index:30;overflow:auto;padding:14px';document.body.appendChild(o);o.addEventListener('click',diagClick)}
+  S.dg={checks:null,log:null,nlog:null,test:null};diagPaint();diagRun();
+}
+async function diagRun(){
+  const d=S.dg;if(!d)return;
+  const adm=isAdmin();
+  const [c,lg,nl]=await Promise.all([dgChecks(),sb.from('push_log').select('*').order('id',{ascending:false}).limit(10),adm?sb.from('notify_log').select('*').order('id',{ascending:false}).limit(10):null]);
+  if(S.dg!==d)return;
+  d.checks=c.out;d.log=lg.error?{err:lg.error.message}:{rows:lg.data||[]};d.nlog=nl?(nl.error?{err:nl.error.message}:{rows:nl.data||[]}):null;
+  S.pushSt=await pushState();const dot=document.getElementById('pdot');if(dot)dot.style.background=S.pushSt==='on'?'#3ecf8e':'#ff6b5e';
+  diagPaint();
+}
+function dgSteps(t){
+  const L=[];
+  L.push(t.saved===null?'⏳ بنحفظ الإشعار...':t.saved?'✅ اتحفظ في قاعدة البيانات':'❌ '+t.err);
+  if(t.saved){
+    if(t.log){L.push(t.log.sent>0?`✅ السيرفر بعت لـ ${t.log.sent} من ${t.log.subs} جهاز`:'❌ السيرفر استلم بس مبعتش: '+(t.log.error||'سبب غير معروف'))}
+    else L.push(t.done?'❌ السيرفر ما سجّلش أي محاولة خلال 15 ثانية: الـ Database Webhook مش متوصّل بالدالة send-push، أو الدالة مش منشورة. الأدمن يراجع خطوات التشغيل تحت.':'⏳ مستنيين السيرفر...');
+    if(t.log&&t.log.sent>0)L.push(t.got?'✅ وصل للجهاز ده':t.done?'❌ السيرفر بعت بس الجهاز ماعرضش الإشعار: راجع إعدادات الإشعارات للمتصفح/التطبيق، وضع عدم الإزعاج، وتوفير الطاقة.':'⏳ مستنيين الجهاز...');
+  }
+  const ok=t.done&&t.saved&&t.log&&t.log.sent>0&&t.got;
+  return L.map(x=>`<p style="margin:6px 0">${esc(x)}</p>`).join('')+(t.done?`<p style="margin:8px 0 0;font-weight:700;color:${ok?'#1b7a43':'var(--red)'}">${ok?'الإشعارات شغالة من أول لآخر ✓':'فيه حاجة مش شغالة، شوف الخطوة اللي فيها ❌.'}</p>`:'');
+}
+function diagPaint(){
+  const o=document.getElementById('diag'),d=S.dg;if(!o||!d)return;
+  const ic=ok=>ok===true?'✅':ok===false?'❌':'⚠️',adm=isAdmin(),pn=id=>{const p=(S.profiles||[]).find(q=>q.id===id);return p?p.full_name:String(id||'').slice(0,6)};
+  const bad=d.checks?d.checks.filter(c=>c.ok===false).length:0,W='max-width:560px;margin:0 auto 12px';
+  let h=`<div class="card" style="${W}"><h2>🩺 فحص الإشعارات</h2>`;
+  h+=d.checks?`<p style="margin:0 0 8px;font-weight:700;color:${bad?'var(--red)':'#1b7a43'}">${bad?bad+(bad===1?' مشكلة':' مشاكل')+' على الجهاز ده':'الجهاز ده سليم ✓'}</p>`:'<p class="empty">جاري الفحص...</p>';
+  h+=(d.checks||[]).map(c=>`<div class="row" style="align-items:flex-start"><div style="flex:1"><b>${ic(c.ok)} ${esc(c.t)}</b>${c.d?`<small>${esc(c.d)}</small>`:''}${c.ok!==true&&c.fix?`<small style="color:var(--red);white-space:pre-wrap">الحل: ${esc(c.fix)}</small>`:''}</div></div>`).join('');
+  h+='<div class="acts" style="justify-content:flex-start;margin-top:10px"><button class="p" data-dg="fix">تفعيل / إصلاح الاشتراك على الجهاز ده</button><button class="s" data-dg="run">إعادة الفحص</button></div></div>';
+  const t=d.test;
+  h+=`<div class="card" style="${W}"><h2>اختبار كامل (من السيرفر للجهاز)</h2><p class="empty" style="margin:0 0 8px;padding:0">بيبعتلك إشعار حقيقي عن طريق السيرفر ويتتبّعه خطوة خطوة.</p><button class="p" data-dg="test"${t&&!t.done?' disabled':''}>إرسال إشعار تجريبي</button>${t?dgSteps(t):''}</div>`;
+  const rowsOf=L=>!L?'<div class="empty">جاري التحميل...</div>':L.err?`<div class="empty">تعذّر القراءة: ${esc(L.err)} (الأدمن يشغّل 17_notifications_tracking.sql)</div>`:'';
+  const lg=d.log;
+  h+=`<div class="card" style="${W}"><h2>آخر محاولات الإرسال${adm?' (كل الحسابات)':' ليك'}</h2>${rowsOf(lg)||(lg.rows.map(r=>`<div class="row" style="align-items:flex-start"><div>${r.error?'❌':r.sent>0?'✅':'⚠️'} ${dgT(r.created_at)}${adm?' · '+esc(pn(r.user_id)):''}<small>اتبعت لـ ${r.sent} من ${r.subs} جهاز${r.failed?' · فشل '+r.failed:''}</small>${r.error?`<small style="color:var(--red)">${esc(r.error)}</small>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش محاولات إرسال متسجّلة.</div>')}</div>`;
+  if(adm){
+    const nl=d.nlog;
+    h+=`<div class="card" style="${W}"><h2>الإشعارات اليدوية (🔔 جنب الواتساب)</h2>${rowsOf(nl)||(nl.rows.map(r=>`<div class="row"><div>${dgT(r.created_at)} · ${esc(pn(r.sender_id))} ← ${esc(pn(r.target_id))}<small>${esc(r.title||'')} · أجهزة المستلم: ${r.subs}</small></div></div>`).join('')||'<div class="empty">لسه ما اتبعتش إشعار يدوي.</div>')}</div>`;
+    h+=`<div class="card" style="${W}"><details><summary><b>خطوات تشغيل نظام الإشعارات (للأدمن)</b></summary><ol style="line-height:1.9;margin:8px 0 0;padding-right:20px"><li>شغّل ملفات SQL: 12 و15 و17 في SQL Editor.</li><li>Edge Functions ← Secrets: ضيف <span dir="ltr">VAPID_PUBLIC_KEY</span> و<span dir="ltr">VAPID_PRIVATE_KEY</span> و<span dir="ltr">VAPID_SUBJECT</span> و<span dir="ltr">PUSH_SECRET</span>. المفتاح العام لازم يطابق <span dir="ltr">VAPID_PUBLIC</span> في app.js.</li><li>انشر الدالة <span dir="ltr">send-push</span> (Verify JWT = OFF).</li><li>Database ← Webhooks ← جديد: جدول <span dir="ltr">notifications</span>، حدث Insert، نوع Supabase Edge Function، الدالة <span dir="ltr">send-push</span>، وهيدر <span dir="ltr">x-push-secret</span> بنفس قيمة PUSH_SECRET.</li><li>كل مستخدم يفتح 🩺 ويضغط «تفعيل» ثم «إرسال إشعار تجريبي».</li></ol><p class="empty" style="margin:8px 0 0;padding:0">التفاصيل والحلول في ملف NOTIFICATIONS.md.</p></details></div>`;
+  }
+  h+=`<div style="${W}"><button class="p" data-dg="close" style="width:100%">إغلاق</button></div>`;
+  o.innerHTML=h;
+}
+async function dgTest(){
+  const d=S.dg;if(!d)return;
+  const t=d.test={saved:null,log:null,got:false,done:false,err:'',id:''};diagPaint();
+  const r=await sb.rpc('kh_notify_test');
+  if(r.error){t.saved=false;t.err=dgRpcErr(r.error);t.done=true;return diagPaint()}
+  t.saved=true;t.id=String(r.data);diagPaint();
+  for(let i=0;i<15&&S.dg===d;i++){
+    await new Promise(z=>setTimeout(z,1000));
+    const q=await sb.from('push_log').select('*').eq('notification_id',t.id).order('id',{ascending:false}).limit(1);
+    if(q.data&&q.data[0])t.log=q.data[0];
+    if(t.log&&(t.log.sent===0||t.got))break;
+    diagPaint();
+  }
+  t.done=true;if(S.dg===d){diagPaint();diagRun()}
+}
+async function diagClick(e){
+  const b=e.target.closest('[data-dg]');if(!b)return;const a=b.dataset.dg;
+  if(a==='close'){const o=document.getElementById('diag');if(o)o.remove();S.dg=null;return}
+  if(a==='run')return diagRun();
+  if(a==='fix'){b.disabled=true;await pushRepair();return diagRun()}
+  if(a==='test')return dgTest();
+}
+/* ===== زرار «🔔 إشعار» جنب الواتساب: بيبعت إشعار في التطبيق + على الموبايل ===== */
+function nb(who,name,msg,label){
+  if(!who)return'';
+  const m=who.m!==undefined?who.m:(msg||'');
+  return `<button class="s" data-a="nt" ${who.u?'data-u="'+esc(who.u)+'"':'data-s="'+esc(who.s)+'"'} data-n="${esc(name||'')}" data-m="${esc(m)}">${label||'🔔 إشعار'}</button>`;
+}
+function ntOpen(b){
+  const old=document.getElementById('ntm');if(old)old.remove();
+  const u=b.dataset.u,s=b.dataset.s,o=document.createElement('div');o.id='ntm';
+  o.style.cssText='position:fixed;inset:0;background:rgba(23,48,43,.85);z-index:25;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  o.innerHTML=`<div class="card" style="max-width:400px;width:100%;margin:0"><h2>🔔 إشعار: ${esc(b.dataset.n||'')}</h2><p class="empty" style="margin:0 0 8px;padding:0">${s?'هيوصل لأولياء أمور المخدوم المربوطين بحساب (المخدوم نفسه ملوش حساب).':'هيوصل جوه التطبيق وعلى الموبايل لو مفعّل الإشعارات.'}</p><textarea id="ntb" rows="5" placeholder="اكتب الرسالة">${esc(b.dataset.m||'')}</textarea><button class="p" id="nts" style="width:100%">إرسال الإشعار</button><button class="s" id="ntx" style="width:100%;margin-top:8px">إلغاء</button><p class="err" id="nte"></p></div>`;
+  document.body.appendChild(o);
+  document.getElementById('ntx').onclick=()=>o.remove();
+  document.getElementById('nts').onclick=async()=>{
+    const body=document.getElementById('ntb').value.trim(),er=document.getElementById('nte'),btn=document.getElementById('nts');
+    if(!body)return er.textContent='اكتب نص الإشعار.';
+    btn.disabled=true;er.textContent='';
+    const title='رسالة من '+(S.p.full_name||'الخدمة');
+    const r=u?await sb.rpc('kh_notify',{p_user:u,p_title:title,p_body:body}):await sb.rpc('kh_notify_parents',{p_servee:s,p_title:title,p_body:body});
+    btn.disabled=false;
+    if(r.error)return er.textContent=dgRpcErr(r.error);
+    const x=r.data||{};o.remove();
+    toast(x.users===0?'مفيش ولي أمر مربوط بحساب للمخدوم ده. ابعت له واتساب.':x.subs===0?'اتبعت جوه التطبيق، بس مفيش جهاز مفعّل إشعارات عنده.':'اتبعت لـ '+x.subs+' جهاز ✓');
+  };
 }
 async function loadNotifs(){const r=await sb.from('notifications').select('*').eq('user_id',S.p.id).order('created_at',{ascending:false}).limit(50);S.nt=r.error?[]:(r.data||[])}
 function vNotif(){
   const L=S.nt||[],n=unread(),dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});
-  return pushCard()+`<div class="card"><button class="s" data-a="outAll">تسجيل الخروج من كل الأجهزة</button></div><div class="card"><h2>الإشعارات${n?' ('+n+' جديد)':''}</h2>${n?'<button class="s" data-a="readAll" style="margin-bottom:8px">تحديد الكل كمقروء</button>':''}${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div>${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}</div>`).join('')||'<div class="empty">مفيش إشعارات.</div>'}</div>`;
+  return pushCard()+`<div class="card"><button class="s" data-a="diag">🩺 فحص الإشعارات واختبارها</button> <button class="s" data-a="outAll">تسجيل الخروج من كل الأجهزة</button></div><div class="card"><h2>الإشعارات${n?' ('+n+' جديد)':''}</h2>${n?'<button class="s" data-a="readAll" style="margin-bottom:8px">تحديد الكل كمقروء</button>':''}${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div>${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}</div>`).join('')||'<div class="empty">مفيش إشعارات.</div>'}</div>`;
 }
 async function loadAnn(){const r=await sb.from('announcements').select('*').order('created_at',{ascending:false}).limit(30);S.an=r.error?[]:(r.data||[]).filter(a=>!secOn()||a.scope==='all'||a.section===S.sec||(a.class_id&&S.classes.some(c=>c.id===a.class_id)));if(r.error)toast('تعذّر تحميل الإعلانات: '+r.error.message)}
 function vAnn(){
@@ -635,9 +770,9 @@ const MSGP={
   rem:x=>'أهلاً بحضرتك، بنفكّركم باجتماع الخدمة الجاي ونتمنى نشوف '+fst(x.full_name)+'. ربنا يبارككم'
 };
 /* اتصال + واتساب (برسالة جاهزة لو اتحددت) */
-function qc(ph,msg){
-  const p=normPhone(ph||'');if(!p)return'';
-  return `<a class="s" style="${LK}" href="tel:${p}">اتصال</a><a class="s" target="_blank" rel="noopener" style="${LK}" href="${waUrl(p,msg)}">واتساب</a>`;
+function qc(ph,msg,who,name){
+  const p=normPhone(ph||''),n=nb(who,name,msg);if(!p)return n;
+  return `<a class="s" style="${LK}" href="tel:${p}">اتصال</a><a class="s" target="_blank" rel="noopener" style="${LK}" href="${waUrl(p,msg)}">واتساب</a>`+n;
 }
 /* أزرار الرسائل الجاهزة: غياب / تهنئة / تذكير */
 function tpl(ph,M,x){
@@ -653,7 +788,7 @@ function absCard(L,max,showAll){
   if(S.ah===null)return'';
   const fu=S.fu||[],open=id=>fu.find(f=>f.servee_id===id&&f.status==='open');
   const rows=L.slice(0,max).map(({x,st})=>{const o=open(x.id);
-    return `<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))} · غايب ${st.streak} اجتماعات ورا بعض${st.last?' · آخر حضور '+fdate(st.last):''}</small><small>${o?'<span class="bd" style="background:#fde9b8;margin:0">بند افتقاد مفتوح</span>':'لسه ما اتفتقدش'}</small></div></div><div class="acts">${qc(x.phone,MSG.abs(x))}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`}).join('');
+    return `<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))} · غايب ${st.streak} اجتماعات ورا بعض${st.last?' · آخر حضور '+fdate(st.last):''}</small><small>${o?'<span class="bd" style="background:#fde9b8;margin:0">بند افتقاد مفتوح</span>':'لسه ما اتفتقدش'}</small></div></div><div class="acts">${qc(x.phone,MSG.abs(x),{s:x.id,m:MSGP.abs(x)},'أولياء أمور '+x.full_name)}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`}).join('');
   return `<div class="card" style="border-color:${L.length?'var(--red)':'var(--line)'}"><h2>⚠️ محتاجين افتقاد (${L.length})</h2><p class="empty" style="margin:0 0 4px;padding:0">غابوا ${ABS_TH} اجتماعات ورا بعض أو أكتر. بيتفتح لهم بند افتقاد وبيوصل إشعار للخادم أوتوماتيك.</p>${rows||'<div class="empty">مفيش حد غايب '+ABS_TH+' اجتماعات ورا بعض. ✓</div>'}${showAll&&L.length>max?`<button class="s" data-a="tab" data-id="follow" style="width:100%;margin-top:8px">عرض الكل (${L.length})</button>`:''}</div>`;
 }
 /* زمايل الخادم في الفصل (دالة سيرفر عشان الخادم ما يقرأش جدول المستخدمين) */
@@ -674,16 +809,16 @@ function myPage(which){
     mates=(S.mates[cid]||[]).filter(m=>m.id!==S.p.id),
     lbl=o=>o.days===0?'النهارده':o.days===1?'بكرة':'بعد '+o.days+' يوم';
   const par=S.cpar[cid],byP=new Map();
-  (par||[]).forEach(r=>{let g=byP.get(r.parent_id);if(!g){g={name:r.name,phone:r.contact_phone||r.phone,kids:[]};byP.set(r.parent_id,g)}const k=L.find(x=>x.id===r.servee_id);if(k)g.kids.push(k.full_name)});
+  (par||[]).forEach(r=>{let g=byP.get(r.parent_id);if(!g){g={id:r.parent_id,name:r.name,phone:r.contact_phone||r.phone,kids:[]};byP.set(r.parent_id,g)}const k=L.find(x=>x.id===r.servee_id);if(k)g.kids.push(k.full_name)});
   const linked=new Set((par||[]).map(r=>r.servee_id)),noPar=L.filter(x=>!linked.has(x.id));
-  const parCard=`<div class="card"><h2>أولياء الأمور${par?' ('+byP.size+')':''}</h2>${par===null?'<div class="empty">تعذّر تحميل أولياء الأمور.</div>':[...byP.values()].map(g=>`<div class="row"><div>${esc(g.name||'بدون اسم')}<small>ولي أمر: ${g.kids.map(esc).join('، ')}</small><small dir="ltr" style="text-align:right">${esc(g.phone||'')}</small></div><div class="acts">${qc(g.phone,'')}</div></div>`).join('')||'<div class="empty">لسه مفيش ولي أمر مربوط بحساب. اطلب من أمين الخدمة يبعتله دعوة.</div>'}${par&&noPar.length?`<p class="empty" style="margin:8px 0 0;padding:0">من غير ولي أمر مربوط (${noPar.length}): ${noPar.map(x=>esc(x.full_name)).join('، ')}</p>`:''}</div>`;
+  const parCard=`<div class="card"><h2>أولياء الأمور${par?' ('+byP.size+')':''}</h2>${par===null?'<div class="empty">تعذّر تحميل أولياء الأمور.</div>':[...byP.values()].map(g=>`<div class="row"><div>${esc(g.name||'بدون اسم')}<small>ولي أمر: ${g.kids.map(esc).join('، ')}</small><small dir="ltr" style="text-align:right">${esc(g.phone||'')}</small></div><div class="acts">${qc(g.phone,'',{u:g.id},g.name)}</div></div>`).join('')||'<div class="empty">لسه مفيش ولي أمر مربوط بحساب. اطلب من أمين الخدمة يبعتله دعوة.</div>'}${par&&noPar.length?`<p class="empty" style="margin:8px 0 0;padding:0">من غير ولي أمر مربوط (${noPar.length}): ${noPar.map(x=>esc(x.full_name)).join('، ')}</p>`:''}</div>`;
   const sum=`<div class="card"><h2>فصلي</h2>${S.classes.length>1?`<select data-a="attClass">${opts(S.classes,cLabel,cid)}</select>`:`<b>${esc(cLabel(c))}</b>`}
   <div class="cnt"><span>مخدومين ${L.length}</span>${avg!==null?`<span>متوسط الحضور ${avg}%</span>`:''}<span>${fdate(S.date)}: حاضر ${P} · غايب ${B}</span></div>
   <button class="p" data-a="tab" data-id="att">تسجيل الحضور</button></div>`,sev=`
-  <div class="card"><h2>مخدومين الفصل (${L.length})</h2>${R.map(({x,st})=>`<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small${st.streak>=ABS_TH?' style="color:var(--red)"':''}>${st.pct===null?'لسه مفيش حضور':'حضور '+st.pct+'%'}${st.streak>=1?' · غايب '+st.streak+' ورا بعض':''}</small></div></div><div class="acts">${qc(x.phone,st.streak>=1?MSG.abs(x):'')}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`,rest=`
+  <div class="card"><h2>مخدومين الفصل (${L.length})</h2>${R.map(({x,st})=>`<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small${st.streak>=ABS_TH?' style="color:var(--red)"':''}>${st.pct===null?'لسه مفيش حضور':'حضور '+st.pct+'%'}${st.streak>=1?' · غايب '+st.streak+' ورا بعض':''}</small></div></div><div class="acts">${qc(x.phone,st.streak>=1?MSG.abs(x):'',{s:x.id,m:st.streak>=1?MSGP.abs(x):''},'أولياء أمور '+x.full_name)}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`,rest=`
   ${absCard(absList(cid),10,false)}
   ${bd.length?`<div class="card"><h2>أعياد ميلاد قريبة (${bd.length})</h2>${bd.map(o=>`<div class="row"><div class="who">${av(o.x,36)}<div>${esc(o.x.full_name)}<small>${lbl(o)}</small></div></div><div class="acts">${qc(o.x.phone,MSG.bd(o.x))}</div></div>`).join('')}</div>`:''}
-  <div class="card"><h2>زمايلي في الفصل (${mates.length})</h2>${mates.map(m=>`<div class="row"><div>${esc(m.name||'بدون اسم')}<small dir="ltr" style="text-align:right">${esc(m.contact_phone||m.phone||'')}</small></div><div class="acts">${qc(m.contact_phone||m.phone,'')}</div></div>`).join('')||'<div class="empty">إنت الخادم الوحيد المربوط بالفصل ده.</div>'}</div>`;
+  <div class="card"><h2>زمايلي في الفصل (${mates.length})</h2>${mates.map(m=>`<div class="row"><div>${esc(m.name||'بدون اسم')}<small dir="ltr" style="text-align:right">${esc(m.contact_phone||m.phone||'')}</small></div><div class="acts">${qc(m.contact_phone||m.phone,'',{u:m.id},m.name)}</div></div>`).join('')||'<div class="empty">إنت الخادم الوحيد المربوط بالفصل ده.</div>'}</div>`;
   const hd=`<div class="card">${S.classes.length>1?`<select data-a="attClass">${opts(S.classes,cLabel,cid)}</select>`:`<b>${esc(cLabel(c))}</b>`}</div>`;
   return which==='pr'?hd+parCard:which==='sv'?hd+sev:sum+rest;
 }
@@ -716,7 +851,7 @@ function vProfile(){
   <div class="card"><h2>البيانات</h2><div class="cnt" style="flex-direction:column;gap:2px">
     <span>الميلاد: ${x.birth_date?esc(x.birth_date)+(age!==null&&age>=0?' · '+age+' سنة':'')+(nb&&nb.days<=30?' · عيد ميلاده '+(nb.days===0?'النهارده':nb.days===1?'بكرة':'بعد '+nb.days+' يوم'):''):'—'}</span>
     <span>العنوان: ${esc(x.address||'—')}</span><span>ملاحظات: ${esc(x.notes||'—')}</span></div></div>
-  <div class="card"><h2>ولي الأمر</h2>${par===null?'<div class="empty">جاري التحميل...</div>':par.map(q=>{const ph=q.contact_phone||q.phone;return `<div class="row" style="align-items:flex-start"><div>${esc(q.name||'بدون اسم')}<small dir="ltr" style="text-align:right">${esc(ph||'')}</small></div><div class="acts">${qc(ph,MSGP.abs(x))}</div></div>${normPhone(ph||'')?`<div class="acts" style="justify-content:flex-start;margin-bottom:6px">${tpl(ph,MSGP,x)}</div>`:''}`}).join('')||'<div class="empty">مفيش ولي أمر مربوط بحساب في التطبيق. اعمل له دعوة من تبويب المخدومين.</div>'}</div>
+  <div class="card"><h2>ولي الأمر</h2>${par===null?'<div class="empty">جاري التحميل...</div>':par.map(q=>{const ph=q.contact_phone||q.phone;return `<div class="row" style="align-items:flex-start"><div>${esc(q.name||'بدون اسم')}<small dir="ltr" style="text-align:right">${esc(ph||'')}</small></div><div class="acts">${qc(ph,MSGP.abs(x))}</div></div>${normPhone(ph||'')?`<div class="acts" style="justify-content:flex-start;margin-bottom:6px">${tpl(ph,MSGP,x)}</div>`:''}`}).join('')||'<div class="empty">مفيش ولي أمر مربوط بحساب في التطبيق. اعمل له دعوة من تبويب المخدومين.</div>'}${par&&par.length?`<div class="acts" style="justify-content:flex-start;margin-top:8px">${[['غياب','abs'],['تهنئة بعيد الميلاد','bd'],['تذكير بالاجتماع','rem']].map(([l,k])=>nb({s:x.id,m:MSGP[k](x)},'أولياء أمور '+x.full_name,'','🔔 '+l)).join('')}</div>`:''}</div>
   <div class="card"><h2>الحضور (آخر 90 يوم)</h2><div class="cnt">${st.sessions?`<span>حاضر ${st.present}</span><span>غايب ${st.absent}</span><span>نسبة الحضور ${st.pct}%</span>`:'<span>لسه مفيش حضور متسجّل</span>'}</div>
     ${st.sessions?`<div class="cnt"><span${st.streak>=ABS_TH?' style="color:var(--red);font-weight:700"':''}>غياب متتالي: ${st.streak}</span>${st.last?`<span>آخر حضور ${fdate(st.last)}</span>`:''}</div>
     <div class="pfl">${ds.map(d=>`<span class="chip ${m[d]==='present'?'ok':'no'}">${m[d]==='present'?'✓':'✗'} ${sd(d)}</span>`).join('')}</div>`:''}</div>
@@ -761,6 +896,8 @@ app.addEventListener('click',async e=>{
   if(a==='photo'){S.pu=id;return document.getElementById('pf').click()}
   if(a==='dismiss'){S.created=null;return render()}
   if(a==='out'){await sb.auth.signOut();return login()}
+  if(a==='diag')return diagOpen();
+  if(a==='nt')return ntOpen(b);
   if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(['follow','rep','home','mycls','mysv'].includes(id))await loadHist();if(['mycls','mypr'].includes(id))await loadMates();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
   if(a==='joinGo')return joinGo();
   if(a==='joinhome'){history.replaceState(null,'',location.pathname);return boot()}
