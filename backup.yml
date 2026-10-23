@@ -1,0 +1,54 @@
+name: Weekly DB backup
+
+# نسخة احتياطية أسبوعية (الجمعة 03:00 بتوقيت القاهرة تقريباً) مشفّرة بباسورد، وبتتحفظ كـ artifact 90 يوم.
+# لازم تضيف 2 Secrets في GitHub: Settings > Secrets and variables > Actions
+#   SUPABASE_DB_URL     رابط Session pooler (بورت 5432) من Supabase > Connect
+#   BACKUP_PASSPHRASE   باسورد طويل بتختاره (احفظه في مكان تاني! من غيره النسخة ما تتفتحش)
+on:
+  schedule:
+    - cron: "0 1 * * 5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Dump and encrypt
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DB_URL" ] || [ -z "$PASS" ]; then echo "Secrets SUPABASE_DB_URL / BACKUP_PASSPHRASE مش متضافين"; exit 1; fi
+          PG=/usr/lib/postgresql/17/bin
+          D="$(date +%F)"
+          $PG/pg_dump "$DB_URL" --schema=public --no-owner --no-privileges --format=custom --file=public.dump
+          $PG/pg_dump "$DB_URL" --table=auth.users --table=auth.identities --data-only --no-owner --format=custom --file=auth.dump
+          # تأكد إن النسخة مش فاضية قبل ما نعتمد عليها
+          N="$($PG/pg_restore --list public.dump | grep -c ' TABLE DATA ')"
+          echo "جداول فيها بيانات: $N"
+          if [ "$N" -lt 5 ]; then echo "النسخة ناقصة بشكل مريب"; exit 1; fi
+          tar -cf "backup-$D.tar" public.dump auth.dump
+          printf %s "$PASS" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 -o "backup-$D.tar.gpg" "backup-$D.tar"
+          rm -f public.dump auth.dump "backup-$D.tar"
+          ls -l
+
+      - name: Upload encrypted backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup
+          path: backup-*.tar.gpg
+          retention-days: 90
+          if-no-files-found: error
