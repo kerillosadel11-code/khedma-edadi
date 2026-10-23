@@ -606,7 +606,7 @@ async function run(a,id){
     S.created=x;
   }
   if(r&&!ok(r))return;
-  await load();render();toast('تم');
+  await load();render();if(S.created)window.scrollTo(0,0);toast(S.created?'تم، الباسورد المؤقت فوق':'تم');
 }
 function fuForm(x){
   const fu=S.fu||[];
