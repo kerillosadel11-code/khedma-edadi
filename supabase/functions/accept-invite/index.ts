@@ -14,6 +14,8 @@ const BAD = "الدعوة غير صالحة أو منتهية، اطلب لين�
 class HttpError extends Error {
   constructor(public msg: string, public status = 400) { super(msg); }
 }
+// خطأ الباسورد: بيستهلك استخدام من الدعوة (من غير release) عشان محدّش يخمّن باسوردات بلينك واحد
+class PwError extends HttpError {}
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
 
@@ -115,11 +117,29 @@ Deno.serve(async (req) => {
       user_metadata: { full_name: name },
     });
     if (ce || !cu?.user) {
-      await release();
       const m = (ce?.message || "").toLowerCase();
-      if (m.includes("already") || m.includes("registered") || m.includes("exists")) {
-        throw new HttpError("الرقم ده مسجّل قبل كده، ادخل بيه من صفحة الدخول");
+      const exists = m.includes("already") || m.includes("registered") || m.includes("exists");
+      if (exists && inv.role === "parent") {
+        // ولي أمر مسجّل قبل كده: نضيف الابن الجديد لو الباسورد صح
+        try {
+          const anon = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { auth: { persistSession: false, autoRefreshToken: false } });
+          const { data: si, error: se } = await anon.auth.signInWithPassword({ email: `${phone}@${EMAIL_DOMAIN}`, password });
+          if (se || !si?.user) throw new PwError("الرقم ده مسجّل قبل كده. اكتب نفس الباسورد بتاعك عشان نضيف الابن، أو ادخل من صفحة الدخول");
+          const { data: pr } = await admin.from("profiles").select("role,active").eq("id", si.user.id).maybeSingle();
+          if (!pr || pr.role !== "parent" || !pr.active) throw new HttpError(BAD);
+          const { data: ex } = await admin.from("parent_links").select("servee_id").eq("parent_id", si.user.id).eq("servee_id", inv.servee_id);
+          if (!ex || !ex.length) {
+            const { error: le } = await admin.from("parent_links").insert({ parent_id: si.user.id, servee_id: inv.servee_id });
+            if (le) { console.error(le); throw new HttpError("تعذّر ربط الابن، جرّب تاني"); }
+          }
+          return json({ ok: true, role: "parent", login: phone, linked: true });
+        } catch (e) {
+          if (!(e instanceof PwError)) await release();
+          throw e;
+        }
       }
+      await release();
+      if (exists) throw new HttpError("الرقم ده مسجّل قبل كده، ادخل بيه من صفحة الدخول");
       console.error("createUser failed", ce);
       throw new HttpError("تعذّر إنشاء الحساب، جرّب تاني");
     }

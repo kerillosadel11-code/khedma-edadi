@@ -73,7 +73,7 @@ const roleLabel=p=>(ROLES[p.role]||p.role)+((p.role==='secretary'&&p.section)?' 
 const badge=sc=>sc&&SEC[sc]?`<span class="bd">${SEC[sc]}</span>`:'';
 const cLabel=c=>c.name+(isAdmin()&&c.section?' · '+SEC[c.section]:'');
 function toast(m){const t=document.getElementById('t');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3000)}
-const ok=r=>{if(r.error){toast('حصل خطأ: '+r.error.message);return false}return true};
+const ok=r=>{if(r.error){toast(r.error.code==='23505'?'ده متسجّل قبل كده (مكرر)':'حصل خطأ: '+r.error.message);return false}return true};
 const EMAIL_DOMAIN='khedma.app';
 function normPhone(raw){
   let d=String(raw||'').replace(/[٠-٩]/g,c=>c.charCodeAt(0)-0x660).replace(/[۰-۹]/g,c=>c.charCodeAt(0)-0x6f0).replace(/\D/g,'');
