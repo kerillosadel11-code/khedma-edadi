@@ -171,7 +171,7 @@ function render(){
 function vClasses(){
   const ec=S.classes.find(c=>c.id===S.edc);
   const edit=ec?`<div class="card" style="border-color:var(--gold)"><h2>تعديل الفصل</h2><input id="ecn" value="${esc(ec.name)}" placeholder="اسم الفصل"><input id="ecs" value="${esc(ec.stage||'')}" placeholder="المرحلة (اختياري)">${isAdmin()?`<select id="ecsec"><option value="">اختار القسم</option><option value="boys"${ec.section==='boys'?' selected':''}>بنين</option><option value="girls"${ec.section==='girls'?' selected':''}>بنات</option></select>`:''}<button class="p" data-a="saveClass">حفظ</button><button class="s" data-a="cancelEdit" style="margin-top:8px">إلغاء</button></div>`:'';
-  return edit+`<div class="card"><h2>إضافة فصل</h2><input id="cn" placeholder="اسم الفصل (مثال: أولى إعدادي)"><input id="cs" placeholder="المرحلة (اختياري)">${isSec()?`<select id="csec" disabled><option>${SEC[S.p.section]}</option></select>`:`<select id="csec"><option value="">اختار القسم</option><option value="boys">بنين</option><option value="girls">بنات</option></select>`}<button class="p" data-a="addClass">إضافة الفصل</button></div>
+  return edit+`<div class="card"><h2>إضافة فصل</h2><input id="cn" placeholder="اسم الفصل (مثال: أولى إعدادي)"><input id="cs" placeholder="المرحلة (اختياري)">${isSec()?`<select id="csec" disabled><option>${SEC[S.p.section]}</option></select>`:`<select id="csec"><option value="">اختار القسم</option><option value="boys"${S.sec==='boys'?' selected':''}>بنين</option><option value="girls"${S.sec==='girls'?' selected':''}>بنات</option></select>`}<button class="p" data-a="addClass">إضافة الفصل</button></div>
   <div class="card"><h2>الفصول (${S.classes.length})</h2>${S.classes.map(c=>`<div class="row"><div>${esc(c.name)}${badge(c.section)}<small>${esc(c.stage||'')} ${S.servees.filter(s=>s.class_id===c.id&&s.active).length} مخدوم</small></div><div class="acts"><button class="s" data-a="editClass" data-id="${c.id}">تعديل</button><button class="s" data-a="promoteClass" data-id="${c.id}">ترقية</button><button class="s d" data-a="delClass" data-id="${c.id}">حذف</button></div></div>`).join('')||'<div class="empty">لسه مفيش فصول. أضف أول فصل من فوق.</div>'}</div>`;
 }
 const nz=t=>String(t||'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').trim();
@@ -198,7 +198,7 @@ function vServees(){
   return svEditCard()+impCard()+`<div class="card"><h2>إضافة مخدوم</h2><input id="sn" placeholder="الاسم بالكامل"><div class="two"><input id="sp" type="tel" placeholder="التليفون" dir="ltr"><input id="sb" type="date" aria-label="تاريخ الميلاد"></div>
   <select id="sc"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><input id="sa" placeholder="العنوان (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
   <div class="card"><h2>استيراد من ملف CSV</h2><select id="icl2"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><input type="file" accept=".csv,.txt" data-a="csvPick"><p class="empty">الأعمدة: الاسم، التليفون، تاريخ الميلاد، العنوان، ملاحظات. من Excel احفظ الملف كـ CSV UTF-8.</p></div>
-  <div class="card"><input id="sq" type="search" data-a="search" placeholder="ابحث بالاسم أو التليفون أو الكود" value="${esc(S.q)}">${isAdmin()?`<select data-a="sfilter"><option value="">الكل (بنين وبنات)</option><option value="boys"${S.sf==='boys'?' selected':''}>بنين</option><option value="girls"${S.sf==='girls'?' selected':''}>بنات</option></select>`:''}<div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="stfilter"><option value="act"${S.st==='act'?' selected':''}>الشغّالين</option><option value="arch"${S.st==='arch'?' selected':''}>المؤرشفين</option><option value="all"${S.st==='all'?' selected':''}>الكل</option></select></div><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button>
+  <div class="card"><input id="sq" type="search" data-a="search" placeholder="ابحث بالاسم أو التليفون أو الكود" value="${esc(S.q)}"><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="stfilter"><option value="act"${S.st==='act'?' selected':''}>الشغّالين</option><option value="arch"${S.st==='arch'?' selected':''}>المؤرشفين</option><option value="all"${S.st==='all'?' selected':''}>الكل</option></select></div><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button>
   <div id="sl">${svList()}</div></div>`;
 }
 function srvStats(id){const H=S.sa.filter(x=>x.servant_id===id),P=H.filter(x=>x.status==='present').length;return{n:H.length,P,A:H.filter(x=>x.status==='absent').length,E:H.filter(x=>x.status==='excused').length,pct:H.length?Math.round(P*100/H.length):null}}
@@ -234,7 +234,7 @@ function srvList(){
 }
 function vSrv(){
   const all=S.profiles.filter(p=>p.role==='servant'),free=all.filter(p=>p.active&&!srvClasses(p.id).length).length;
-  return credCard()+srvEditCard()+`<div class="card"><input id="srq" type="search" data-a="srvsearch" placeholder="ابحث باسم الخادم أو تليفونه" value="${esc(S.sq)}">${isAdmin()?`<select data-a="srvsec"><option value="">الكل (بنين وبنات)</option><option value="boys"${S.ssec==='boys'?' selected':''}>بنين</option><option value="girls"${S.ssec==='girls'?' selected':''}>بنات</option></select>`:''}
+  return credCard()+srvEditCard()+`<div class="card"><input id="srq" type="search" data-a="srvsearch" placeholder="ابحث باسم الخادم أو تليفونه" value="${esc(S.sq)}">
   <select data-a="srvfc"><option value="">كل الفصول</option><option value="_none"${S.sfc==='_none'?' selected':''}>غير مربوطين بفصل${free?' ('+free+')':''}</option>${opts(S.classes,cLabel,S.sfc)}</select>
   <p class="empty">الخدام الجداد بيتعملوا من تبويب "مستخدم جديد" أو "دعوات واتساب"، وبعدين تربطهم بفصل من هنا.</p></div>
   <div class="card" id="srl">${srvList()}</div>`;
@@ -427,7 +427,7 @@ function vAnn(){
   if(S.an===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
   const adm=isAdmin();
   return `<div class="card"><h2>إعلان جديد</h2><select id="asc" data-a="annscope">${adm?'<option value="all">كل الخدمة</option>':''}<option value="section">${adm?'قسم كامل':'قسمي كله'}</option><option value="class">فصل معين</option></select>
-  <div id="ascw" style="display:none">${adm?`<select id="asec"><option value="">اختار القسم</option><option value="boys">بنين</option><option value="girls">بنات</option></select>`:''}</div>
+  <div id="ascw" style="display:none">${adm?`<select id="asec"><option value="">اختار القسم</option><option value="boys"${S.sec==='boys'?' selected':''}>بنين</option><option value="girls"${S.sec==='girls'?' selected':''}>بنات</option></select>`:''}</div>
   <div id="aclw" style="display:none"><select id="acl"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
   <input id="at" maxlength="100" placeholder="عنوان الإعلان"><textarea id="ab" rows="4" maxlength="1000" placeholder="نص الإعلان (اختياري)"></textarea>
   <button class="p" data-a="annSend">إرسال</button><p class="empty">بيوصل للخدام وأولياء الأمور المعنيين كإشعار جوه التطبيق (🔔).</p></div>
@@ -511,7 +511,7 @@ function credCard(){
 function vAdd(){
   return credCard()+`<div class="card"><h2>إضافة مستخدم</h2><input id="un" placeholder="الاسم بالكامل"><input id="up" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
   <select id="ur" data-a="newrole">${Object.entries(ROLES).filter(([k])=>isAdmin()||k==='servant'||k==='parent').map(([k,n])=>`<option value="${k}"${k==='servant'?' selected':''}>${n}</option>`).join('')}</select>
-  <div id="usc" style="display:none"><select id="usec"><option value="">اختار قسم أمين الخدمة</option><option value="boys">بنين</option><option value="girls">بنات</option></select></div>
+  <div id="usc" style="display:none"><select id="usec"><option value="">اختار قسم أمين الخدمة</option><option value="boys"${S.sec==='boys'?' selected':''}>بنين</option><option value="girls"${S.sec==='girls'?' selected':''}>بنات</option></select></div>
   <div id="uc"><select id="ucl"><option value="">اختار فصل الخادم</option>${opts(S.classes,cLabel)}</select></div>
   <div id="ue" style="display:none"><select id="use"><option value="">اختار المخدوم</option>${opts(S.servees,s=>s.full_name)}</select></div>
   <button class="p" data-a="addUser">إنشاء الحساب</button><p class="empty">هيتعمل باسورد مؤقت يتغيّر أول دخول. لو ولي الأمر عنده أكتر من ابن، اربط الباقي من تبويب المستخدمين.</p></div>`;
@@ -530,7 +530,7 @@ function vInv(){
   const lbl=i=>i.role==='secretary'?'أمين خدمة '+(SEC[i.section]||''):i.role==='parent'?'ولي أمر · '+sname(i.servee_id):'خادم · '+cname(i.class_id);
   return invLinkCard()+`<div class="card"><h2>${adm?'دعوة جديدة':'دعوة خدام'}</h2>
   ${adm?`<select id="ir" data-a="invrole"><option value="secretary">أمين خدمة</option><option value="servant">خادم</option></select>
-  <div id="isec"><select id="is"><option value="">اختار القسم</option><option value="boys">بنين</option><option value="girls">بنات</option></select></div>`:''}
+  <div id="isec"><select id="is"><option value="">اختار القسم</option><option value="boys"${S.sec==='boys'?' selected':''}>بنين</option><option value="girls"${S.sec==='girls'?' selected':''}>بنات</option></select></div>`:''}
   <div id="icl" ${adm?'style="display:none"':''}><select id="ic"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
   <button class="p" data-a="mkInv">عمل لينك الدعوة</button>
   <p class="empty">${adm?'لينك الأمين لمرة واحدة. ':''}لينك الخدام صالح 7 أيام ولحد 30 خادم، وكل خادم بيسجّل بياناته بنفسه وحسابه بيستنى موافقتك.</p></div>
