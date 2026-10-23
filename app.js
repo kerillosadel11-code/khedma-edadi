@@ -165,14 +165,14 @@ const cname=id=>{const c=S.classes.find(c=>c.id===id);return c?cLabel(c):'بدو
 const pname=id=>(S.profiles.find(c=>c.id===id)||{}).full_name||'؟';
 const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
 
-const NAVIC={home:'🏠',mycls:'🧑‍🏫',classes:'🏫',servees:'🧒',srv:'🤝',people:'👥',add:'➕',inv:'💬',att:'✅',sat:'🙋',prep:'📖',follow:'📞',comp:'🏆',ann:'📢',rep:'📊',audit:'🛡️',notif:'🔔'};
+const NAVIC={home:'🏠',mycls:'🧑‍🏫',mysv:'🧒',mypr:'👪',classes:'🏫',servees:'🧒',srv:'🤝',people:'👥',add:'➕',inv:'💬',att:'✅',sat:'🙋',prep:'📖',follow:'📞',comp:'🏆',ann:'📢',rep:'📊',audit:'🛡️',notif:'🔔'};
 function render(){
   const adm=canManage();
   if(S.cards)return app.innerHTML=head()+vCards();
   if(S.pf)return app.innerHTML=head()+vProfile();
-  if(!adm&&!['mycls','att','prep','sat','follow','comp','notif'].includes(S.tab))S.tab='mycls';
-  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل']]:[]):[['mycls','فصلي'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['sat','حضوري']];
-  app.innerHTML=head()+`<main>${{mycls:vMyClass,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn}[S.tab]()}</main><nav class="bn">${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${n}</span></button>`).join('')}</nav>`;
+  if(!adm&&!['mycls','mysv','mypr','att','prep','sat','follow','comp','notif'].includes(S.tab))S.tab='mycls';
+  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل']]:[]):[['mycls','فصلي'],['mysv','المخدومين'],['mypr','أولياء الأمور'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['sat','حضوري']];
+  app.innerHTML=head()+`<main>${{mycls:vMyClass,mysv:vMyServees,mypr:vMyParents,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn}[S.tab]()}</main><nav class="bn">${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${n}</span></button>`).join('')}</nav>`;
   const on=document.querySelector('nav.bn .on');if(on)on.scrollIntoView({inline:'nearest',block:'nearest'});
 }
 function vClasses(){
@@ -663,7 +663,7 @@ async function loadMates(cid){
   S.mates[cid]=r.error?[]:(r.data||[]);S.cpar[cid]=q.error?null:(q.data||[]);
 }
 /* ---------- شاشة «فصلي» ---------- */
-function vMyClass(){
+function myPage(which){
   if(!S.classes.length)return '<div class="card"><div class="empty">مفيش فصل مربوط بيك لسه. اطلب من أبونا يربطك بفصل.</div></div>';
   const cid=acid(),c=S.classes.find(x=>x.id===cid)||{},H=histInfo(90),
     L=S.servees.filter(x=>x.class_id===cid&&x.active).sort((a,b)=>a.full_name.localeCompare(b.full_name,'ar')),
@@ -677,15 +677,19 @@ function vMyClass(){
   (par||[]).forEach(r=>{let g=byP.get(r.parent_id);if(!g){g={name:r.name,phone:r.contact_phone||r.phone,kids:[]};byP.set(r.parent_id,g)}const k=L.find(x=>x.id===r.servee_id);if(k)g.kids.push(k.full_name)});
   const linked=new Set((par||[]).map(r=>r.servee_id)),noPar=L.filter(x=>!linked.has(x.id));
   const parCard=`<div class="card"><h2>أولياء الأمور${par?' ('+byP.size+')':''}</h2>${par===null?'<div class="empty">تعذّر تحميل أولياء الأمور.</div>':[...byP.values()].map(g=>`<div class="row"><div>${esc(g.name||'بدون اسم')}<small>ولي أمر: ${g.kids.map(esc).join('، ')}</small><small dir="ltr" style="text-align:right">${esc(g.phone||'')}</small></div><div class="acts">${qc(g.phone,'')}</div></div>`).join('')||'<div class="empty">لسه مفيش ولي أمر مربوط بحساب. اطلب من أمين الخدمة يبعتله دعوة.</div>'}${par&&noPar.length?`<p class="empty" style="margin:8px 0 0;padding:0">من غير ولي أمر مربوط (${noPar.length}): ${noPar.map(x=>esc(x.full_name)).join('، ')}</p>`:''}</div>`;
-  return `<div class="card"><h2>فصلي</h2>${S.classes.length>1?`<select data-a="attClass">${opts(S.classes,cLabel,cid)}</select>`:`<b>${esc(cLabel(c))}</b>`}
+  const sum=`<div class="card"><h2>فصلي</h2>${S.classes.length>1?`<select data-a="attClass">${opts(S.classes,cLabel,cid)}</select>`:`<b>${esc(cLabel(c))}</b>`}
   <div class="cnt"><span>مخدومين ${L.length}</span>${avg!==null?`<span>متوسط الحضور ${avg}%</span>`:''}<span>${fdate(S.date)}: حاضر ${P} · غايب ${B}</span></div>
-  <button class="p" data-a="tab" data-id="att">تسجيل الحضور</button></div>
-  ${parCard}
-  <div class="card"><h2>مخدومين الفصل (${L.length})</h2>${R.map(({x,st})=>`<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small${st.streak>=ABS_TH?' style="color:var(--red)"':''}>${st.pct===null?'لسه مفيش حضور':'حضور '+st.pct+'%'}${st.streak>=1?' · غايب '+st.streak+' ورا بعض':''}</small></div></div><div class="acts">${qc(x.phone,st.streak>=1?MSG.abs(x):'')}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>
+  <button class="p" data-a="tab" data-id="att">تسجيل الحضور</button></div>`,sev=`
+  <div class="card"><h2>مخدومين الفصل (${L.length})</h2>${R.map(({x,st})=>`<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small${st.streak>=ABS_TH?' style="color:var(--red)"':''}>${st.pct===null?'لسه مفيش حضور':'حضور '+st.pct+'%'}${st.streak>=1?' · غايب '+st.streak+' ورا بعض':''}</small></div></div><div class="acts">${qc(x.phone,st.streak>=1?MSG.abs(x):'')}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`,rest=`
   ${absCard(absList(cid),10,false)}
   ${bd.length?`<div class="card"><h2>أعياد ميلاد قريبة (${bd.length})</h2>${bd.map(o=>`<div class="row"><div class="who">${av(o.x,36)}<div>${esc(o.x.full_name)}<small>${lbl(o)}</small></div></div><div class="acts">${qc(o.x.phone,MSG.bd(o.x))}</div></div>`).join('')}</div>`:''}
   <div class="card"><h2>زمايلي في الفصل (${mates.length})</h2>${mates.map(m=>`<div class="row"><div>${esc(m.name||'بدون اسم')}<small dir="ltr" style="text-align:right">${esc(m.contact_phone||m.phone||'')}</small></div><div class="acts">${qc(m.contact_phone||m.phone,'')}</div></div>`).join('')||'<div class="empty">إنت الخادم الوحيد المربوط بالفصل ده.</div>'}</div>`;
+  const hd=`<div class="card">${S.classes.length>1?`<select data-a="attClass">${opts(S.classes,cLabel,cid)}</select>`:`<b>${esc(cLabel(c))}</b>`}</div>`;
+  return which==='pr'?hd+parCard:which==='sv'?hd+sev:sum+rest;
 }
+function vMyClass(){return myPage('cl')}
+function vMyServees(){return myPage('sv')}
+function vMyParents(){return myPage('pr')}
 /* ---------- ملف المخدوم ---------- */
 async function openProfile(id){
   S.pf=id;S.pfPar=null;S.fuf=null;render();window.scrollTo(0,0);
@@ -757,7 +761,7 @@ app.addEventListener('click',async e=>{
   if(a==='photo'){S.pu=id;return document.getElementById('pf').click()}
   if(a==='dismiss'){S.created=null;return render()}
   if(a==='out'){await sb.auth.signOut();return login()}
-  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(['follow','rep','home','mycls'].includes(id))await loadHist();if(id==='mycls')await loadMates();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
+  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(['follow','rep','home','mycls','mysv'].includes(id))await loadHist();if(['mycls','mypr'].includes(id))await loadMates();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
   if(a==='joinGo')return joinGo();
   if(a==='joinhome'){history.replaceState(null,'',location.pathname);return boot()}
   if(a==='mkInv')return mkInv();
@@ -897,7 +901,7 @@ app.addEventListener('change',async e=>{
     document.getElementById('ue').style.display=b.value==='parent'?'':'none';return;
   }
   if(b.dataset.a==='invrole'){document.getElementById('isec').style.display=b.value==='secretary'?'':'none';document.getElementById('icl').style.display=b.value==='servant'?'':'none';return}
-  if(b.dataset.a==='attClass'){S.ac=b.value;if(S.tab==='mycls')await loadMates();return render()}
+  if(b.dataset.a==='attClass'){S.ac=b.value;if(['mycls','mypr'].includes(S.tab))await loadMates();return render()}
   if(b.dataset.a==='satDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='prepDate'){S.pd=b.value||today();return render()}
   if(b.dataset.a==='attDate'){S.date=b.value||today();await loadAtt();return render()}
