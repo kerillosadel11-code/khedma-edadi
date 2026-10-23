@@ -63,7 +63,7 @@ nav{overflow-x:auto}nav button{flex:1 0 auto;padding:12px 10px;white-space:nowra
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 const sb=supabase.createClient('https://radvrgthxxtesjitzkil.supabase.co','sb_publishable_UFK-e5F6zuI2qZ2P5KVjiw_LrE33N_k');
-const S={th:2,rd:56,rc:'',ah:null,fu:null,fuf:null,tab:'home',f:'',q:'',lim:50,st:'act',ed:null,edc:null,imp:null,aud:null,af:''},app=document.getElementById('app');
+const S={nt:[],an:null,cmp:null,pr:null,pc:'',pbell:false,th:2,rd:56,rc:'',ah:null,fu:null,fuf:null,tab:'home',f:'',q:'',lim:50,st:'act',ed:null,edc:null,imp:null,aud:null,af:''},app=document.getElementById('app');
 const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const v=id=>document.getElementById(id).value.trim();
 const ROLES={admin:'أدمن',secretary:'أمين خدمة',servant:'خادم',parent:'ولي أمر'};
@@ -91,7 +91,7 @@ const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOStr
 S.date=today();S.pd=today();S.photos={};S.att=[];S.sa=[];S.lp=[];
 const av=(s,z=44)=>{const u=S.photos[s.id];return u?`<img class="av" src="${u}" alt="" style="width:${z}px;height:${z}px">`:`<span class="av" style="width:${z}px;height:${z}px;font-size:${Math.round(z/2.4)}px">${esc((s.full_name||'؟').trim().charAt(0))}</span>`};
 function qrImg(code){if(!code)return'';const q=qrcode(0,'M');q.addData(code);q.make();return `<img src="${q.createDataURL(4,4)}" alt="QR">`}
-const rpcErr=e=>({NOT_FOUND:'الكود ده مش معروف',FORBIDDEN:'المخدوم ده مش في فصلك',INACTIVE:'المخدوم ده موقوف',BAD_DATE:'التاريخ ده في المستقبل',BAD_STATUS:'حالة غير صحيحة'}[e.message]||e.message);
+const rpcErr=e=>({NOT_FOUND:'الكود ده مش معروف',FORBIDDEN:'المخدوم ده مش في فصلك',INACTIVE:'المخدوم ده موقوف',BAD_DATE:'التاريخ ده في المستقبل',BAD_STATUS:'حالة غير صحيحة',BAD_TITLE:'اكتب عنوان الإعلان',BAD_SECTION:'اختار القسم',BAD_SCOPE:'نطاق غير صحيح',BAD_POINTS:'عدد النقاط غير مسموح (من 1 لـ 50)',BAD_COMP:'المسابقة دي مش لفصل المخدوم ده'}[e.message]||e.message);
 async function loadAtt(){const r=await sb.from('attendance_days').select('servee_id,status').eq('att_date',S.date);if(ok(r))S.att=r.data||[]}
 async function loadPhotos(){
   const ps=S.servees.filter(x=>x.photo_path);S.photos={};if(!ps.length)return;
@@ -161,18 +161,20 @@ async function loadParent(){
   r.forEach(ok);[S.servees,S.classes,S.hist]=r.map(x=>x.data||[]);
   const pt=await sb.from('servee_points').select('servee_id,total_points').in('servee_id',ids);
   S.pts=pt.error?{}:Object.fromEntries((pt.data||[]).map(x=>[x.servee_id,x.total_points]));
+  await loadNotifs();
   await loadPhotos();
 }
 const fdate=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
 function vParent(){
-  if(!S.servees.length)return `<main><div class="card"><h2>أهلاً ${esc(S.p.full_name)}</h2><div class="empty">لسه مفيش ابن مربوط بحسابك. كلّم أبونا يربطه.</div></div></main>`;
-  return `<main><h2 style="margin:0 0 10px">أهلاً ${esc(S.p.full_name)}</h2>`+S.servees.map(x=>{
+  if(!S.servees.length)return `<main>${S.pbell?vNotif():''}<div class="card"><h2>أهلاً ${esc(S.p.full_name)}</h2><div class="empty">لسه مفيش ابن مربوط بحسابك. كلّم أبونا يربطه.</div></div></main>`;
+  return `<main>${S.pbell?vNotif():''}<h2 style="margin:0 0 10px">أهلاً ${esc(S.p.full_name)}</h2>`+S.servees.map(x=>{
     const H=S.hist.filter(h=>h.servee_id===x.id),P=H.filter(h=>h.status==='present').length,B=H.length-P,pc=H.length?Math.round(P*100/H.length):0;
     return `<div class="card"><div class="who">${av(x,64)}<div><b style="font-size:18px">${esc(x.full_name)}</b><small>${esc(cname(x.class_id))}</small></div></div>
     <div class="cnt" style="margin-top:12px"><span>حاضر ${P}</span><span>غايب ${B}</span>${H.length?`<span>نسبة الحضور ${pc}%</span>`:''}${(S.pts||{})[x.id]>0?`<span>النقاط ${S.pts[x.id]}</span>`:''}</div>
     <h2 style="margin-top:8px">آخر الأسابيع</h2>${H.slice(0,12).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':'var(--red)'}">${h.status==='present'?'حاضر':'غايب'}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`}).join('')+`</main>`;
 }
-const head=()=>`<header><b>خدمة إعدادي</b><span>${esc(S.p.full_name)} · ${esc(roleLabel(S.p))} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>`;
+const unread=()=>(S.nt||[]).filter(n=>!n.is_read).length;
+const head=()=>`<header><b>خدمة إعدادي</b><span><a href="#" data-a="bell" style="color:#fff;text-decoration:none" aria-label="الإشعارات">🔔${unread()?` <b style="background:var(--red);border-radius:10px;padding:0 6px;font-size:12px">${unread()}</b>`:''}</a> · ${esc(S.p.full_name)} · ${esc(roleLabel(S.p))} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>`;
 async function load(){
   if(canManage())await loadAdmin();
   else{
@@ -186,6 +188,7 @@ async function loadExtra(){
   const d0=new Date(Date.now()-90*864e5).toISOString().slice(0,10);
   const [a,b]=await Promise.all([sb.from('servant_attendance').select('servant_id,att_date,status').gte('att_date',d0),sb.from('lesson_prep').select('*').order('prep_date',{ascending:false}).limit(200)]);
   S.sa=a.error?[]:(a.data||[]);S.lp=b.error?[]:(b.data||[]);
+  await loadNotifs();
 }
 async function loadAdmin(){
   const r=await Promise.all([sb.from('classes').select('*').order('created_at'),fetchAll(()=>sb.from('servees').select('*').order('full_name').order('id')),sb.from('profiles').select('*').order('full_name'),sb.from('class_servants').select('*'),sb.from('parent_links').select('*')]);
@@ -199,9 +202,9 @@ const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
 function render(){
   const adm=canManage();
   if(S.cards)return app.innerHTML=head()+vCards();
-  if(!adm&&!['att','prep','sat','follow'].includes(S.tab))S.tab='att';
-  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل']]:[]):[['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['sat','حضوري']];
-  app.innerHTML=head()+`<nav>${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}</nav><main>${{classes:vClasses,servees:vServees,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep}[S.tab]()}</main>`;
+  if(!adm&&!['att','prep','sat','follow','comp','notif'].includes(S.tab))S.tab='att';
+  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل']]:[]):[['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['sat','حضوري']];
+  app.innerHTML=head()+`<nav>${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}</nav><main>${{classes:vClasses,servees:vServees,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn}[S.tab]()}</main>`;
 }
 function vClasses(){
   const ec=S.classes.find(c=>c.id===S.edc);
@@ -372,6 +375,46 @@ function vRep(){
 function dl(name,rows){
   const q=x=>{let t=String(x??'');if(/^[=+\-@]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"'};
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+const paint=()=>S.p.role==='parent'?(app.innerHTML=head()+vParent()):render();
+async function loadNotifs(){const r=await sb.from('notifications').select('*').eq('user_id',S.p.id).order('created_at',{ascending:false}).limit(50);S.nt=r.error?[]:(r.data||[])}
+function vNotif(){
+  const L=S.nt||[],n=unread(),dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});
+  return `<div class="card"><h2>الإشعارات${n?' ('+n+' جديد)':''}</h2>${n?'<button class="s" data-a="readAll" style="margin-bottom:8px">تحديد الكل كمقروء</button>':''}${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div>${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}</div>`).join('')||'<div class="empty">مفيش إشعارات.</div>'}</div>`;
+}
+async function loadAnn(){const r=await sb.from('announcements').select('*').order('created_at',{ascending:false}).limit(30);S.an=r.error?[]:(r.data||[]);if(r.error)toast('تعذّر تحميل الإعلانات: '+r.error.message)}
+function vAnn(){
+  if(S.an===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
+  const adm=isAdmin();
+  return `<div class="card"><h2>إعلان جديد</h2><select id="asc" data-a="annscope">${adm?'<option value="all">كل الخدمة</option>':''}<option value="section">${adm?'قسم كامل':'قسمي كله'}</option><option value="class">فصل معين</option></select>
+  <div id="ascw" style="display:none">${adm?`<select id="asec"><option value="">اختار القسم</option><option value="boys">بنين</option><option value="girls">بنات</option></select>`:''}</div>
+  <div id="aclw" style="display:none"><select id="acl"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
+  <input id="at" maxlength="100" placeholder="عنوان الإعلان"><textarea id="ab" rows="4" maxlength="1000" placeholder="نص الإعلان (اختياري)"></textarea>
+  <button class="p" data-a="annSend">إرسال</button><p class="empty">بيوصل للخدام وأولياء الأمور المعنيين كإشعار جوه التطبيق (🔔).</p></div>
+  <div class="card"><h2>آخر الإعلانات (${S.an.length})</h2>${S.an.map(a=>`<div class="row"><div>${esc(a.title)}<small>${a.scope==='all'?'كل الخدمة':a.scope==='section'?'قسم '+(SEC[a.section]||''):'فصل '+esc(cname(a.class_id))} · وصل ${a.sent_count} · ${new Date(a.created_at).toLocaleDateString('ar-EG')}</small>${a.body?`<small style="white-space:pre-wrap">${esc(a.body)}</small>`:''}</div></div>`).join('')||'<div class="empty">لسه ما بعتش إعلانات.</div>'}</div>`;
+}
+async function loadComp(){
+  const [c,p]=await Promise.all([sb.from('competitions').select('*').order('starts_on',{ascending:false}),fetchAll(()=>sb.from('points').select('*').order('created_at',{ascending:false}).order('id'))]);
+  if(c.error)toast('تعذّر تحميل المسابقات: '+c.error.message);
+  S.cmp=c.error?[]:(c.data||[]);S.pr=p.error?[]:(p.data||[]);
+}
+const PV=[1,2,3,5,10,-1,-2,-5];
+function vComp(){
+  if(S.cmp===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
+  const td=today(),cs=S.cmp.filter(c=>!c.class_id||S.classes.some(x=>x.id===c.class_id)),act=cs.filter(c=>!c.ends_on||c.ends_on>=td);
+  const cur=cs.find(c=>c.id===S.pc)||act[0]||cs[0]||null,mg=canManage();
+  const cand=cur?S.servees.filter(x=>x.active&&(!cur.class_id||x.class_id===cur.class_id)):[];
+  const rows=cur?(S.pr||[]).filter(x=>x.competition_id===cur.id):[];
+  const sum={};rows.forEach(x=>sum[x.servee_id]=(sum[x.servee_id]||0)+x.points);
+  const top=Object.entries(sum).map(([id,n])=>({id,n})).filter(o=>S.servees.some(x=>x.id===o.id)).sort((a,b)=>b.n-a.n).slice(0,10);
+  const medal=['🥇','🥈','🥉'];
+  const create=mg?`<div class="card"><h2>مسابقة جديدة</h2><input id="mt" placeholder="اسم المسابقة (مثال: مسابقة الحفظ)"><select id="mc"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><div class="two"><input id="ms" type="date" value="${td}" aria-label="تبدأ"><input id="me" type="date" aria-label="تنتهي"></div><button class="p" data-a="compAdd">إضافة المسابقة</button></div>`:'';
+  const sel=`<select data-a="pc">${cs.map(c=>`<option value="${c.id}"${cur&&c.id===cur.id?' selected':''}>${esc(c.title)}${c.class_id?' · '+esc(cname(c.class_id)):''}${c.ends_on&&c.ends_on<td?' (انتهت)':''}</option>`).join('')}</select>`;
+  if(!cs.length)return create+'<div class="card"><h2>المسابقات</h2><div class="empty">لسه مفيش مسابقات.'+(mg?'':' كلّم الأمين يضيف مسابقة.')+'</div></div>';
+  return create+`<div class="card"><h2>إعطاء نقاط</h2>${sel}<select id="pcs"><option value="">اختار المخدوم</option>${opts(cand,x=>x.full_name)}</select><div class="two"><select id="pv">${PV.map(n=>`<option value="${n}">${n>0?'+':''}${n}</option>`).join('')}</select><input id="pr" placeholder="السبب (اختياري)"></div><button class="p" data-a="givePts">تسجيل النقاط</button></div>
+  <div class="card"><h2>لوحة الشرف${cur?' · '+esc(cur.title):''}</h2>${top.map((o,i)=>`<div class="row"><div>${medal[i]||(i+1)+'.'} ${esc(sname(o.id))}</div><b>${o.n}</b></div>`).join('')||'<div class="empty">لسه مفيش نقاط في المسابقة دي.</div>'}</div>
+  <div class="card"><h2>آخر النقاط</h2>${rows.slice(0,20).map(x=>`<div class="row"><div>${esc(sname(x.servee_id))}<small>${x.reason?esc(x.reason)+' · ':''}${new Date(x.created_at).toLocaleDateString('ar-EG')}${mg&&pname(x.given_by)!=='؟'?' · '+esc(pname(x.given_by)):''}</small></div><div class="acts"><b style="color:${x.points>0?'#1b7a43':'var(--red)'}">${x.points>0?'+':''}${x.points}</b>${isAdmin()?`<button class="s d" data-a="ptDel" data-id="${x.id}">حذف</button>`:''}</div></div>`).join('')||'<div class="empty">مفيش نقاط لسه.</div>'}</div>
+  ${isAdmin()&&cur?`<div class="card"><button class="s d" data-a="compDel" data-id="${cur.id}">حذف مسابقة «${esc(cur.title)}»</button></div>`:''}`;
 }
 function vCards(){
   const L=S.cards.map(id=>S.servees.find(x=>x.id===id)).filter(Boolean);
@@ -560,7 +603,7 @@ app.addEventListener('click',async e=>{
   if(a==='photo'){S.pu=id;return document.getElementById('pf').click()}
   if(a==='dismiss'){S.created=null;return render()}
   if(a==='out'){await sb.auth.signOut();return login()}
-  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(id==='follow'||id==='rep')await loadHist();return render()}
+  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(id==='follow'||id==='rep')await loadHist();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='notif')await loadNotifs();return render()}
   if(a==='joinGo')return joinGo();
   if(a==='joinhome'){history.replaceState(null,'',location.pathname);return boot()}
   if(a==='mkInv')return mkInv();
@@ -616,6 +659,34 @@ app.addEventListener('click',async e=>{
     }
     return;
   }
+  if(a==='bell'){await loadNotifs();if(S.p.role==='parent')S.pbell=!S.pbell;else S.tab='notif';return paint()}
+  if(a==='readAll'){const r=await sb.from('notifications').update({is_read:true}).eq('user_id',S.p.id).eq('is_read',false);if(!ok(r))return;await loadNotifs();return paint()}
+  if(a==='readN'){const r=await sb.from('notifications').update({is_read:true}).eq('id',id);if(!ok(r))return;await loadNotifs();return paint()}
+  if(a==='annSend'){
+    const sc=v('asc'),title=v('at'),body=document.getElementById('ab').value.trim(),cl=sc==='class'?v('acl'):null,sec=(sc==='section'&&isAdmin())?v('asec'):null;
+    if(!title)return toast('اكتب عنوان الإعلان');
+    if(sc==='class'&&!cl)return toast('اختار الفصل');
+    if(sc==='section'&&isAdmin()&&!sec)return toast('اختار القسم');
+    if(!confirm('إرسال الإعلان دلوقتي؟'))return;
+    const {data,error}=await sb.rpc('kh_announce',{p_title:title,p_body:body||null,p_scope:sc,p_class:cl,p_section:sec});
+    if(error)return toast(error.message==='FORBIDDEN'?'مش مسموح لك بالإرسال ده':rpcErr(error));
+    toast('اتبعت لـ '+data+' شخص');await loadAnn();return render();
+  }
+  if(a==='compAdd'){
+    if(!v('mt'))return toast('اكتب اسم المسابقة');if(!v('mc'))return toast('اختار الفصل');
+    if(v('me')&&v('me')<v('ms'))return toast('تاريخ النهاية قبل البداية');
+    const r=await sb.from('competitions').insert({title:v('mt'),class_id:v('mc'),starts_on:v('ms')||today(),ends_on:v('me')||null});
+    if(!ok(r))return;await loadComp();render();return toast('اتضافت');
+  }
+  if(a==='compDel'){const c=S.cmp.find(x=>x.id===id);if(!c||!isAdmin())return;if(!confirm('حذف المسابقة «'+c.title+'» ونقاطها؟'))return;const r=await sb.from('competitions').delete().eq('id',id);if(!ok(r))return;S.pc='';await loadComp();return render()}
+  if(a==='givePts'){
+    const c=S.cmp.find(x=>x.id===S.pc)||S.cmp.filter(x=>!x.ends_on||x.ends_on>=today())[0]||S.cmp[0];
+    if(!c)return;if(!v('pcs'))return toast('اختار المخدوم');
+    const r=await sb.from('points').insert({servee_id:v('pcs'),competition_id:c.id,points:parseInt(v('pv'),10),reason:v('pr')||null});
+    if(r.error)return toast(rpcErr(r.error));
+    S.pc=c.id;await loadComp();render();return toast('اتسجّلت');
+  }
+  if(a==='ptDel'){if(!isAdmin()||!confirm('حذف عملية النقاط دي؟'))return;const r=await sb.from('points').delete().eq('id',id);if(!ok(r))return;await loadComp();return render()}
   if(a==='smark'){
     const[uid,st]=id.split('|'),cur=(S.sa.find(x=>x.servant_id===uid&&x.att_date===S.date)||{}).status;
     const r=cur===st?await sb.from('servant_attendance').delete().eq('servant_id',uid).eq('att_date',S.date):await sb.from('servant_attendance').upsert({servant_id:uid,att_date:S.date,status:st},{onConflict:'servant_id,att_date'});
@@ -656,6 +727,8 @@ app.addEventListener('change',async e=>{
   if(b.dataset.a==='prepDate'){S.pd=b.value||today();return render()}
   if(b.dataset.a==='attDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='filter'){S.f=b.value;S.lim=50;return render()}
+  if(b.dataset.a==='annscope'){const x=b.value;const w=document.getElementById('ascw'),c=document.getElementById('aclw');if(w)w.style.display=(x==='section'&&isAdmin())?'block':'none';if(c)c.style.display=x==='class'?'block':'none';return}
+  if(b.dataset.a==='pc'){S.pc=b.value;return render()}
   if(b.dataset.a==='th'){S.th=+b.value;return render()}
   if(b.dataset.a==='rc'){S.rc=b.value;return render()}
   if(b.dataset.a==='rd'){S.rd=+b.value;return render()}
