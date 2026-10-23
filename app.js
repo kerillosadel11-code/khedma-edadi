@@ -137,16 +137,23 @@ async function loadAdmin(){
 }
 /* ===== مبدّل القسم لأبونا: الكل / بنين / بنات (الفلترة في التطبيق بعد التحميل) ===== */
 const secOn=()=>isAdmin()&&!!S.sec;
+function clearStale(){
+  const has=id=>S.classes.some(c=>c.id===id);
+  if(S.sfc&&S.sfc!=='_none'&&!has(S.sfc))S.sfc='';
+  if(S.f&&!has(S.f))S.f='';if(S.rc&&!has(S.rc))S.rc='';if(S.ac&&!has(S.ac))S.ac=null;
+  S.ssec='';S.sf='';
+}
 function applySec(){
   const A=S.all;if(!A)return;
   const sec=isAdmin()?S.sec:'';
-  if(!sec){S.classes=A.classes;S.servees=A.servees;S.profiles=A.profiles;S.cs=A.cs;S.pl=A.pl;return}
+  if(!sec){S.classes=A.classes;S.servees=A.servees;S.profiles=A.profiles;S.cs=A.cs;S.pl=A.pl;clearStale();return}
   const cl=A.classes.filter(c=>c.section===sec),cid=new Set(cl.map(c=>c.id)),
     sv=A.servees.filter(x=>x.section===sec||cid.has(x.class_id)||(!x.section&&!x.class_id)),sid=new Set(sv.map(x=>x.id)),
     cs=A.cs.filter(x=>cid.has(x.class_id)),csu=new Set(cs.map(x=>x.servant_id)),anyCs=new Set(A.cs.map(x=>x.servant_id)),
     pl=A.pl.filter(x=>sid.has(x.servee_id)),plu=new Set(pl.map(x=>x.parent_id));
   S.classes=cl;S.servees=sv;S.cs=cs;S.pl=pl;
   S.profiles=A.profiles.filter(q=>q.role==='admin'||(q.role==='secretary'?q.section===sec:q.role==='servant'?(q.section===sec||csu.has(q.id)||(!q.section&&!anyCs.has(q.id))):(plu.has(q.id)||(q.pending&&!q.active&&!q.section))));
+  clearStale();
 }
 const fSv=rows=>{if(!secOn())return rows;const ids=new Set(S.servees.map(x=>x.id));return rows.filter(r=>ids.has(r.servee_id))};
 function secBar(){
@@ -230,7 +237,7 @@ function srvEditCard(){
 }
 function srvList(){
   const L=srvFiltered().sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ar'));
-  return `<h2>الخدام (${L.length})</h2>`+(L.map(srvRow).join('')||'<div class="empty">مفيش خدام بالشكل ده.</div>');
+  return `<h2>الخدام (${L.length})</h2>`+(L.map(srvRow).join('')||'<div class="empty">مفيش خدام بالشكل ده.'+(isAdmin()?'<small style="display:block;direction:ltr;text-align:left">sec='+(S.sec||'all')+' · servants='+S.profiles.filter(p=>p.role==="servant").length+'/'+(S.all?S.all.profiles.filter(p=>p.role==="servant").length:'?')+' · fc='+(S.sfc||'-')+' · q='+(S.sq||'-')+'</small>':'')+'</div>');
 }
 function vSrv(){
   const all=S.profiles.filter(p=>p.role==='servant'),free=all.filter(p=>p.active&&!srvClasses(p.id).length).length;
