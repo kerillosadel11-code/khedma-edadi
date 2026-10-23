@@ -1,0 +1,45 @@
+:root{--bg:#f3f5f2;--ink:#17302b;--mut:#5d6f6a;--line:#d5ddd8;--card:#fff;--gold:#d9a441;--red:#a33b2e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 "Noto Kufi Arabic",Tahoma,system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{background:var(--ink);color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+header b{font-size:18px}header span{color:var(--gold);font-size:14px}
+nav{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0}
+nav button{flex:1;border:0;background:none;padding:12px 4px;font:inherit;font-weight:600;color:var(--mut);border-bottom:3px solid transparent}
+nav button{font-size:14px}
+nav button.on{color:var(--ink);border-color:var(--gold)}
+main{max-width:720px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.login{max-width:380px;margin:12vh auto 0}
+.login h1{margin:0 0 4px;font-size:26px}.login p{color:var(--mut);margin:0 0 16px}
+h2{font-size:17px;margin:0 0 10px}
+input,select,textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);margin-bottom:8px}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+button.p{width:100%;padding:11px;border:0;border-radius:8px;background:var(--ink);color:#fff;font:inherit;font-weight:600}
+button.s{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 10px;font:inherit;font-size:14px;color:var(--ink)}
+button.d{color:var(--red)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.row small{display:block;color:var(--mut);font-size:13px}
+.bd{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;background:#eee;color:#555;margin-inline-start:6px;vertical-align:middle}
+.acts{display:flex;gap:6px;flex-shrink:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.err{color:var(--red);min-height:1.5em;margin:8px 0 0}
+.off{opacity:.55}
+.empty{color:var(--mut);padding:8px 0}
+nav{overflow-x:auto}nav button{flex:1 0 auto;padding:12px 10px;white-space:nowrap}
+.acts{flex-wrap:wrap;justify-content:flex-end}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.av{border-radius:50%;object-fit:cover;background:var(--line);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700}
+.s.on{background:var(--ink);color:#fff;border-color:var(--ink)}.s.on.bad{background:var(--red);border-color:var(--red)}
+.cnt{display:flex;gap:14px;color:var(--mut);font-size:14px;margin:4px 0 8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.idc{background:#fff;border:2px solid var(--ink);border-radius:12px;padding:10px;break-inside:avoid;text-align:center}
+.idh{background:var(--ink);color:#fff;border-radius:6px;font-size:13px;padding:2px 6px;margin-bottom:8px}
+.idb{display:flex;align-items:center;gap:10px;text-align:right}.idb small{display:block;color:var(--mut)}
+.code{display:block;font-weight:700;letter-spacing:1px;direction:ltr;text-align:right}
+.idq img{width:150px;height:150px;image-rendering:pixelated;margin-top:6px}
+#scan{position:fixed;inset:0;background:#000;z-index:20;display:flex;flex-direction:column}
+#scan video{flex:1;min-height:0;width:100%;object-fit:cover}
+#sres{background:#fff;padding:12px;min-height:120px}
+@media print{header,nav,.np,#t{display:none!important}body{background:#fff}.cards{grid-template-columns:repeat(2,1fr)}}
+#t{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;display:none;z-index:9;max-width:90%}
