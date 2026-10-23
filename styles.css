@@ -43,3 +43,8 @@ nav{overflow-x:auto}nav button{flex:1 0 auto;padding:12px 10px;white-space:nowra
 #sres{background:#fff;padding:12px;min-height:120px}
 @media print{header,nav,.np,#t{display:none!important}body{background:#fff}.cards{grid-template-columns:repeat(2,1fr)}}
 #t{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;display:none;z-index:9;max-width:90%}
+
+.srv{border-top:1px solid var(--line)}.srv:first-of-type{border-top:0}
+.srv.open{background:#faf8f1;border-radius:10px;padding:0 10px;margin:6px 0}
+.srvd{padding-bottom:10px}.srvd h3{font-size:14px;margin:12px 0 4px;color:var(--mut)}
+.srvd .cnt a{color:var(--gold,#b8892b);font-weight:700;text-decoration:none}
