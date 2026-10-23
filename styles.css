@@ -64,3 +64,12 @@ body:has(nav.bn){padding-right:var(--sw)}
 .chip{display:inline-block;min-width:54px;text-align:center;font-size:12px;padding:3px 6px;border-radius:8px;border:1px solid var(--line)}
 .chip.ok{background:#e3f4ea;color:#1b7a43;border-color:#b9e2c9}
 .chip.no{background:#f9e3df;color:var(--red);border-color:#efc3bc}
+
+/* منع الصفحة تتّسع أفقيًا (كانت بتبوّظ الشريط الجانبي في المستخدمين والمخدومين) */
+html,body{overflow-x:hidden;max-width:100%}
+main{min-width:0}
+.two>*,.row>div,.who>div{min-width:0}
+input[type=date],input[type=file]{min-width:0;max-width:100%}
+.row{flex-wrap:wrap}
+.row>.acts{max-width:100%}
+.row select{max-width:100%}
