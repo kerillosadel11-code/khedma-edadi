@@ -88,6 +88,7 @@ async function boot(){
   S.p=p;
   if(p.role==='admin'||p.role==='secretary'||p.role==='servant'){await load();render()}
   else{await loadParent();app.innerHTML=head()+vParent()}
+  askPush();
 }
 async function loadParent(){
   const l=await sb.from('parent_links').select('servee_id').eq('parent_id',S.p.id);ok(l);
@@ -313,10 +314,50 @@ function dl(name,rows){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
 }
 const paint=()=>S.p.role==='parent'?(app.innerHTML=head()+vParent()):render();
+
+const VAPID_PUBLIC='BE8fbsT8UBQMFqkbtAvcg0uz1eFr1jwN1A2fqSwdCyPfpIeJD7RKAtujdGiJMkOcpV2FhoGY36l8w_jZtatXTgc';
+const pushOK=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+const b64u=s=>{const p='='.repeat((4-s.length%4)%4),r=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(r,c=>c.charCodeAt(0))};
+async function pushState(){if(!pushOK())return 'unsupported';if(Notification.permission==='denied')return 'denied';try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();return sub?'on':'off'}catch(_){return 'off'}}
+async function pushEnable(){
+  const perm=await Notification.requestPermission();if(perm!=='granted')return toast('الإشعارات مرفوضة من إعدادات المتصفح');
+  const reg=await navigator.serviceWorker.ready;
+  let sub=await reg.pushManager.getSubscription();
+  if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUBLIC)});
+  const j=sub.toJSON();
+  const r=await sb.from('push_subscriptions').upsert({user_id:S.p.id,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:'endpoint'});
+  if(r.error)return toast('تعذّر التفعيل: '+r.error.message);
+  toast('تم تفعيل الإشعارات على الجهاز ده');
+}
+async function pushDisable(){
+  const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();
+  if(sub){await sb.from('push_subscriptions').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe()}
+  toast('تم إيقاف الإشعارات على الجهاز ده');
+}
+function pushCard(){
+  const st=S.pushSt;
+  if(!st)return '';
+  if(st==='unsupported')return '<div class="card"><div class="empty">المتصفح ده مبيدعمش إشعارات الموبايل. على الآيفون: ضيف التطبيق للشاشة الرئيسية الأول.</div></div>';
+  if(st==='denied')return '<div class="card"><div class="empty">الإشعارات مقفولة من إعدادات المتصفح للموقع ده. افتحها من إعدادات الموقع.</div></div>';
+  return '<div class="card"><h2>إشعارات الموبايل</h2><small>'+(st==='on'?'مفعّلة على الجهاز ده':'مش مفعّلة على الجهاز ده')+'</small><button class="'+(st==='on'?'s':'p')+'" data-a="'+(st==='on'?'pushOff':'pushOn')+'" style="margin-top:8px">'+(st==='on'?'إيقاف':'تفعيل الإشعارات')+'</button></div>';
+}
+
+async function askPush(){
+  S.pushSt=await pushState();
+  let o=document.getElementById('pushAsk');
+  if(S.pushSt==='on'){if(o)o.remove();return}
+  if(!o){o=document.createElement('div');o.id='pushAsk';o.style.cssText='position:fixed;inset:0;background:rgba(23,48,43,.96);z-index:20;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto';document.body.appendChild(o)}
+  const st=S.pushSt,adm=S.p&&S.p.role==='admin';
+  const msg=st==='denied'?'الإشعارات مقفولة للموقع ده. افتح إعدادات الموقع (أيقونة القفل 🔒 جنب الرابط) واختار الإشعارات ثم «السماح»، وبعدين اضغط الزرار تحت.':st==='unsupported'?'المتصفح ده مبيدعمش الإشعارات. على الآيفون: اضغط مشاركة ثم «إضافة إلى الشاشة الرئيسية» وافتح التطبيق من الأيقونة. أو افتح الموقع من Chrome.':'تفعيل الإشعارات شرط لاستخدام التطبيق، عشان توصلك تنبيهات الخدمة والتذكير الأسبوعي. اضغط الزرار وبعدين «السماح».';
+  o.innerHTML='<div class="card" style="max-width:360px;text-align:center;margin:0"><div style="font-size:44px">🔔</div><h2>فعّل الإشعارات</h2><p style="margin:6px 0 14px">'+msg+'</p><button class="p" id="pushGo" style="width:100%">'+(st==='off'?'تفعيل الإشعارات':'فعّلتها، تحقّق تاني')+'</button>'+(adm?'<button class="s" id="pushLater" style="width:100%;margin-top:8px">لاحقاً</button>':'')+'<button class="s" id="pushOut" style="width:100%;margin-top:8px">تسجيل خروج</button></div>';
+  document.getElementById('pushGo').onclick=async()=>{if(S.pushSt==='off')await pushEnable();await askPush();if(S.pushSt==='on'&&S.p)paint()};
+  const l=document.getElementById('pushLater');if(l)l.onclick=()=>o.remove();
+  document.getElementById('pushOut').onclick=async()=>{o.remove();await sb.auth.signOut();location.reload()};
+}
 async function loadNotifs(){const r=await sb.from('notifications').select('*').eq('user_id',S.p.id).order('created_at',{ascending:false}).limit(50);S.nt=r.error?[]:(r.data||[])}
 function vNotif(){
   const L=S.nt||[],n=unread(),dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});
-  return `<div class="card"><h2>الإشعارات${n?' ('+n+' جديد)':''}</h2>${n?'<button class="s" data-a="readAll" style="margin-bottom:8px">تحديد الكل كمقروء</button>':''}${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div>${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}</div>`).join('')||'<div class="empty">مفيش إشعارات.</div>'}</div>`;
+  return pushCard()+`<div class="card"><button class="s" data-a="outAll">تسجيل الخروج من كل الأجهزة</button></div><div class="card"><h2>الإشعارات${n?' ('+n+' جديد)':''}</h2>${n?'<button class="s" data-a="readAll" style="margin-bottom:8px">تحديد الكل كمقروء</button>':''}${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div>${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}</div>`).join('')||'<div class="empty">مفيش إشعارات.</div>'}</div>`;
 }
 async function loadAnn(){const r=await sb.from('announcements').select('*').order('created_at',{ascending:false}).limit(30);S.an=r.error?[]:(r.data||[]);if(r.error)toast('تعذّر تحميل الإعلانات: '+r.error.message)}
 function vAnn(){
@@ -540,7 +581,7 @@ app.addEventListener('click',async e=>{
   if(a==='photo'){S.pu=id;return document.getElementById('pf').click()}
   if(a==='dismiss'){S.created=null;return render()}
   if(a==='out'){await sb.auth.signOut();return login()}
-  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(id==='follow'||id==='rep')await loadHist();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='notif')await loadNotifs();return render()}
+  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(id==='follow'||id==='rep')await loadHist();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
   if(a==='joinGo')return joinGo();
   if(a==='joinhome'){history.replaceState(null,'',location.pathname);return boot()}
   if(a==='mkInv')return mkInv();
@@ -596,7 +637,10 @@ app.addEventListener('click',async e=>{
     }
     return;
   }
-  if(a==='bell'){await loadNotifs();if(S.p.role==='parent')S.pbell=!S.pbell;else S.tab='notif';return paint()}
+  if(a==='outAll'){if(!confirm('تسجيل الخروج من كل الأجهزة (بما فيها دي)؟'))return;await sb.auth.signOut({scope:'global'});return location.reload()}
+  if(a==='pushOn'){await pushEnable();S.pushSt=await pushState();return paint()}
+  if(a==='pushOff'){await pushDisable();S.pushSt=await pushState();return paint()}
+  if(a==='bell'){S.pushSt=await pushState();await loadNotifs();if(S.p.role==='parent')S.pbell=!S.pbell;else S.tab='notif';return paint()}
   if(a==='readAll'){const r=await sb.from('notifications').update({is_read:true}).eq('user_id',S.p.id).eq('is_read',false);if(!ok(r))return;await loadNotifs();return paint()}
   if(a==='readN'){const r=await sb.from('notifications').update({is_read:true}).eq('id',id);if(!ok(r))return;await loadNotifs();return paint()}
   if(a==='annSend'){
