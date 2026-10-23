@@ -24,11 +24,11 @@ async function fn(body,name='create-user'){
 }
 async function fetchAll(mk){let out=[],f=0;for(;;){const r=await mk().range(f,f+999);if(r.error)return r;out=out.concat(r.data||[]);if(!r.data||r.data.length<1000)return{data:out,error:null};f+=1000}}
 const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
-S.sq='';S.sfc='';S.ssec='';S.sso=null;S.sed=null;S.date=today();S.pd=today();S.photos={};S.att=[];S.sa=[];S.lp=[];
+S.sec=(()=>{try{const x=localStorage.getItem('khedma_sec');return x==='boys'||x==='girls'?x:''}catch(_){return ''}})();S.all=null;S.sq='';S.sfc='';S.ssec='';S.sso=null;S.sed=null;S.date=today();S.pd=today();S.photos={};S.att=[];S.sa=[];S.lp=[];
 const av=(s,z=44)=>{const u=S.photos[s.id];return u?`<img class="av" src="${u}" alt="" style="width:${z}px;height:${z}px">`:`<span class="av" style="width:${z}px;height:${z}px;font-size:${Math.round(z/2.4)}px">${esc((s.full_name||'؟').trim().charAt(0))}</span>`};
 function qrImg(code){if(!code)return'';const q=qrcode(0,'M');q.addData(code);q.make();return `<img src="${q.createDataURL(4,4)}" alt="QR">`}
 const rpcErr=e=>({NOT_FOUND:'الكود ده مش معروف',FORBIDDEN:'المخدوم ده مش في فصلك',INACTIVE:'المخدوم ده موقوف',BAD_DATE:'التاريخ ده في المستقبل',BAD_STATUS:'حالة غير صحيحة',BAD_TITLE:'اكتب عنوان الإعلان',BAD_SECTION:'اختار القسم',BAD_SCOPE:'نطاق غير صحيح',BAD_POINTS:'عدد النقاط غير مسموح (من 1 لـ 50)',BAD_COMP:'المسابقة دي مش لفصل المخدوم ده'}[e.message]||e.message);
-async function loadAtt(){const r=await sb.from('attendance_days').select('servee_id,status').eq('att_date',S.date);if(ok(r))S.att=r.data||[]}
+async function loadAtt(){const r=await sb.from('attendance_days').select('servee_id,status').eq('att_date',S.date);if(ok(r))S.att=fSv(r.data||[])}
 async function loadPhotos(){
   const ps=S.servees.filter(x=>x.photo_path);S.photos={};if(!ps.length)return;
   const {data}=await sb.storage.from('servee-photos').createSignedUrls(ps.map(x=>x.photo_path),3600);
@@ -111,14 +111,14 @@ function vParent(){
     <h2 style="margin-top:8px">آخر الأسابيع</h2>${H.slice(0,12).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':'var(--red)'}">${h.status==='present'?'حاضر':'غايب'}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`}).join('')+`</main>`;
 }
 const unread=()=>(S.nt||[]).filter(n=>!n.is_read).length;
-const head=()=>`<header><b>خدمة إعدادي</b><span><a href="#" data-a="bell" style="color:#fff;text-decoration:none" aria-label="الإشعارات">🔔${unread()?` <b style="background:var(--red);border-radius:10px;padding:0 6px;font-size:12px">${unread()}</b>`:''}</a> · ${esc(S.p.full_name)} · ${esc(roleLabel(S.p))} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>`;
+const head=()=>`<header><b>خدمة إعدادي</b><span><a href="#" data-a="bell" style="color:#fff;text-decoration:none" aria-label="الإشعارات">🔔${unread()?` <b style="background:var(--red);border-radius:10px;padding:0 6px;font-size:12px">${unread()}</b>`:''}</a> · ${esc(S.p.full_name)} · ${esc(roleLabel(S.p))} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>${secBar()}`;
 async function load(){
   if(canManage())await loadAdmin();
   else{
     const r=await Promise.all([sb.from('classes').select('*').order('created_at'),fetchAll(()=>sb.from('servees').select('*').order('full_name').order('id')),sb.from('class_servants').select('*')]);
     r.forEach(ok);[S.classes,S.servees,S.cs]=r.map(x=>x.data||[]);S.profiles=[];S.pl=[];
   }
-  S.inv=[];if(canManage()){const ri=await sb.from('invites').select('*').order('created_at',{ascending:false});S.inv=ri.error?[]:(ri.data||[])}
+  S.inv=[];if(canManage()){const ri=await sb.from('invites').select('*').order('created_at',{ascending:false});S.inv=ri.error?[]:(ri.data||[]).filter(i=>!secOn()||!i.section||i.section===S.sec)}
   await Promise.all([loadAtt(),loadPhotos(),loadExtra(),loadHist()]);
   if(!canManage())await loadMates();
 }
@@ -126,13 +126,34 @@ async function loadExtra(){
   const d0=new Date(Date.now()-90*864e5).toISOString().slice(0,10);
   const [a,b]=await Promise.all([sb.from('servant_attendance').select('servant_id,att_date,status').gte('att_date',d0),sb.from('lesson_prep').select('*').order('prep_date',{ascending:false}).limit(200)]);
   S.sa=a.error?[]:(a.data||[]);S.lp=b.error?[]:(b.data||[]);
+  if(secOn()){const pu=new Set(S.profiles.map(q=>q.id)),cu=new Set(S.classes.map(c=>c.id));S.sa=S.sa.filter(x=>pu.has(x.servant_id));S.lp=S.lp.filter(x=>cu.has(x.class_id))}
   await loadNotifs();
 }
 async function loadAdmin(){
   const r=await Promise.all([sb.from('classes').select('*').order('created_at'),fetchAll(()=>sb.from('servees').select('*').order('full_name').order('id')),sb.from('profiles').select('*').order('full_name'),sb.from('class_servants').select('*'),sb.from('parent_links').select('*')]);
   r.forEach(ok);
   [S.classes,S.servees,S.profiles,S.cs,S.pl]=r.map(x=>x.data||[]);
+  S.all={classes:S.classes,servees:S.servees,profiles:S.profiles,cs:S.cs,pl:S.pl};applySec();
 }
+/* ===== مبدّل القسم لأبونا: الكل / بنين / بنات (الفلترة في التطبيق بعد التحميل) ===== */
+const secOn=()=>isAdmin()&&!!S.sec;
+function applySec(){
+  const A=S.all;if(!A)return;
+  const sec=isAdmin()?S.sec:'';
+  if(!sec){S.classes=A.classes;S.servees=A.servees;S.profiles=A.profiles;S.cs=A.cs;S.pl=A.pl;return}
+  const cl=A.classes.filter(c=>c.section===sec),cid=new Set(cl.map(c=>c.id)),
+    sv=A.servees.filter(x=>x.section===sec||cid.has(x.class_id)||(!x.section&&!x.class_id)),sid=new Set(sv.map(x=>x.id)),
+    cs=A.cs.filter(x=>cid.has(x.class_id)),csu=new Set(cs.map(x=>x.servant_id)),anyCs=new Set(A.cs.map(x=>x.servant_id)),
+    pl=A.pl.filter(x=>sid.has(x.servee_id)),plu=new Set(pl.map(x=>x.parent_id));
+  S.classes=cl;S.servees=sv;S.cs=cs;S.pl=pl;
+  S.profiles=A.profiles.filter(q=>q.role==='admin'||(q.role==='secretary'?q.section===sec:q.role==='servant'?(q.section===sec||csu.has(q.id)||(!q.section&&!anyCs.has(q.id))):(plu.has(q.id)||(q.pending&&!q.active&&!q.section))));
+}
+const fSv=rows=>{if(!secOn())return rows;const ids=new Set(S.servees.map(x=>x.id));return rows.filter(r=>ids.has(r.servee_id))};
+function secBar(){
+  if(!isAdmin())return'';
+  return `<div class="secbar">${[['','الكل (بنين وبنات)'],['boys','خدمة بنين'],['girls','خدمة بنات']].map(([k,n])=>`<button class="s${S.sec===k?' on':''}" data-a="sec" data-id="${k}">${n}</button>`).join('')}</div>`;
+}
+
 const cname=id=>{const c=S.classes.find(c=>c.id===id);return c?cLabel(c):'بدون فصل'};
 const pname=id=>(S.profiles.find(c=>c.id===id)||{}).full_name||'؟';
 const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
@@ -304,7 +325,7 @@ async function loadHist(){
   const d0=new Date(Date.now()-90*864e5).toISOString().slice(0,10);
   const [a,f]=await Promise.all([fetchAll(()=>sb.from('attendance_days').select('servee_id,att_date,status').gte('att_date',d0).order('att_date',{ascending:false}).order('servee_id')),fetchAll(()=>sb.from('followups').select('*').order('followup_date',{ascending:false}).order('created_at',{ascending:false}))]);
   if(a.error)toast('تعذّر تحميل سجل الحضور: '+a.error.message);
-  S.ah=a.error?[]:(a.data||[]);S.fu=f.error?[]:(f.data||[]);
+  S.ah=fSv(a.error?[]:(a.data||[]));S.fu=fSv(f.error?[]:(f.data||[]));
 }
 function histInfo(days){
   const d0=new Date(Date.now()-days*864e5).toISOString().slice(0,10),sv=new Map(S.servees.map(x=>[x.id,x])),byS={},datesByC={};
@@ -401,7 +422,7 @@ function vNotif(){
   const L=S.nt||[],n=unread(),dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});
   return pushCard()+`<div class="card"><button class="s" data-a="outAll">تسجيل الخروج من كل الأجهزة</button></div><div class="card"><h2>الإشعارات${n?' ('+n+' جديد)':''}</h2>${n?'<button class="s" data-a="readAll" style="margin-bottom:8px">تحديد الكل كمقروء</button>':''}${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div>${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}</div>`).join('')||'<div class="empty">مفيش إشعارات.</div>'}</div>`;
 }
-async function loadAnn(){const r=await sb.from('announcements').select('*').order('created_at',{ascending:false}).limit(30);S.an=r.error?[]:(r.data||[]);if(r.error)toast('تعذّر تحميل الإعلانات: '+r.error.message)}
+async function loadAnn(){const r=await sb.from('announcements').select('*').order('created_at',{ascending:false}).limit(30);S.an=r.error?[]:(r.data||[]).filter(a=>!secOn()||a.scope==='all'||a.section===S.sec||(a.class_id&&S.classes.some(c=>c.id===a.class_id)));if(r.error)toast('تعذّر تحميل الإعلانات: '+r.error.message)}
 function vAnn(){
   if(S.an===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
   const adm=isAdmin();
@@ -415,7 +436,7 @@ function vAnn(){
 async function loadComp(){
   const [c,p]=await Promise.all([sb.from('competitions').select('*').order('starts_on',{ascending:false}),fetchAll(()=>sb.from('points').select('*').order('created_at',{ascending:false}).order('id'))]);
   if(c.error)toast('تعذّر تحميل المسابقات: '+c.error.message);
-  S.cmp=c.error?[]:(c.data||[]);S.pr=p.error?[]:(p.data||[]);
+  S.cmp=c.error?[]:(c.data||[]);S.pr=fSv(p.error?[]:(p.data||[]));
 }
 const PV=[1,2,3,5,10,-1,-2,-5];
 function vComp(){
@@ -845,6 +866,13 @@ app.addEventListener('click',async e=>{
     if(!ok(r))return;S.sed=null;await load();render();return toast('تم الحفظ');
   }
   if(a==='srvOpen'){S.sso=S.sso===id?null:id;return render()}
+  if(a==='sec'){
+    if(!isAdmin()||S.sec===id)return;
+    S.sec=id;try{localStorage.setItem('khedma_sec',id)}catch(_){}
+    S.f='';S.rc='';S.ac=null;S.sfc='';S.ssec='';S.sf='';S.ed=null;S.edc=null;S.sed=null;S.sso=null;S.pf=null;S.pfPar=null;S.fuf=null;S.cards=null;S.lim=50;
+    await load();if(S.cmp!==null)await loadComp();if(S.an!==null)await loadAnn();
+    render();return toast(id==='boys'?'خدمة بنين':id==='girls'?'خدمة بنات':'الكل: بنين وبنات');
+  }
   if(a==='pf')return openProfile(id);
   if(a==='pfBack'){S.pf=null;S.pfPar=null;S.fuf=null;return render()}
   run(a,id);

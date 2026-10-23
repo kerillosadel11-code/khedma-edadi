@@ -73,3 +73,6 @@ input[type=date],input[type=file]{min-width:0;max-width:100%}
 .row{flex-wrap:wrap}
 .row>.acts{max-width:100%}
 .row select{max-width:100%}
+
+.secbar{display:flex;gap:6px;padding:8px 16px;background:#fff;border-bottom:1px solid var(--line)}
+.secbar button{flex:1;padding:6px 4px;font-weight:600}
