@@ -3,3 +3,6 @@ wrangler.jsonc
 .assetsignore
 .git
 README.md
+*.sql
+index.ts
+accept-invite_index.ts
