@@ -1189,4 +1189,41 @@ app.addEventListener('input',e=>{
   clearTimeout(S.qt);S.qt=setTimeout(()=>{S.q=b.value;S.lim=50;const l=document.getElementById('sl');if(l)l.innerHTML=svList()},150);
 });
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+// إشعارات فاتت وإنت قافل التطبيق أو النت كان قاطع: بتتحمّل أول ما ترجع، وبتوصل لحظيًا وإنت فاتح
+let _live=null,_liveUid=null,_busy=false,_rt=false;
+async function catchUp(){
+  if(!S.p||_busy)return;_busy=true;
+  try{
+    if(S.nt==null){await loadNotifs();return}
+    const seen=new Set(S.nt.map(x=>x.id));
+    await loadNotifs();
+    const fresh=S.nt.filter(x=>!x.is_read&&!seen.has(x.id));
+    if(fresh.length){
+      const f=fresh[0];
+      toast(fresh.length===1?'🔔 '+f.title:'🔔 عندك '+fresh.length+' إشعارات جديدة');
+      if(navigator.vibrate)navigator.vibrate(80);
+      if(document.hidden&&'Notification' in window&&Notification.permission==='granted'&&await pushState()!=='on'){
+        try{const reg=await navigator.serviceWorker.ready;reg.showNotification(f.title||'خدمة إعدادي',{body:String(f.body||'').slice(0,200),icon:'icon-192.png',dir:'rtl',lang:'ar',tag:'nt-'+f.id})}catch(_){}
+      }
+    }
+    const hd=document.querySelector('header');
+    if(hd){const t=document.createElement('div');t.innerHTML=head();if(t.firstElementChild)hd.replaceWith(t.firstElementChild)}
+    if(S.tab==='notif'||S.pbell)paint();
+  }catch(_){}finally{_busy=false}
+}
+function startLive(){
+  if(!S.p||_liveUid===S.p.id)return;
+  try{
+    if(_live)sb.removeChannel(_live);
+    _liveUid=S.p.id;_rt=false;
+    _live=sb.channel('nt-'+S.p.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+S.p.id},()=>catchUp()).subscribe(st=>{_rt=st==='SUBSCRIBED'});
+  }catch(_){_liveUid=null}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.p){catchUp();startLive()}});
+window.addEventListener('online',()=>{if(S.p){catchUp();startLive()}});
+window.addEventListener('focus',()=>{if(S.p)catchUp()});
+setInterval(()=>{if(S.p&&!document.hidden)startLive()},20000);
+// لو الاتصال اللحظي مش شغّال لأي سبب، نفحص كل دقيقة
+setInterval(()=>{if(S.p&&!_rt)catchUp()},60000);
+
 boot();
