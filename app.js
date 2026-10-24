@@ -312,6 +312,11 @@ function vAtt(){
   <button class="s" data-a="restAbs">سجّل الباقي غياب</button></div>
   <div class="card"><h2>المخدومين (${L.length})</h2>${L.map(x=>`<div class="row"><div class="who">${av(x)}<div>${esc(x.full_name)}</div></div><div class="acts"><button class="s ${A[x.id]==='present'?'on':''}" data-a="mark" data-id="${x.id}|present">حاضر</button><button class="s ${A[x.id]==='absent'?'on bad':''}" data-a="mark" data-id="${x.id}|absent">غايب</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`;
 }
+const SAT_GR=[['1','خدام أولى'],['2','خدام تانية'],['3','خدام تالتة'],['0','خدام غير محدد الفصل']];
+const grNorm=t=>String(t||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه');
+const clsGrade=c=>{const t=grNorm((c.name||'')+' '+(c.stage||''));return /اول/.test(t)?'1':/تان|ثان/.test(t)?'2':/تالت|ثالث/.test(t)?'3':''};
+const srvGrade=p=>{const g=srvClasses(p.id).map(clsGrade).filter(Boolean).sort();return g[0]||'0'};
+const srvSection=p=>p.section||(srvClasses(p.id).find(c=>c.section)||{}).section||'';
 const SST={present:'حاضر',absent:'غايب',excused:'معتذر'};
 const servList=()=>S.profiles.filter(p=>p.role==='servant'&&p.active);
 function vSat(){
@@ -322,10 +327,15 @@ function vSat(){
   }
   const L=servList(),A=Object.fromEntries(S.sa.filter(x=>x.att_date===S.date).map(x=>[x.servant_id,x.status]));
   const P=L.filter(x=>A[x.id]==='present').length,B=L.filter(x=>A[x.id]==='absent').length,E=L.filter(x=>A[x.id]==='excused').length;
+  const row=x=>`<div class="row"><div>${esc(x.full_name||'بدون اسم')}</div><div class="acts"><button class="s ${A[x.id]==='present'?'on':''}" data-a="smark" data-id="${x.id}|present">حاضر</button><button class="s ${A[x.id]==='absent'?'on bad':''}" data-a="smark" data-id="${x.id}|absent">غايب</button><button class="s ${A[x.id]==='excused'?'on':''}" data-a="smark" data-id="${x.id}|excused">معتذر</button></div></div>`;
+  const grp=(arr,title)=>arr.length?`<div class="card"><h2>${title} (${arr.length})</h2>${arr.map(row).join('')}</div>`:'';
+  const byGrade=(arr,pre)=>SAT_GR.map(([k,n])=>grp(arr.filter(x=>srvGrade(x)===k),pre+n)).join('');
+  const secs=isAdmin()&&!S.sec?[['boys','خدمة بنين'],['girls','خدمة بنات']]:[['','']];
+  let body=secs.map(([sc,sn])=>byGrade(sc?L.filter(x=>srvSection(x)===sc):L,sn?sn+' · ':'')).join('');
+  if(isAdmin()&&!S.sec)body+=grp(L.filter(x=>!srvSection(x)),'بدون قسم');
   return `<div class="card"><h2>حضور الخدام</h2><input type="date" data-a="satDate" value="${S.date}" max="${today()}">
   <div class="cnt"><span>حاضر ${P}</span><span>غايب ${B}</span><span>معتذر ${E}</span><span>لسه ${L.length-P-B-E}</span></div>
-  <button class="s" data-a="satRest">سجّل الباقي غياب</button></div>
-  <div class="card"><h2>الخدام (${L.length})</h2>${L.map(x=>`<div class="row"><div>${esc(x.full_name||'بدون اسم')}${isAdmin()?badge(x.section):''}</div><div class="acts"><button class="s ${A[x.id]==='present'?'on':''}" data-a="smark" data-id="${x.id}|present">حاضر</button><button class="s ${A[x.id]==='absent'?'on bad':''}" data-a="smark" data-id="${x.id}|absent">غايب</button><button class="s ${A[x.id]==='excused'?'on':''}" data-a="smark" data-id="${x.id}|excused">معتذر</button></div></div>`).join('')||'<div class="empty">مفيش خدام مفعّلين لسه.</div>'}</div>`;
+  <button class="s" data-a="satRest">سجّل الباقي غياب</button></div>${body||'<div class="card"><div class="empty">مفيش خدام مفعّلين لسه.</div></div>'}`;
 }
 /* ===== توزيعة الأسبوع: مهام الخدام (فقرة / مسابقة / متابعة) + مين خلّص ومين اعتذر ===== */
 const DK={segment:'تحضير فقرة',competition:'تجهيز مسابقة',followup:'متابعة مخدومين',other:'أخرى'};
