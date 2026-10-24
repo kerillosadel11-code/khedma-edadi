@@ -4,12 +4,15 @@ PWA عربي (RTL) على Supabase، مستضاف على Cloudflare Workers.
 
 ## الهيكل
 - `index.html` `sw.js` `manifest.json`: التطبيق نفسه (بيتنشر على Cloudflare).
-- `supabase/sql/`: ملفات SQL بالترتيب (06 ثم 07 ... ثم 17). كل ملف بيتنفّذ مرة واحدة في SQL Editor.
+- `supabase/sql/`: ملفات SQL بالترتيب (06 ثم 07 ... ثم 17 ثم 18). كل ملف بيتنفّذ مرة واحدة في SQL Editor.
 - `supabase/functions/`: دوال Edge (ببقى النشر من لوحة Supabase، Verify JWT = OFF للتنين):
   - `accept-invite`: قبول الدعوات (أمين / خادم / ولي أمر).
   - `set-active`: إيقاف وتفعيل الحسابات وقفل الدخول.
 - `.github/workflows/backup.yml`: نسخة احتياطية أسبوعية مشفّرة (محتاجة Secrets: SUPABASE_DB_URL و BACKUP_PASSPHRASE).
 - `scripts/verify-backup.sh`: فحص نسخة احتياطية.
+
+## توزيعة الأسبوع
+ملف `18_weekly_duties.sql`: مهام الخدام (فقرة / مسابقة / متابعة) مع ميعاد الاجتماع. الخادم يشوف مهامه ويعلّم خلّصت أو يعتذر بسبب، والأدمن وأمين القسم يشوفوا مين خلّص ومين لسه ومين اعتذر. التذكير التلقائي (قبل الاجتماع بـ 24 ساعة و3 ساعات + ملخص للأدمن والأمين) بيشتغل من pg_cron كل 15 دقيقة، لازم يكون متفعّل من Database ← Extensions.
 
 ## الإشعارات
 التشغيل والفحص وحل المشاكل في [`NOTIFICATIONS.md`](NOTIFICATIONS.md). أي مستخدم يقدر يفحص جهازه من 🩺 في الهيدر.

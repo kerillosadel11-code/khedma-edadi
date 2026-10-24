@@ -127,6 +127,7 @@ async function loadExtra(){
   const [a,b]=await Promise.all([sb.from('servant_attendance').select('servant_id,att_date,status').gte('att_date',d0),sb.from('lesson_prep').select('*').order('prep_date',{ascending:false}).limit(200)]);
   S.sa=a.error?[]:(a.data||[]);S.lp=b.error?[]:(b.data||[]);
   if(secOn()){const pu=new Set(S.profiles.map(q=>q.id)),cu=new Set(S.classes.map(c=>c.id));S.sa=S.sa.filter(x=>pu.has(x.servant_id));S.lp=S.lp.filter(x=>cu.has(x.class_id))}
+  await loadDuty();
   await loadNotifs();
 }
 async function loadAdmin(){
@@ -165,14 +166,14 @@ const cname=id=>{const c=S.classes.find(c=>c.id===id);return c?cLabel(c):'بدو
 const pname=id=>(S.profiles.find(c=>c.id===id)||{}).full_name||'؟';
 const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
 
-const NAVIC={home:'🏠',mycls:'🧑‍🏫',mysv:'🧒',mypr:'👪',classes:'🏫',servees:'🧒',srv:'🤝',people:'👥',add:'➕',inv:'💬',att:'✅',sat:'🙋',prep:'📖',follow:'📞',comp:'🏆',ann:'📢',msg:'✉️',pst:'📡',set:'⚙️',rep:'📊',audit:'🛡️',notif:'🔔'};
+const NAVIC={home:'🏠',mycls:'🧑‍🏫',mysv:'🧒',mypr:'👪',classes:'🏫',servees:'🧒',srv:'🤝',people:'👥',add:'➕',inv:'💬',att:'✅',sat:'🙋',prep:'📖',follow:'📞',comp:'🏆',ann:'📢',msg:'✉️',pst:'📡',set:'⚙️',rep:'📊',audit:'🛡️',notif:'🔔',duty:'🗓️'};
 function render(){
   const adm=canManage();
   if(S.cards)return app.innerHTML=head()+vCards();
   if(S.pf)return app.innerHTML=head()+vProfile();
-  if(!adm&&!['mycls','mysv','mypr','att','prep','sat','follow','comp','notif','msg'].includes(S.tab))S.tab='mycls';
-  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['msg','الرسائل'],['pst','حالة الإشعارات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل'],['set','الإعدادات']]:[]):[['mycls','فصلي'],['mysv','المخدومين'],['mypr','أولياء الأمور'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['msg','الرسائل'],['sat','حضوري']];
-  app.innerHTML=head()+`<main>${{mycls:vMyClass,mysv:vMyServees,mypr:vMyParents,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn,msg:vMsg,pst:vPst,set:vSet}[S.tab]()}</main><nav class="bn">${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${n}</span></button>`).join('')}</nav>`;
+  if(!adm&&!['mycls','mysv','mypr','att','prep','sat','duty','follow','comp','notif','msg'].includes(S.tab))S.tab='mycls';
+  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['duty','توزيعة الأسبوع'+dutyBadge()],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['msg','الرسائل'],['pst','حالة الإشعارات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل'],['set','الإعدادات']]:[]):[['mycls','فصلي'],['duty','توزيعتي'+dutyBadge()],['mysv','المخدومين'],['mypr','أولياء الأمور'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['msg','الرسائل'],['sat','حضوري']];
+  app.innerHTML=head()+`<main>${{mycls:vMyClass,mysv:vMyServees,mypr:vMyParents,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,duty:vDuty,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn,msg:vMsg,pst:vPst,set:vSet}[S.tab]()}</main><nav class="bn">${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${n}</span></button>`).join('')}</nav>`;
   const on=document.querySelector('nav.bn .on');if(on)on.scrollIntoView({inline:'nearest',block:'nearest'});
 }
 function vClasses(){
@@ -325,6 +326,75 @@ function vSat(){
   <div class="cnt"><span>حاضر ${P}</span><span>غايب ${B}</span><span>معتذر ${E}</span><span>لسه ${L.length-P-B-E}</span></div>
   <button class="s" data-a="satRest">سجّل الباقي غياب</button></div>
   <div class="card"><h2>الخدام (${L.length})</h2>${L.map(x=>`<div class="row"><div>${esc(x.full_name||'بدون اسم')}${isAdmin()?badge(x.section):''}</div><div class="acts"><button class="s ${A[x.id]==='present'?'on':''}" data-a="smark" data-id="${x.id}|present">حاضر</button><button class="s ${A[x.id]==='absent'?'on bad':''}" data-a="smark" data-id="${x.id}|absent">غايب</button><button class="s ${A[x.id]==='excused'?'on':''}" data-a="smark" data-id="${x.id}|excused">معتذر</button></div></div>`).join('')||'<div class="empty">مفيش خدام مفعّلين لسه.</div>'}</div>`;
+}
+/* ===== توزيعة الأسبوع: مهام الخدام (فقرة / مسابقة / متابعة) + مين خلّص ومين اعتذر ===== */
+const DK={segment:'تحضير فقرة',competition:'تجهيز مسابقة',followup:'متابعة مخدومين',other:'أخرى'};
+const DS={todo:'لسه',doing:'جاري',done:'خلّص',declined:'اعتذر'};
+const DC={todo:'#eee',doing:'#fde9b8',done:'#cfeedd',declined:'#f3d6d2'};
+const dutyOpen=x=>x.status==='todo'||x.status==='doing';
+const ftime=t=>{const [h,m]=String(t||'0:0').split(':').map(Number);return (h%12||12)+':'+String(m||0).padStart(2,'0')+(h>=12?' م':' ص')};
+const dstat=st=>`<span class="bd" style="background:${DC[st]||'#eee'}">${DS[st]||st}</span>`;
+const dcls=x=>{const c=x.class_id&&S.classes.find(k=>k.id===x.class_id);return c?' · '+esc(cLabel(c)):''};
+async function loadDuty(){
+  const r=await sb.from('duties').select('*').order('meet_date',{ascending:false}).order('meet_time').limit(600);
+  S.dty=r.error?[]:(r.data||[]);S.dtyErr=r.error?r.error.message:'';
+}
+const dutyRows=()=>{const a=S.dty||[];if(!secOn())return a;const pu=new Set(S.profiles.map(q=>q.id));return a.filter(x=>pu.has(x.assigned_to))};
+function dutyBadge(){
+  const td=today(),A=dutyRows();
+  const n=canManage()?A.filter(x=>x.status==='declined'&&x.meet_date>=td).length:A.filter(x=>x.assigned_to===S.p.id&&dutyOpen(x)&&x.meet_date>=td).length;
+  return n?(canManage()?' ⚠️':' ')+'('+n+')':'';
+}
+function vDuty(){
+  if(!S.dty)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
+  return (S.dtyErr?`<div class="card"><div class="empty" style="color:var(--red)">تعذّر تحميل التوزيعة. لو أول مرة: شغّل ملف <b dir="ltr">18_weekly_duties.sql</b> في Supabase.<small dir="ltr" style="text-align:left">${esc(S.dtyErr)}</small></div></div>`:'')+(canManage()?vDutyMgr():vDutyMine());
+}
+function vDutyMine(){
+  const td=today(),all=dutyRows().filter(x=>x.assigned_to===S.p.id);
+  const up=all.filter(x=>x.meet_date>=td).sort((a,b)=>(a.meet_date+a.meet_time).localeCompare(b.meet_date+b.meet_time));
+  const past=all.filter(x=>x.meet_date<td).slice(0,10);
+  const btn=(x,st,n,cls)=>`<button class="s${cls?' '+cls:''}" data-a="dutySt" data-id="${x.id}|${st}">${n}</button>`;
+  const card=x=>`<div class="card"${x.status==='declined'?' style="border-color:var(--red)"':x.status==='done'?' style="opacity:.8"':''}>
+    <div class="row" style="border-top:0;padding:0 0 6px;align-items:flex-start"><div><h2 style="margin:0">${esc(x.title)}</h2><small>${DK[x.kind]||''}${dcls(x)} · ${fdate(x.meet_date)} · ${ftime(x.meet_time)}</small></div>${dstat(x.status)}</div>
+    ${x.details?`<p style="margin:6px 0;white-space:pre-wrap">${esc(x.details)}</p>`:''}
+    ${x.status==='declined'?`<p class="empty" style="color:var(--red)">سبب اعتذارك: ${esc(x.decline_reason||'')}</p>`:''}
+    <div class="acts" style="justify-content:flex-start">${x.status==='todo'?btn(x,'doing','بدأت')+btn(x,'done','خلّصت ✓','on')+btn(x,'declined','اعتذار','d'):x.status==='doing'?btn(x,'done','خلّصت ✓','on')+btn(x,'declined','اعتذار','d')+btn(x,'todo','رجوع لسه'):btn(x,'todo','رجوع')}</div></div>`;
+  const open=up.filter(dutyOpen).length;
+  return `<div class="card"><h2>توزيعتي</h2><div class="cnt"><span>مطلوب مني ${open}</span><span>خلّصت ${up.filter(x=>x.status==='done').length}</span>${up.some(x=>x.status==='declined')?`<span>اعتذرت ${up.filter(x=>x.status==='declined').length}</span>`:''}</div><button class="s" data-a="dutyRefresh">🔄 تحديث</button></div>
+  ${up.map(card).join('')||'<div class="card"><div class="empty">مفيش مهام عليك في الاجتماعات الجاية.</div></div>'}
+  ${past.length?`<div class="card"><h2>اللي فاتت</h2>${past.map(x=>`<div class="row"><div>${esc(x.title)}<small>${fdate(x.meet_date)}</small></div>${dstat(x.status)}</div>`).join('')}</div>`:''}`;
+}
+function vDutyMgr(){
+  const td=today(),A=dutyRows(),sv=servList().sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ar'));
+  const dates=[...new Set(A.map(x=>x.meet_date))].sort().reverse();
+  if(!S.dd||!dates.includes(S.dd))S.dd=dates.filter(d=>d>=td).slice(-1)[0]||dates[0]||'';
+  const D=A.filter(x=>x.meet_date===S.dd),cnt=st=>D.filter(x=>x.status===st).length;
+  let ht='';try{ht=localStorage.getItem('khedma_dtime')||''}catch(_){}
+  const sname_=p=>esc(p.full_name||'بدون اسم')+(isAdmin()&&p.section?badge(p.section):'');
+  const form=`<div class="card"><h2>توزيعة جديدة</h2>
+    <select id="du_sv"><option value="">اختار الخادم</option>${opts(sv,p=>(p.full_name||'بدون اسم')+(isAdmin()&&p.section?' · '+SEC[p.section]:''))}</select>
+    <select id="du_k">${Object.entries(DK).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select>
+    <input id="du_t" maxlength="120" placeholder="المطلوب (مثال: فقرة قصة القديس مار مينا)">
+    <textarea id="du_n" rows="2" maxlength="1000" placeholder="تفاصيل (اختياري): الأدوات، المدة، أسماء المخدومين..."></textarea>
+    <select id="du_c"><option value="">الفصل (اختياري)</option>${opts(S.classes,cLabel)}</select>
+    <div class="two"><input id="du_d" type="date" value="${S.dd&&S.dd>=td?S.dd:td}" aria-label="تاريخ الاجتماع"><input id="du_h" type="time" value="${esc(ht)}" aria-label="ساعة الاجتماع"></div>
+    <button class="p" data-a="dutyAdd">توزيع وإرسال إشعار للخادم</button></div>`;
+  const dec=A.filter(x=>x.status==='declined'&&x.meet_date>=td);
+  const decCard=dec.length?`<div class="card" style="border-color:var(--red)"><h2>⚠️ اعتذروا عن التوزيعة (${dec.length})</h2>${dec.map(x=>{const p=S.profiles.find(q=>q.id===x.assigned_to)||{};return `<div class="row" style="align-items:flex-start"><div><b>${sname_(p)}</b> · ${esc(x.title)}<small>${DK[x.kind]||''}${dcls(x)} · ${fdate(x.meet_date)} · ${ftime(x.meet_time)}</small><small style="color:var(--red)">السبب: ${esc(x.decline_reason||'—')}</small></div><div class="acts"><select id="du_re_${x.id}" style="width:auto;margin:0"><option value="">أسندها لـ...</option>${opts(sv.filter(q=>q.id!==x.assigned_to),q=>q.full_name||'بدون اسم')}</select><button class="s on" data-a="dutyRe" data-id="${x.id}">إسناد</button></div></div>`}).join('')}</div>`:'';
+  const by={};D.forEach(x=>(by[x.assigned_to]=by[x.assigned_to]||[]).push(x));
+  const ord={declined:0,todo:1,doing:2,done:3};
+  const groups=Object.entries(by).map(([id,L])=>({p:S.profiles.find(q=>q.id===id)||{id,full_name:'؟'},L:L.sort((a,b)=>ord[a.status]-ord[b.status])}))
+    .sort((a,b)=>(a.L.every(x=>x.status==='done')-b.L.every(x=>x.status==='done'))||(a.p.full_name||'').localeCompare(b.p.full_name||'','ar'));
+  const none=sv.filter(p=>!by[p.id]);
+  const times=[...new Set(D.map(x=>ftime(x.meet_time)))].join(' / ');
+  const list=S.dd?`<div class="card"><h2>${fdate(S.dd)}${times?' · '+times:''}</h2>
+    <select data-a="dutyDate">${dates.map(d=>{const L=A.filter(x=>x.meet_date===d);return `<option value="${d}"${d===S.dd?' selected':''}>${fdate(d)} · خلّص ${L.filter(x=>x.status==='done').length} من ${L.length}${d===td?' (النهارده)':''}</option>`}).join('')}</select>
+    <div class="cnt"><span>✅ خلّص ${cnt('done')}</span><span>⏳ جاري ${cnt('doing')}</span><span>🕓 لسه ${cnt('todo')}</span><span>❌ اعتذر ${cnt('declined')}</span></div>
+    <div class="acts" style="justify-content:flex-start"><button class="s" data-a="dutyRefresh">🔄 تحديث</button>${D.some(dutyOpen)?`<button class="s on" data-a="dutyNudge">🔔 ذكّر اللي لسه (${D.filter(dutyOpen).length})</button>`:''}</div></div>
+    ${groups.map(g=>`<div class="card"><h2>${sname_(g.p)} <small style="display:inline;font-weight:400;color:var(--mut)">خلّص ${g.L.filter(x=>x.status==='done').length} من ${g.L.length}</small></h2>${g.L.map(x=>`<div class="row" style="align-items:flex-start"><div>${esc(x.title)} ${dstat(x.status)}<small>${DK[x.kind]||''}${dcls(x)}${x.details?' · '+esc(x.details.length>90?x.details.slice(0,90)+'…':x.details):''}</small>${x.status==='declined'?`<small style="color:var(--red)">السبب: ${esc(x.decline_reason||'—')}</small>`:''}${x.status==='done'&&x.done_at?`<small>خلّص ${new Date(x.done_at).toLocaleString('ar-EG',{weekday:'long',hour:'numeric',minute:'2-digit'})}</small>`:''}</div><div class="acts">${x.status==='done'?`<button class="s" data-a="dutySt" data-id="${x.id}|todo">رجوع</button>`:x.status!=='declined'?`<button class="s on" data-a="dutySt" data-id="${x.id}|done">تم</button>`:''}<button class="s d" data-a="dutyDel" data-id="${x.id}">حذف</button></div></div>`).join('')}</div>`).join('')}
+    ${none.length?`<div class="card"><h2>من غير توزيعة (${none.length})</h2><div class="empty">${none.map(p=>esc(p.full_name||'بدون اسم')).join(' · ')}</div></div>`:''}`
+    :'<div class="card"><div class="empty">لسه مفيش توزيعة. ابدأ بإضافة أول مهمة من فوق.</div></div>';
+  return decCard+form+list;
 }
 const PST={todo:'لم يبدأ',doing:'جاري',ready:'جاهز'};
 function vPrep(){
@@ -988,7 +1058,7 @@ app.addEventListener('click',async e=>{
   if(a==='out'){await sb.auth.signOut();return login()}
   if(a==='diag')return diagOpen();
   if(a==='nt')return ntOpen(b);
-  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(['follow','rep','home','mycls','mysv'].includes(id))await loadHist();if(['mycls','mypr'].includes(id))await loadMates();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='msg')await loadMsg();if(id==='pst')await loadPst();if(id==='set'){S.pushSt=await pushState();await loadTpl()}if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
+  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(['follow','rep','home','mycls','mysv'].includes(id))await loadHist();if(['mycls','mypr'].includes(id))await loadMates();if(id==='comp')await loadComp();if(id==='duty')await loadDuty();if(id==='ann')await loadAnn();if(id==='msg')await loadMsg();if(id==='pst')await loadPst();if(id==='set'){S.pushSt=await pushState();await loadTpl()}if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
   if(a==='joinGo')return joinGo();
   if(a==='joinhome'){history.replaceState(null,'',location.pathname);return boot()}
   if(a==='mkInv')return mkInv();
@@ -1157,6 +1227,35 @@ app.addEventListener('click',async e=>{
     const r=await sb.from('lesson_prep').update({approved:!p.approved}).eq('id',id);
     if(!ok(r))return;await loadExtra();return render();
   }
+  if(a==='dutyAdd'){
+    const sv=v('du_sv'),t=v('du_t'),d=v('du_d'),h=v('du_h');
+    if(!sv)return toast('اختار الخادم');if(!t)return toast('اكتب المطلوب');if(!d)return toast('اختار تاريخ الاجتماع');if(!h)return toast('اختار ساعة الاجتماع');
+    const r=await sb.from('duties').insert({assigned_to:sv,kind:v('du_k'),title:t,details:document.getElementById('du_n').value.trim()||null,class_id:v('du_c')||null,meet_date:d,meet_time:h});
+    if(!ok(r))return;try{localStorage.setItem('khedma_dtime',h)}catch(_){}
+    S.dd=d;await loadDuty();render();return toast('اتوزّعت، وبعتنا إشعار للخادم');
+  }
+  if(a==='dutySt'){
+    const[did,st]=id.split('|');let reason=null;
+    if(st==='declined'){reason=prompt('اكتب سبب الاعتذار (هيوصل لأبونا ولأمين الخدمة):');if(reason===null)return;if(!reason.trim())return toast('لازم تكتب السبب');}
+    const r=await sb.from('duties').update({status:st,decline_reason:reason?reason.trim():null}).eq('id',did);
+    if(!ok(r))return;await loadDuty();render();return toast(st==='done'?'تمام، اتعلّمت خلّصت':st==='declined'?'اتبعت اعتذارك للأمين':'تم');
+  }
+  if(a==='dutyRe'){
+    const el=document.getElementById('du_re_'+id);if(!el||!el.value)return toast('اختار الخادم اللي هتسندها له');
+    const r=await sb.from('duties').update({assigned_to:el.value}).eq('id',id);
+    if(!ok(r))return;await loadDuty();render();return toast('اتسندت وبعتنا إشعار للخادم');
+  }
+  if(a==='dutyDel'){
+    if(!confirm('حذف المهمة دي من التوزيعة؟'))return;
+    const r=await sb.from('duties').delete().eq('id',id);
+    if(!ok(r))return;await loadDuty();render();return toast('اتحذفت');
+  }
+  if(a==='dutyNudge'){
+    const {data,error}=await sb.rpc('kh_duty_nudge',{p_date:S.dd});
+    if(error)return toast('حصل خطأ: '+error.message);
+    return toast(data?'اتبعت تذكير لـ '+data+' خادم':'الكل اتذكّر من أقل من ساعتين');
+  }
+  if(a==='dutyRefresh'){await loadDuty();render();return toast('اتحدّث')}
   if(a==='srvEdit'){S.sed=id;S.sso=id;render();return window.scrollTo(0,0)}
   if(a==='srvCancel'){S.sed=null;return render()}
   if(a==='srvSave'){
@@ -1189,6 +1288,7 @@ app.addEventListener('change',async e=>{
   if(b.dataset.a==='attClass'){S.ac=b.value;if(['mycls','mypr'].includes(S.tab))await loadMates();return render()}
   if(b.dataset.a==='satDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='prepDate'){S.pd=b.value||today();return render()}
+  if(b.dataset.a==='dutyDate'){S.dd=b.value;return render()}
   if(b.dataset.a==='attDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='filter'){S.f=b.value;S.lim=50;return render()}
   if(b.dataset.a==='annscope'){const x=b.value;const w=document.getElementById('ascw'),c=document.getElementById('aclw');if(w)w.style.display=(x==='section'&&isAdmin())?'block':'none';if(c)c.style.display=x==='class'?'block':'none';return}
