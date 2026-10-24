@@ -573,7 +573,7 @@ function ntOpen(b){
 async function loadNotifs(){const r=await sb.from('notifications').select('*').eq('user_id',S.p.id).order('created_at',{ascending:false}).limit(50);S.nt=r.error?[]:(r.data||[])}
 function vNotif(){
   const L=S.nt||[],n=unread(),dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});
-  return pushCard()+`<div class="card"><button class="s" data-a="diag">🩺 فحص الإشعارات واختبارها</button> <button class="s" data-a="outAll">تسجيل الخروج من كل الأجهزة</button></div><div class="card"><h2>الإشعارات${n?' ('+n+' جديد)':''}</h2>${n?'<button class="s" data-a="readAll" style="margin-bottom:8px">تحديد الكل كمقروء</button>':''}${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div>${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}</div>`).join('')||'<div class="empty">مفيش إشعارات.</div>'}</div>`;
+  return pushCard()+`<div class="card"><button class="s" data-a="diag">🩺 فحص الإشعارات واختبارها</button> <button class="s" data-a="outAll">تسجيل الخروج من كل الأجهزة</button></div><div class="card"><h2>الإشعارات${n?' ('+n+' جديد)':''}</h2>${n?'<button class="s" data-a="readAll" style="margin-bottom:8px">تحديد الكل كمقروء</button>':''}${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div><div class="acts">${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}${String(x.title||'').startsWith('✉️')?`<button class="s${S.rpn===x.id?' on':''}" data-a="replyOpen" data-id="${x.id}">رد</button>`:''}</div>${S.rpn===x.id?`<div style="flex-basis:100%"><textarea id="rp_b" rows="3" maxlength="500" data-a="rpdraft" placeholder="اكتب ردك...">${esc(S.rpd||'')}</textarea><button class="p" data-a="replySend" data-id="${x.id}">إرسال الرد</button></div>`:''}</div>`).join('')||'<div class="empty">مفيش إشعارات.</div>'}</div>`;
 }
 async function loadAnn(){const r=await sb.from('announcements').select('*').order('created_at',{ascending:false}).limit(30);S.an=r.error?[]:(r.data||[]).filter(a=>!secOn()||a.scope==='all'||a.section===S.sec||(a.class_id&&S.classes.some(c=>c.id===a.class_id)));if(r.error)toast('تعذّر تحميل الإعلانات: '+r.error.message)}
 function vAnn(){
@@ -1023,6 +1023,14 @@ app.addEventListener('click',async e=>{
   if(a==='pushOn'){await pushEnable();S.pushSt=await pushState();return paint()}
   if(a==='pushOff'){await pushDisable();S.pushSt=await pushState();return paint()}
   if(a==='bell'){S.pushSt=await pushState();await loadNotifs();if(S.p.role==='parent')S.pbell=!S.pbell;else S.tab='notif';return paint()}
+  if(a==='replyOpen'){S.rpn=S.rpn===id?null:id;S.rpd='';return paint()}
+  if(a==='replySend'){
+    const body=document.getElementById('rp_b').value.trim();if(!body)return toast('اكتب الرد');
+    const {error}=await sb.rpc('kh_reply',{p_notification:id,p_body:body});
+    if(error)return toast(MSGERR[error.message]||('حصل خطأ: '+error.message));
+    await sb.from('notifications').update({is_read:true}).eq('id',id);
+    S.rpn=null;S.rpd='';await loadNotifs();toast('اتبعت الرد');return paint();
+  }
   if(a==='readAll'){const r=await sb.from('notifications').update({is_read:true}).eq('user_id',S.p.id).eq('is_read',false);if(!ok(r))return;await loadNotifs();return paint()}
   if(a==='readN'){const r=await sb.from('notifications').update({is_read:true}).eq('id',id);if(!ok(r))return;await loadNotifs();return paint()}
   if(a==='annSend'){
@@ -1203,7 +1211,8 @@ document.getElementById('pf').addEventListener('change',async e=>{
   }catch(_){toast('الصورة دي مش مقبولة، جرّب صورة تانية')}
 });
 app.addEventListener('input',e=>{
-  const b=e.target;if(b&&b.dataset&&b.dataset.a==='msgfind'){const q=nz(b.value);document.querySelectorAll('.smlbl').forEach(l=>l.style.display=(!q||l.dataset.n.includes(q))?'flex':'none');return}
+  const b=e.target;if(b&&b.dataset&&b.dataset.a==='rpdraft'){S.rpd=b.value;return}
+  if(b&&b.dataset&&b.dataset.a==='msgfind'){const q=nz(b.value);document.querySelectorAll('.smlbl').forEach(l=>l.style.display=(!q||l.dataset.n.includes(q))?'flex':'none');return}
   if(b&&b.dataset&&b.dataset.a==='srvsearch'){clearTimeout(S.qt);S.qt=setTimeout(()=>{S.sq=b.value;const l=document.getElementById('srl');if(l)l.innerHTML=srvList()},150);return}
   if(!b||!b.dataset||b.dataset.a!=='search')return;
   clearTimeout(S.qt);S.qt=setTimeout(()=>{S.q=b.value;S.lim=50;const l=document.getElementById('sl');if(l)l.innerHTML=svList()},150);
