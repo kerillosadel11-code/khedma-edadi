@@ -596,10 +596,11 @@ function vMsg(){
   const tl=m=>(m.audience==='parents'?'أولياء أمور · ':'خدام · ')+(m.target==='all'?'الكل':m.target==='class'?'فصل '+esc(cname(m.class_id)):m.target==='servee'?'أهل '+esc(sname(m.servee_id)):m.target==='one'?'ولي أمر معيّن':'مختارين');
   const st=tplOf('servant_msg')||{title:'',body:''};
   return `<div class="card"><h2>رسالة جديدة</h2>
-  <select id="sm_au" data-a="msgau"><option value="servants">لخدام</option><option value="parents">لأولياء أمور</option></select>
-  <div id="sm_sv"><select id="sm_tg" data-a="msgtgt"><option value="all">${isAdmin()?(S.sec?'كل خدام '+SEC[S.sec]:'كل الخدام'):'كل خدامي'}</option><option value="class">خدام فصل معين</option><option value="selected">خدام أختارهم (واحد أو أكتر)</option></select>
+  <select id="sm_au" data-a="msgau"><option value="servants">لخدام</option><option value="parents">لأولياء أمور</option>${isAdmin()?'<option value="secs">لأمناء الخدمة</option>':''}</select>
+  <div id="sm_sv"><select id="sm_tg" data-a="msgtgt"><option value="all">${isAdmin()?(S.sec?'كل خدام '+SEC[S.sec]:'كل الخدام'):'كل خدامي'}</option><option value="class">خدام فصل / مرحلة معينة</option><option value="selected">خادم بعينه (أو أكتر)</option></select>
   <div id="sm_cw" style="display:none"><select id="sm_cl"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
-  <div id="sm_sw" style="display:none;max-height:220px;overflow:auto;border:1px solid #ddd;border-radius:8px;padding:6px;margin:6px 0">${sv.map(p=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" class="smchk" value="${p.id}"> ${esc(p.full_name)}</label>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div></div>
+  <div id="sm_sw" style="display:none"><input type="search" data-a="msgfind" data-t="smchk" placeholder="ابحث باسم الخادم"><div style="max-height:220px;overflow:auto;border:1px solid #ddd;border-radius:8px;padding:6px;margin:6px 0">${sv.map(p=>`<label class="smlbl" data-n="${esc(nz(p.full_name))}" style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" class="smchk" value="${p.id}"> ${esc(p.full_name)}<small style="margin-inline-start:auto">${esc(srvClasses(p.id).map(c=>c.name).join(' · '))}</small></label>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div></div></div>
+  <div id="sm_se" style="display:none"><select id="sm_st" data-a="msgst"><option value="all">${S.sec?'كل أمناء خدمة '+SEC[S.sec]:'كل أمناء الخدمة'}</option><option value="selected">أمين بعينه</option></select><div id="sm_sew" style="display:none;border:1px solid #ddd;border-radius:8px;padding:6px;margin:6px 0">${S.profiles.filter(p=>p.role==='secretary'&&p.active).map(p=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" class="smsec" value="${p.id}"> ${esc(p.full_name)} ${badge(p.section)}</label>`).join('')||'<div class="empty">مفيش أمناء خدمة.</div>'}</div></div>
   <div id="sm_pa" style="display:none"><select id="sm_pt" data-a="msgpt"><option value="all">${isAdmin()?(S.sec?'كل أولياء أمور '+SEC[S.sec]:'كل أولياء الأمور'):'كل أولياء أمور قسمي'}</option><option value="class">أولياء أمور فصل</option><option value="servee">أولياء أمور مخدوم معيّن</option><option value="one">ولي أمر معيّن</option></select>
   <div id="sm_pcw" style="display:none"><select id="sm_pcl"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
   <div id="sm_psw" style="display:none"><select id="sm_ps"><option value="">اختار المخدوم</option>${S.servees.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.full_name)} — ${esc(cname(x.class_id))}</option>`).join('')}</select></div>
@@ -1036,7 +1037,11 @@ app.addEventListener('click',async e=>{
     const au=v('sm_au'),title=v('sm_t'),body=document.getElementById('sm_b').value.trim();
     if(!body)return toast('اكتب نص الرسالة');
     let fn,args;
-    if(au==='servants'){
+    if(au==='secs'){
+      const tg=v('sm_st'),us=tg==='selected'?[...document.querySelectorAll('.smsec:checked')].map(x=>x.value):S.profiles.filter(p=>p.role==='secretary'&&p.active).map(p=>p.id);
+      if(!us.length)return toast(tg==='selected'?'اختار أمين واحد على الأقل':'مفيش أمناء خدمة');
+      fn='kh_msg_servants';args={p_title:title||null,p_body:body,p_target:'selected',p_class:null,p_users:us,p_section:null};
+    }else if(au==='servants'){
       const tg=v('sm_tg'),cl=tg==='class'?v('sm_cl'):null,us=tg==='selected'?[...document.querySelectorAll('.smchk:checked')].map(x=>x.value):null;
       if(tg==='class'&&!cl)return toast('اختار الفصل');
       if(tg==='selected'&&!us.length)return toast('اختار خادم واحد على الأقل');
@@ -1051,7 +1056,7 @@ app.addEventListener('click',async e=>{
     if(!confirm('إرسال الرسالة دلوقتي؟'))return;
     const {data,error}=await sb.rpc(fn,args);
     if(error)return toast(MSGERR[error.message]||('حصل خطأ: '+error.message));
-    toast('اتبعتت لـ '+data+(au==='servants'?' خادم':' ولي أمر'));S.msgOpen=null;await loadMsg();return render();
+    toast('اتبعتت لـ '+data+(au==='parents'?' ولي أمر':au==='secs'?' أمين':' خادم'));S.msgOpen=null;await loadMsg();return render();
   }
   if(a==='msgOpen'){
     if(S.msgOpen===id){S.msgOpen=null;return render()}
@@ -1151,7 +1156,8 @@ app.addEventListener('change',async e=>{
   if(b.dataset.a==='attDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='filter'){S.f=b.value;S.lim=50;return render()}
   if(b.dataset.a==='annscope'){const x=b.value;const w=document.getElementById('ascw'),c=document.getElementById('aclw');if(w)w.style.display=(x==='section'&&isAdmin())?'block':'none';if(c)c.style.display=x==='class'?'block':'none';return}
-  if(b.dataset.a==='msgau'){const x=b.value,sv=document.getElementById('sm_sv'),pa=document.getElementById('sm_pa'),bd=document.getElementById('sm_b'),ti=document.getElementById('sm_t');sv.style.display=x==='servants'?'block':'none';pa.style.display=x==='parents'?'block':'none';const t=tplOf(x==='servants'?'servant_msg':'parent_msg'),o=tplOf(x==='servants'?'parent_msg':'servant_msg');if(t&&(!bd.value.trim()||(o&&bd.value===o.body))){bd.value=t.body;ti.value=t.title}return}
+  if(b.dataset.a==='msgau'){const x=b.value,sv=document.getElementById('sm_sv'),pa=document.getElementById('sm_pa'),bd=document.getElementById('sm_b'),ti=document.getElementById('sm_t');sv.style.display=x==='servants'?'block':'none';pa.style.display=x==='parents'?'block':'none';const se=document.getElementById('sm_se');if(se)se.style.display=x==='secs'?'block':'none';const t=tplOf(x==='parents'?'parent_msg':'servant_msg'),o=tplOf(x==='parents'?'servant_msg':'parent_msg');if(t&&(!bd.value.trim()||(o&&bd.value===o.body))){bd.value=t.body;ti.value=t.title}return}
+  if(b.dataset.a==='msgst'){const w=document.getElementById('sm_sew');if(w)w.style.display=b.value==='selected'?'block':'none';return}
   if(b.dataset.a==='msgtgt'){const x=b.value,c=document.getElementById('sm_cw'),w=document.getElementById('sm_sw');if(c)c.style.display=x==='class'?'block':'none';if(w)w.style.display=x==='selected'?'block':'none';return}
   if(b.dataset.a==='msgpt'){const x=b.value;for(const [k,id] of [['class','sm_pcw'],['servee','sm_psw'],['one','sm_puw']]){const e=document.getElementById(id);if(e)e.style.display=x===k?'block':'none'}return}
   if(b.dataset.a==='pstf'){S.pstR=b.value;return render()}
@@ -1195,7 +1201,8 @@ document.getElementById('pf').addEventListener('change',async e=>{
   }catch(_){toast('الصورة دي مش مقبولة، جرّب صورة تانية')}
 });
 app.addEventListener('input',e=>{
-  const b=e.target;if(b&&b.dataset&&b.dataset.a==='srvsearch'){clearTimeout(S.qt);S.qt=setTimeout(()=>{S.sq=b.value;const l=document.getElementById('srl');if(l)l.innerHTML=srvList()},150);return}
+  const b=e.target;if(b&&b.dataset&&b.dataset.a==='msgfind'){const q=nz(b.value);document.querySelectorAll('.smlbl').forEach(l=>l.style.display=(!q||l.dataset.n.includes(q))?'flex':'none');return}
+  if(b&&b.dataset&&b.dataset.a==='srvsearch'){clearTimeout(S.qt);S.qt=setTimeout(()=>{S.sq=b.value;const l=document.getElementById('srl');if(l)l.innerHTML=srvList()},150);return}
   if(!b||!b.dataset||b.dataset.a!=='search')return;
   clearTimeout(S.qt);S.qt=setTimeout(()=>{S.q=b.value;S.lim=50;const l=document.getElementById('sl');if(l)l.innerHTML=svList()},150);
 });
