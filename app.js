@@ -446,20 +446,22 @@ const srvGrade=p=>{const g=srvClasses(p.id).map(clsGrade).filter(Boolean).sort()
 const srvSection=p=>p.section||(srvClasses(p.id).find(c=>c.section)||{}).section||'';
 const SST={present:'حاضر',absent:'غايب',excused:'معتذر'};
 const servList=()=>S.profiles.filter(p=>p.role==='servant'&&p.active);
+const secList=()=>S.profiles.filter(p=>p.role==='secretary'&&p.active);
+const attList=()=>servList().concat(secList());
 function vSat(){
   if(!canManage()){
     const H=S.sa.filter(x=>x.servant_id===S.p.id).sort((a,b)=>b.att_date.localeCompare(a.att_date)),P=H.filter(x=>x.status==='present').length;
     return `<div class="card"><h2>حضوري</h2><div class="cnt"><span>حاضر ${P}</span><span>غايب ${H.filter(x=>x.status==='absent').length}</span><span>معتذر ${H.filter(x=>x.status==='excused').length}</span>${H.length?`<span>نسبة الحضور ${Math.round(P*100/H.length)}%</span>`:''}</div></div>
     <div class="card"><h2>آخر الأيام</h2>${H.slice(0,30).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':h.status==='excused'?'var(--mut)':'var(--red)'}">${SST[h.status]}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`;
   }
-  const L=servList(),A=Object.fromEntries(S.sa.filter(x=>x.att_date===S.date).map(x=>[x.servant_id,x.status]));
+  const L=attList(),A=Object.fromEntries(S.sa.filter(x=>x.att_date===S.date).map(x=>[x.servant_id,x.status]));
   const P=L.filter(x=>A[x.id]==='present').length,B=L.filter(x=>A[x.id]==='absent').length,E=L.filter(x=>A[x.id]==='excused').length;
   const row=x=>{const q=srvPct(x.id,56);return `<div class="row"><div>${esc(x.full_name||'بدون اسم')}${q.n?`<small>حضور ${q.pct}% آخر 8 أسابيع${q.n>=3&&q.pct<60?' <span class="tag r">غير منتظم</span>':''}</small>`:''}</div><div class="acts"><button class="s ${A[x.id]==='present'?'on':''}" data-a="smark" data-id="${x.id}|present">حاضر</button><button class="s ${A[x.id]==='absent'?'on bad':''}" data-a="smark" data-id="${x.id}|absent">غايب</button><button class="s ${A[x.id]==='excused'?'on':''}" data-a="smark" data-id="${x.id}|excused">معتذر</button></div></div>`};
   const grp=(arr,title)=>arr.length?`<div class="card"><h2>${title} (${arr.length})</h2>${arr.map(row).join('')}</div>`:'';
-  const byGrade=(arr,pre)=>SAT_GR.map(([k,n])=>grp(arr.filter(x=>srvGrade(x)===k),pre+n)).join('');
+  const byGrade=(arr,pre)=>SAT_GR.map(([k,n])=>grp(arr.filter(x=>x.role!=='secretary'&&srvGrade(x)===k),pre+n)).join('');
   const secs=isAdmin()&&!S.sec?[['boys','خدمة بنين'],['girls','خدمة بنات']]:[['','']];
-  let body=secs.map(([sc,sn])=>byGrade(sc?L.filter(x=>srvSection(x)===sc):L,sn?sn+' · ':'')).join('');
-  if(isAdmin()&&!S.sec)body+=grp(L.filter(x=>!srvSection(x)),'بدون قسم');
+  let body=secs.map(([sc,sn])=>grp(L.filter(x=>x.role==='secretary'&&(!sc||x.section===sc)),sn?'أمناء '+sn:'أمناء الخدمة')+byGrade(sc?L.filter(x=>srvSection(x)===sc):L,sn?sn+' · ':'')).join('');
+  if(isAdmin()&&!S.sec)body+=grp(L.filter(x=>x.role!=='secretary'&&!srvSection(x)),'بدون قسم')+grp(L.filter(x=>x.role==='secretary'&&!x.section),'أمناء بدون قسم');
   return `<div class="card"><h2>حضور الخدام</h2><input type="date" data-a="satDate" value="${S.date}" max="${today()}">
   <div class="cnt"><span>حاضر ${P}</span><span>غايب ${B}</span><span>معتذر ${E}</span><span>لسه ${L.length-P-B-E}</span></div>
   <button class="s" data-a="satRest">سجّل الباقي غياب</button></div>${body||'<div class="card"><div class="empty">مفيش خدام مفعّلين لسه.</div></div>'}`;
@@ -603,8 +605,8 @@ function vRep(){
     <div class="card"><h2>المخدومين (${st.length})</h2>${st.map(({x,st:t})=>`<div class="row"><div>${esc(x.full_name)}<small>حاضر ${t.present} من ${t.sessions}${t.streak>=2?' · غايب '+t.streak+' ورا بعض':''}</small></div><div style="width:40%;text-align:left">${t.pct===null?'—':t.pct+'%'}${bar(t.pct)}</div></div>`).join('')||'<div class="empty">مفيش مخدومين.</div>'}</div>`}
   let sv='';
   if(canManage()&&S.profiles.length){const d0=new Date(Date.now()-days*864e5).toISOString().slice(0,10);
-    const L=servList().map(p=>{const r=S.sa.filter(x=>x.servant_id===p.id&&x.att_date>=d0),pr=r.filter(x=>x.status==='present').length;return{p,pr,ab:r.filter(x=>x.status==='absent').length,ex:r.filter(x=>x.status==='excused').length,n:r.length,pct:r.length?Math.round(pr*100/r.length):null}}).sort((a,b)=>(a.pct??101)-(b.pct??101));
-    sv=`<div class="card"><h2>حضور الخدام (${L.length})</h2><button class="s" data-a="exp" data-id="servants" style="margin-bottom:8px">تصدير Excel (CSV)</button>${L.map(o=>`<div class="row"><div>${esc(o.p.full_name||'بدون اسم')}${isAdmin()?badge(o.p.section):''}<small>حاضر ${o.pr} · غايب ${o.ab} · معتذر ${o.ex}</small></div><div style="width:40%;text-align:left">${o.pct===null?'—':o.pct+'%'}${bar(o.pct)}</div></div>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div>`}
+    const L=attList().map(p=>{const r=S.sa.filter(x=>x.servant_id===p.id&&x.att_date>=d0),pr=r.filter(x=>x.status==='present').length;return{p,pr,ab:r.filter(x=>x.status==='absent').length,ex:r.filter(x=>x.status==='excused').length,n:r.length,pct:r.length?Math.round(pr*100/r.length):null}}).sort((a,b)=>(a.pct??101)-(b.pct??101));
+    sv=`<div class="card"><h2>حضور الخدام (${L.length})</h2><button class="s" data-a="exp" data-id="servants" style="margin-bottom:8px">تصدير Excel (CSV)</button>${L.map(o=>`<div class="row"><div>${esc(o.p.full_name||'بدون اسم')}${o.p.role==='secretary'?'<span class="bd">أمين</span>':''}${isAdmin()?badge(o.p.section):''}<small>حاضر ${o.pr} · غايب ${o.ab} · معتذر ${o.ex}</small></div><div style="width:40%;text-align:left">${o.pct===null?'—':o.pct+'%'}${bar(o.pct)}</div></div>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div>`}
   return `<div class="card"><h2>تقارير الحضور</h2><div class="two"><select data-a="rc"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.rc)}</select><select data-a="rd">${[[28,'آخر 4 أسابيع'],[56,'آخر 8 أسابيع'],[90,'آخر 90 يوم']].map(([n,l])=>`<option value="${n}"${days===n?' selected':''}>${l}</option>`).join('')}</select></div></div>
   <div class="card"><h2>الفصول</h2><button class="s" data-a="exp" data-id="servees" style="margin-bottom:8px">تصدير Excel (CSV)</button>${crow.map(o=>`<div class="row"><div>${esc(cLabel(o.c))}<small>${o.act.length} مخدوم · ${o.ds.length} اجتماع</small></div><div style="width:40%;text-align:left">${o.avg===null?'—':o.avg+'%'}${bar(o.avg)}</div></div>`).join('')||'<div class="empty">مفيش فصول.</div>'}</div>${det}${sv}`;
 }
@@ -1357,10 +1359,10 @@ app.addEventListener('click',async e=>{
   if(a==='satRest'){
     if(!confirm('تسجيل كل اللي لسه ما اتحضروش كغايبين؟'))return;
     const done=new Set(S.sa.filter(x=>x.att_date===S.date).map(x=>x.servant_id));
-    const rows=servList().filter(p=>!done.has(p.id)).map(p=>({servant_id:p.id,att_date:S.date,status:'absent'}));
+    const rows=attList().filter(p=>!done.has(p.id)).map(p=>({servant_id:p.id,att_date:S.date,status:'absent'}));
     if(!rows.length)return toast('الكل متسجّل');
     const r=await sb.from('servant_attendance').upsert(rows,{onConflict:'servant_id,att_date'});
-    if(!ok(r))return;await loadExtra();render();return toast('اتسجّل غياب '+rows.length+' خادم');
+    if(!ok(r))return;await loadExtra();render();return toast('اتسجّل غياب '+rows.length+' (خدام وأمناء)');
   }
   if(a==='prepSave'){
     const cid=acid();if(!cid)return;
