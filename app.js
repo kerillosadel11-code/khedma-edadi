@@ -165,14 +165,14 @@ const cname=id=>{const c=S.classes.find(c=>c.id===id);return c?cLabel(c):'بدو
 const pname=id=>(S.profiles.find(c=>c.id===id)||{}).full_name||'؟';
 const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
 
-const NAVIC={home:'🏠',mycls:'🧑‍🏫',mysv:'🧒',mypr:'👪',classes:'🏫',servees:'🧒',srv:'🤝',people:'👥',add:'➕',inv:'💬',att:'✅',sat:'🙋',prep:'📖',follow:'📞',comp:'🏆',ann:'📢',msg:'✉️',set:'⚙️',rep:'📊',audit:'🛡️',notif:'🔔'};
+const NAVIC={home:'🏠',mycls:'🧑‍🏫',mysv:'🧒',mypr:'👪',classes:'🏫',servees:'🧒',srv:'🤝',people:'👥',add:'➕',inv:'💬',att:'✅',sat:'🙋',prep:'📖',follow:'📞',comp:'🏆',ann:'📢',msg:'✉️',pst:'📡',set:'⚙️',rep:'📊',audit:'🛡️',notif:'🔔'};
 function render(){
   const adm=canManage();
   if(S.cards)return app.innerHTML=head()+vCards();
   if(S.pf)return app.innerHTML=head()+vProfile();
   if(!adm&&!['mycls','mysv','mypr','att','prep','sat','follow','comp','notif'].includes(S.tab))S.tab='mycls';
-  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['msg','الرسائل'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل'],['set','الإعدادات']]:[]):[['mycls','فصلي'],['mysv','المخدومين'],['mypr','أولياء الأمور'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['sat','حضوري']];
-  app.innerHTML=head()+`<main>${{mycls:vMyClass,mysv:vMyServees,mypr:vMyParents,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn,msg:vMsg,set:vSet}[S.tab]()}</main><nav class="bn">${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${n}</span></button>`).join('')}</nav>`;
+  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['msg','الرسائل'],['pst','حالة الإشعارات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل'],['set','الإعدادات']]:[]):[['mycls','فصلي'],['mysv','المخدومين'],['mypr','أولياء الأمور'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['sat','حضوري']];
+  app.innerHTML=head()+`<main>${{mycls:vMyClass,mysv:vMyServees,mypr:vMyParents,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn,msg:vMsg,pst:vPst,set:vSet}[S.tab]()}</main><nav class="bn">${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${n}</span></button>`).join('')}</nav>`;
   const on=document.querySelector('nav.bn .on');if(on)on.scrollIntoView({inline:'nearest',block:'nearest'});
 }
 function vClasses(){
@@ -608,6 +608,25 @@ function vSet(){
   <button class="p" data-a="tplSave" data-id="${t.key}">حفظ</button> <button class="s" data-a="tplPrev" data-id="${t.key}">معاينة</button> <button class="s" data-a="tplReset" data-id="${t.key}">رجّع الافتراضي</button></div>`).join('');
   return pushCard()+`<div class="card"><h2>الإشعارات</h2><button class="s" data-a="diag">🩺 فحص الإشعارات واختبارها</button><p class="empty">فعّل الإشعارات على جهازك من الكارت اللي فوق. الرسايل التلقائية تحت جاهزة، وبتتبدّل فيها {name} بأول اسمين من اسم المستلم، وتقدر تعدّل نصها.</p></div>`+cards;
 }
+const PST_ROLE={servant:'خادم',parent:'ولي أمر',secretary:'أمين خدمة'};
+const pstState=x=>x.subs===0?'off':((x.sent_30===0&&x.failed_30>0)?'warn':'on');
+async function loadPst(){const r=await sb.rpc('kh_push_status');S.pst=r.error?[]:(r.data||[]);if(r.error)toast('تعذّر تحميل حالة الإشعارات: '+r.error.message)}
+function vPst(){
+  if(S.pst==null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
+  const f=S.pstR||'',q=S.pstS||'',dt=x=>x?new Date(x).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}):'—';
+  const base=S.pst.filter(x=>!f||x.role===f),cnt={on:0,warn:0,off:0};base.forEach(x=>cnt[pstState(x)]++);
+  const ord={off:0,warn:1,on:2};
+  const L=base.filter(x=>!q||pstState(x)===q).sort((a,b)=>ord[pstState(a)]-ord[pstState(b)]||String(a.full_name||'').localeCompare(String(b.full_name||''),'ar'));
+  const msg=n=>encodeURIComponent('أهلاً '+n+'، عشان توصلك رسايل وتنبيهات خدمة إعدادي، افتح الرابط ده واضغط 🔔 ثم «تفعيل / إصلاح الاشتراك على الجهاز ده»: '+location.origin);
+  const stTxt={on:'✅ مفعّل',warn:'⚠️ مفعّل لكن آخر إرسال فشل',off:'❌ مش مفعّل'};
+  return `<div class="card"><h2>مين بيستقبل الإشعارات</h2>
+  <div class="cnt"><span>✅ مفعّل ${cnt.on}</span><span>⚠️ مشكلة ${cnt.warn}</span><span>❌ مش مفعّل ${cnt.off}</span></div>
+  <select data-a="pstf"><option value="">الكل</option><option value="servant"${f==='servant'?' selected':''}>الخدام</option><option value="parent"${f==='parent'?' selected':''}>أولياء الأمور</option>${isAdmin()?`<option value="secretary"${f==='secretary'?' selected':''}>أمناء الخدمة</option>`:''}</select>
+  <select data-a="psts"><option value="">كل الحالات</option><option value="off"${q==='off'?' selected':''}>مش مفعّل</option><option value="warn"${q==='warn'?' selected':''}>فيه مشكلة</option><option value="on"${q==='on'?' selected':''}>مفعّل</option></select>
+  <p class="empty">«مفعّل» معناه إن الشخص ده ضغط تفعيل الإشعارات على جهاز واحد على الأقل. ومحدش بيتحسب مفعّل لو فتح التطبيق بس.</p></div>
+  <div class="card"><h2>القايمة (${L.length})</h2>${L.map(x=>{const s=pstState(x),ph=normPhone(x.contact_phone||''),n=esc(String(x.full_name||'').split(/\s+/).slice(0,2).join(' '));
+  return `<div class="row"><div>${esc(x.full_name||'بدون اسم')} <span class="bd">${PST_ROLE[x.role]||''}</span>${isAdmin()&&x.section?badge(x.section):''}<small>${stTxt[s]}${x.subs?' · '+x.subs+' جهاز':''}</small><small>اشتراك: ${dt(x.last_sub)} · آخر محاولة إرسال: ${dt(x.last_attempt)} · وصل ${x.sent_30} / فشل ${x.failed_30} (آخر 30 يوم)</small></div><div class="acts">${s!=='on'&&ph?`<a class="s" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="https://wa.me/20${ph.slice(1)}?text=${msg(n)}">ذكّره واتساب</a>`:''}</div></div>`}).join('')||'<div class="empty">مفيش حد.</div>'}</div>`;
+}
 async function loadComp(){
   const [c,p]=await Promise.all([sb.from('competitions').select('*').order('starts_on',{ascending:false}),fetchAll(()=>sb.from('points').select('*').order('created_at',{ascending:false}).order('id'))]);
   if(c.error)toast('تعذّر تحميل المسابقات: '+c.error.message);
@@ -931,7 +950,7 @@ app.addEventListener('click',async e=>{
   if(a==='out'){await sb.auth.signOut();return login()}
   if(a==='diag')return diagOpen();
   if(a==='nt')return ntOpen(b);
-  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(['follow','rep','home','mycls','mysv'].includes(id))await loadHist();if(['mycls','mypr'].includes(id))await loadMates();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='msg')await loadMsg();if(id==='set'){S.pushSt=await pushState();await loadTpl()}if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
+  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(['follow','rep','home','mycls','mysv'].includes(id))await loadHist();if(['mycls','mypr'].includes(id))await loadMates();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='msg')await loadMsg();if(id==='pst')await loadPst();if(id==='set'){S.pushSt=await pushState();await loadTpl()}if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
   if(a==='joinGo')return joinGo();
   if(a==='joinhome'){history.replaceState(null,'',location.pathname);return boot()}
   if(a==='mkInv')return mkInv();
@@ -1124,6 +1143,8 @@ app.addEventListener('change',async e=>{
   if(b.dataset.a==='msgau'){const x=b.value,sv=document.getElementById('sm_sv'),pa=document.getElementById('sm_pa'),bd=document.getElementById('sm_b'),ti=document.getElementById('sm_t');sv.style.display=x==='servants'?'block':'none';pa.style.display=x==='parents'?'block':'none';const t=tplOf(x==='servants'?'servant_msg':'parent_msg'),o=tplOf(x==='servants'?'parent_msg':'servant_msg');if(t&&(!bd.value.trim()||(o&&bd.value===o.body))){bd.value=t.body;ti.value=t.title}return}
   if(b.dataset.a==='msgtgt'){const x=b.value,c=document.getElementById('sm_cw'),w=document.getElementById('sm_sw');if(c)c.style.display=x==='class'?'block':'none';if(w)w.style.display=x==='selected'?'block':'none';return}
   if(b.dataset.a==='msgpt'){const x=b.value;for(const [k,id] of [['class','sm_pcw'],['servee','sm_psw'],['one','sm_puw']]){const e=document.getElementById(id);if(e)e.style.display=x===k?'block':'none'}return}
+  if(b.dataset.a==='pstf'){S.pstR=b.value;return render()}
+  if(b.dataset.a==='psts'){S.pstS=b.value;return render()}
   if(b.dataset.a==='pc'){S.pc=b.value;return render()}
   if(b.dataset.a==='th'){S.th=+b.value;return render()}
   if(b.dataset.a==='rc'){S.rc=b.value;return render()}
