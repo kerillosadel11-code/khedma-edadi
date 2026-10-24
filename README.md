@@ -4,7 +4,7 @@ PWA عربي (RTL) على Supabase، مستضاف على Cloudflare Workers.
 
 ## الهيكل
 - `index.html` `sw.js` `manifest.json`: التطبيق نفسه (بيتنشر على Cloudflare).
-- `supabase/sql/`: ملفات SQL بالترتيب (06 ثم 07 ... ثم 17 ثم 18). كل ملف بيتنفّذ مرة واحدة في SQL Editor.
+- `supabase/sql/`: ملفات SQL بالترتيب (06 ثم 07 ... ثم 17 ثم 18 ثم 19). كل ملف بيتنفّذ مرة واحدة في SQL Editor.
 - `supabase/functions/`: دوال Edge (ببقى النشر من لوحة Supabase، Verify JWT = OFF للتنين):
   - `accept-invite`: قبول الدعوات (أمين / خادم / ولي أمر).
   - `set-active`: إيقاف وتفعيل الحسابات وقفل الدخول.

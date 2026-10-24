@@ -397,6 +397,11 @@ function vDutyMgr(){
   return decCard+form+list;
 }
 const PST={todo:'لم يبدأ',doing:'جاري',ready:'جاهز'};
+const PF=[['pv','main_verse','الآية الرئيسية',2],['pg','spiritual_goal','الهدف الروحي من الدرس',2],['pi','intro_aid','مقدمة أو وسيلة إيضاح',3],['pl','lesson_verse','آية الدرس',2],['pp','preamble','تمهيد للدرس',3],['ps_','summary','ملخص الدرس',4]];
+function prepEvalCard(cur){
+  if(isAdmin())return cur.id?`<div class="card"><h2>تقييم أبونا</h2><textarea id="pe" rows="3" maxlength="2000" placeholder="اكتب تقييمك لتحضير الدرس">${esc(cur.father_eval||'')}</textarea><button class="p" data-a="prepEval" data-id="${cur.id}">حفظ التقييم وإرساله لخدام الفصل</button></div>`:'<div class="card"><h2>تقييم أبونا</h2><div class="empty">الخادم لسه ما حفظش تحضير لليوم ده.</div></div>';
+  return cur.father_eval?`<div class="card" style="border-color:var(--gold)"><h2>تقييم أبونا</h2><p style="margin:0;white-space:pre-wrap">${esc(cur.father_eval)}</p>${cur.eval_at?`<small style="color:var(--mut)">${new Date(cur.eval_at).toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'})}</small>`:''}</div>`:'';
+}
 function vPrep(){
   if(!S.classes.length)return '<div class="card"><div class="empty">مفيش فصل مربوط بيك لسه. اطلب من أبونا يربطك بفصل.</div></div>';
   const cid=acid(),cur=S.lp.find(p=>p.class_id===cid&&p.prep_date===S.pd)||{},mg=canManage();
@@ -405,11 +410,13 @@ function vPrep(){
   return `<div class="card"><h2>تحضير الدرس</h2>
   <select data-a="attClass">${opts(S.classes,cLabel,cid)}</select>
   <input type="date" data-a="prepDate" value="${S.pd}" aria-label="تاريخ الدرس">
-  <input id="pt" placeholder="موضوع الدرس" value="${esc(cur.topic||'')}">
-  <textarea id="pn" rows="4" placeholder="ملاحظات التحضير (الأفكار، الأنشطة، الأدوات...)">${esc(cur.notes||'')}</textarea>
+  <input id="pt" maxlength="150" placeholder="عنوان الدرس" value="${esc(cur.topic||'')}">
+  ${PF.map(([id,k,lb,rw])=>`<label style="display:block;font-weight:600;font-size:14px;margin:2px 0">${lb}</label><textarea id="${id}" rows="${rw}" maxlength="3000">${esc(cur[k]||'')}</textarea>`).join('')}
+  <textarea id="pn" rows="2" maxlength="2000" placeholder="ملاحظات إضافية (اختياري)">${esc(cur.notes||'')}</textarea>
   <select id="ps">${Object.entries(PST).map(([k,n])=>`<option value="${k}"${(cur.status||'todo')===k?' selected':''}>${n}</option>`).join('')}</select>
   <button class="p" data-a="prepSave">حفظ التحضير</button>
   ${cur.approved?'<p class="empty">✓ معتمد من الأمين. أي تعديل من الخادم هيلغي الاعتماد.</p>':''}</div>
+  ${prepEvalCard(cur)}
   ${mg?`<div class="card"><h2>لسه ما جهّزوش في ${fdate(S.pd)} (${miss.length})</h2>${miss.map(c=>`<div class="row"><div>${esc(cLabel(c))}</div></div>`).join('')||'<div class="empty">كل الفصول جاهزة.</div>'}</div>`:''}
   <div class="card"><h2>تحضيرات الفصل (${L.length})</h2>${L.map(p=>`<div class="row"><div>${fdate(p.prep_date)}<span class="bd">${PST[p.status]||''}</span>${p.approved?'<span class="bd" style="background:#cfeedd">معتمد</span>':''}<small>${esc(p.topic||'من غير موضوع')}</small></div><div class="acts"><button class="s" data-a="prepOpen" data-id="${p.prep_date}">فتح</button>${mg&&p.status==='ready'?`<button class="s${p.approved?' on':''}" data-a="prepApp" data-id="${p.id}">${p.approved?'إلغاء الاعتماد':'اعتماد'}</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش تحضير للفصل ده.</div>'}</div>`;
 }
@@ -1217,9 +1224,16 @@ app.addEventListener('click',async e=>{
   }
   if(a==='prepSave'){
     const cid=acid();if(!cid)return;
-    if(!v('pt'))return toast('اكتب موضوع الدرس');
-    const r=await sb.from('lesson_prep').upsert({class_id:cid,prep_date:S.pd,topic:v('pt'),notes:document.getElementById('pn').value.trim()||null,status:v('ps')},{onConflict:'class_id,prep_date'});
+    if(!v('pt'))return toast('اكتب عنوان الدرس');
+    const row={class_id:cid,prep_date:S.pd,topic:v('pt'),notes:document.getElementById('pn').value.trim()||null,status:v('ps')};
+    PF.forEach(([id,k])=>row[k]=document.getElementById(id).value.trim()||null);
+    if(row.status==='ready'){const m=PF.filter(([,k])=>!row[k]).map(([,,lb])=>lb);if(m.length)return toast('كمّل قبل «جاهز»: '+m.join('، '))}
+    const r=await sb.from('lesson_prep').upsert(row,{onConflict:'class_id,prep_date'});
     if(!ok(r))return;await loadExtra();render();return toast('تم الحفظ');
+  }
+  if(a==='prepEval'){
+    const r=await sb.from('lesson_prep').update({father_eval:document.getElementById('pe').value.trim()||null}).eq('id',id);
+    if(!ok(r))return;await loadExtra();render();return toast('اتحفظ التقييم وبعتناه لخدام الفصل');
   }
   if(a==='prepOpen'){S.pd=id;render();return window.scrollTo(0,0)}
   if(a==='prepApp'){
