@@ -1038,9 +1038,9 @@ app.addEventListener('click',async e=>{
     if(!body)return toast('اكتب نص الرسالة');
     let fn,args;
     if(au==='secs'){
-      const tg=v('sm_st'),us=tg==='selected'?[...document.querySelectorAll('.smsec:checked')].map(x=>x.value):S.profiles.filter(p=>p.role==='secretary'&&p.active).map(p=>p.id);
-      if(!us.length)return toast(tg==='selected'?'اختار أمين واحد على الأقل':'مفيش أمناء خدمة');
-      fn='kh_msg_servants';args={p_title:title||null,p_body:body,p_target:'selected',p_class:null,p_users:us,p_section:null};
+      const tg=v('sm_st'),us=tg==='selected'?[...document.querySelectorAll('.smsec:checked')].map(x=>x.value):null;
+      if(tg==='selected'&&!us.length)return toast('اختار أمين واحد على الأقل');
+      fn='kh_msg_secretaries';args={p_title:title||null,p_body:body,p_target:tg,p_users:tg==='selected'?us:null,p_section:S.sec||null};
     }else if(au==='servants'){
       const tg=v('sm_tg'),cl=tg==='class'?v('sm_cl'):null,us=tg==='selected'?[...document.querySelectorAll('.smchk:checked')].map(x=>x.value):null;
       if(tg==='class'&&!cl)return toast('اختار الفصل');
