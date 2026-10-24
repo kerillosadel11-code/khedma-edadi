@@ -258,7 +258,7 @@ function srvRow(p){
   <h3>الحضور (آخر 90 يوم)</h3>
   <div class="cnt">${st.n?`<span>حاضر ${st.P}</span><span>غايب ${st.A}</span><span>معتذر ${st.E}</span><span>نسبة الحضور ${st.pct}%</span>`:'<span>لسه مفيش حضور متسجّل</span>'}</div>
   <div class="cnt"><span>تحضيرات الدروس: ${np}</span></div>
-  <div class="acts" style="justify-content:flex-start"><button class="s" data-a="srvEdit" data-id="${p.id}">تعديل البيانات</button><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button><button class="s${p.pending&&!p.active?' on':''}" data-a="togUser" data-id="${p.id}">${p.pending&&!p.active?'موافقة':(p.active?'إيقاف':'تفعيل')}</button></div></div>`;
+  <div class="acts" style="justify-content:flex-start"><button class="s" data-a="srvEdit" data-id="${p.id}">تعديل البيانات</button><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button><button class="s${p.pending&&!p.active?' on':''}" data-a="togUser" data-id="${p.id}">${p.pending&&!p.active?'موافقة':(p.active?'إيقاف':'تفعيل')}</button>${(isAdmin()&&p.role!=='admin')||(isSec()&&p.role==='servant')?`<button class="s d" data-a="delUser" data-id="${p.id}">حذف</button>`:''}</div></div>`;
   return `<div class="srv open">${head}${det}</div>`;
 }
 function srvEditCard(){
@@ -1011,7 +1011,7 @@ async function mkInv(){
 function vPeople(){
   const sv=S.profiles.filter(p=>p.role==='servant'||p.role==='secretary'),pr=S.profiles.filter(p=>p.role==='parent');
   return credCard()+`<div class="card"><h2>المستخدمين (${S.profiles.length})</h2><p class="empty">الحسابات الجديدة بتتعمل من تبويب "مستخدم جديد". هنا تعمل باسورد مؤقت جديد أو توقّف الحساب${isAdmin()?' أو تغيّر الدور':''}.</p>
-  ${S.profiles.filter(p=>isAdmin()||(p.id!==S.p.id&&(p.role==='servant'||p.role==='parent'))).map(p=>`<div class="row ${p.active?'':'off'}"><div>${esc(p.full_name||'بدون اسم')}${p.role==='secretary'?badge(p.section):''}${p.pending&&!p.active?'<span class="bd" style="background:#fde9b8">مستني موافقة</span>':''}${p.phone?`<small dir="ltr" style="text-align:right">${esc(p.phone)}</small>`:''}${isSec()?`<small>${esc(ROLES[p.role]||'')}</small>`:''}</div><div class="acts"><button class="s" data-a="renameUser" data-id="${p.id}">الاسم</button><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button>${p.id!==S.p.id?`<button class="s${p.pending&&!p.active?' on':''}" data-a="togUser" data-id="${p.id}">${p.pending&&!p.active?'موافقة':(p.active?'إيقاف':'تفعيل')}</button>`:''}${isAdmin()?`<select data-a="role" data-id="${p.id}" style="margin:0;width:auto">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${p.role===k?' selected':''}>${n}</option>`).join('')}</select>`:''}</div></div>`).join('')}</div>
+  ${S.profiles.filter(p=>isAdmin()||(p.id!==S.p.id&&(p.role==='servant'||p.role==='parent'))).map(p=>`<div class="row ${p.active?'':'off'}"><div>${esc(p.full_name||'بدون اسم')}${p.role==='secretary'?badge(p.section):''}${p.pending&&!p.active?'<span class="bd" style="background:#fde9b8">مستني موافقة</span>':''}${p.phone?`<small dir="ltr" style="text-align:right">${esc(p.phone)}</small>`:''}${isSec()?`<small>${esc(ROLES[p.role]||'')}</small>`:''}</div><div class="acts"><button class="s" data-a="renameUser" data-id="${p.id}">الاسم</button><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button>${p.id!==S.p.id?`<button class="s${p.pending&&!p.active?' on':''}" data-a="togUser" data-id="${p.id}">${p.pending&&!p.active?'موافقة':(p.active?'إيقاف':'تفعيل')}</button>${(isAdmin()&&p.role!=='admin')||(isSec()&&p.role==='servant')?`<button class="s d" data-a="delUser" data-id="${p.id}">حذف</button>`:''}`:''}${isAdmin()?`<select data-a="role" data-id="${p.id}" style="margin:0;width:auto">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${p.role===k?' selected':''}>${n}</option>`).join('')}</select>`:''}</div></div>`).join('')}</div>
   <div class="card"><h2>ربط خادم بفصل</h2><select id="ls">${opts(sv,p=>(p.full_name||'بدون اسم')+(p.role==='secretary'?' (أمين خدمة)':''))}</select><select id="lc">${opts(S.classes,cLabel)}</select><button class="p" data-a="addCS">ربط</button>
   ${S.cs.map(x=>`<div class="row"><div>${esc(pname(x.servant_id))}<small>${esc(cname(x.class_id))}</small></div><button class="s d" data-a="delCS" data-id="${x.class_id}|${x.servant_id}">فك</button></div>`).join('')}</div>
   <div class="card"><h2>ربط ولي أمر بمخدوم</h2><select id="lp">${opts(pr,p=>p.full_name||'بدون اسم')}</select><select id="le">${opts(S.servees,s=>s.full_name)}</select><button class="p" data-a="addPL">ربط</button>
@@ -1029,6 +1029,7 @@ async function run(a,id){
   else if(a==='restServee'){r=await sb.from('servees').update({active:true,archived_at:null,archive_reason:null}).eq('id',id)}
   else if(a==='togServee'){const s=S.servees.find(x=>x.id===id);r=await sb.from('servees').update({active:!s.active}).eq('id',id)}
   else if(a==='togUser'){const u=S.profiles.find(x=>x.id===id);if(!u)return;r=await sb.from('profiles').update(u.pending&&!u.active?{active:true,pending:false}:{active:!u.active}).eq('id',id)}
+  else if(a==='delUser'){const u=S.profiles.find(x=>x.id===id);if(!u||id===S.p.id)return;if(!canManage())return;if(!confirm('حذف نهائي للحساب ده؟ هيتمسح دخوله وربطه بالفصول وحضوره. لو عايز تحتفظ بيه استخدم «إيقاف».'))return;const t=prompt('اكتب اسم الحساب للتأكيد:\n'+(u.full_name||''));if(t===null)return;if(nz(t)!==nz(u.full_name||''))return toast('الاسم مش مطابق، اتلغى الحذف');r=await sb.rpc('kh_delete_user',{p_user:id})}
   else if(a==='addCS'){if(!v('ls')||!v('lc'))return toast('اختار الخادم والفصل');r=await sb.from('class_servants').insert({servant_id:v('ls'),class_id:v('lc')})}
   else if(a==='srvAddCS'){const c=document.getElementById('sac_'+id);if(!c||!c.value)return toast('اختار الفصل');r=await sb.from('class_servants').insert({servant_id:id,class_id:c.value})}
   else if(a==='delCS'){const[c,s]=id.split('|');r=await sb.from('class_servants').delete().eq('class_id',c).eq('servant_id',s)}
@@ -1485,7 +1486,13 @@ app.addEventListener('change',async e=>{
     if(b.dataset.id===S.p.id&&b.value!=='admin'&&!confirm('هتشيل الأدمن من حسابك. متأكد؟'))return render();
     let upd={role:b.value};
     if(b.value==='secretary'){const t=(prompt('قسم أمين الخدمة؟ اكتب: بنين أو بنات')||'').trim();const m={'بنين':'boys','بنات':'girls'}[t];if(!m){toast('لازم تحدد القسم (بنين أو بنات)');return render()}upd.section=m}
+    let cid=null;
+    if(b.value==='servant'&&!S.cs.some(x=>x.servant_id===b.dataset.id)){
+      const cl=S.classes;
+      if(cl.length){const n=prompt('اختار فصل الخادم (اكتب الرقم، أو سيبها فاضية وتربطه بعدين):\n'+cl.map((c,i)=>(i+1)+' - '+cLabel(c)).join('\n'));if(n===null)return render();const c=cl[parseInt(n,10)-1];if(c)cid=c.id}
+    }
     if(!ok(await sb.from('profiles').update(upd).eq('id',b.dataset.id)))return;
+    if(cid&&!ok(await sb.from('class_servants').insert({servant_id:b.dataset.id,class_id:cid})))return;
     await load();render();toast('تم');
   }
 });
