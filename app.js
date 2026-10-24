@@ -242,11 +242,11 @@ function srvStats(id){const H=S.sa.filter(x=>x.servant_id===id),P=H.filter(x=>x.
 const srvClasses=id=>S.cs.filter(x=>x.servant_id===id).map(x=>S.classes.find(c=>c.id===x.class_id)).filter(Boolean);
 function srvFiltered(){
   const q=nz(S.sq);
-  return S.profiles.filter(p=>p.role==='servant'&&(!S.ssec||p.section===S.ssec||srvClasses(p.id).some(c=>c.section===S.ssec))&&(!S.sfc||(S.sfc==='_none'?!srvClasses(p.id).length:S.cs.some(x=>x.servant_id===p.id&&x.class_id===S.sfc)))&&(!q||nz(p.full_name).includes(q)||(p.phone||'').includes(S.sq.trim())));
+  return S.profiles.filter(p=>(p.role==='servant'||p.role==='secretary')&&(!S.ssec||p.section===S.ssec||srvClasses(p.id).some(c=>c.section===S.ssec))&&(!S.sfc||(S.sfc==='_none'?!srvClasses(p.id).length:S.cs.some(x=>x.servant_id===p.id&&x.class_id===S.sfc)))&&(!q||nz(p.full_name).includes(q)||(p.phone||'').includes(S.sq.trim())));
 }
 function srvRow(p){
   const cl=srvClasses(p.id),open=S.sso===p.id,ph=normPhone(p.contact_phone||p.phone);
-  const head=`<div class="row ${p.active?'':'off'}" style="border-top:0"><div class="who">${av(p)}<div>${esc(p.full_name||'بدون اسم')}${p.pending&&!p.active?'<span class="bd" style="background:#fde9b8">مستني موافقة</span>':!p.active?'<span class="bd" style="background:#f3d6d2">موقوف</span>':''}<small>${cl.length?cl.map(c=>esc(cLabel(c))).join(' · '):'<span style="color:var(--red)">غير مربوط بفصل</span>'}</small></div></div><div class="acts"><button class="s${open?' on':''}" data-a="srvOpen" data-id="${p.id}">${open?'إخفاء':'التفاصيل'}</button></div></div>`;
+  const head=`<div class="row ${p.active?'':'off'}" style="border-top:0"><div class="who">${av(p)}<div>${esc(p.full_name||'بدون اسم')}${p.role==='secretary'?'<span class="bd">أمين خدمة'+(p.section?' '+SEC[p.section]:'')+'</span>':''}${p.pending&&!p.active?'<span class="bd" style="background:#fde9b8">مستني موافقة</span>':!p.active?'<span class="bd" style="background:#f3d6d2">موقوف</span>':''}<small>${cl.length?cl.map(c=>esc(cLabel(c))).join(' · '):'<span style="color:var(--red)">غير مربوط بفصل</span>'}</small></div></div><div class="acts"><button class="s${open?' on':''}" data-a="srvOpen" data-id="${p.id}">${open?'إخفاء':'التفاصيل'}</button></div></div>`;
   if(!open)return `<div class="srv">${head}</div>`;
   const st=srvStats(p.id),np=S.lp.filter(x=>x.created_by===p.id).length,free=S.classes.filter(c=>!cl.some(x=>x.id===c.id));
   const det=`<div class="srvd">
@@ -270,7 +270,7 @@ function srvList(){
   return `<h2>الخدام (${L.length})</h2>`+(L.map(srvRow).join('')||'<div class="empty">مفيش خدام بالشكل ده.'+(isAdmin()?'<small style="display:block;direction:ltr;text-align:left">sec='+(S.sec||'all')+' · servants='+S.profiles.filter(p=>p.role==="servant").length+'/'+(S.all?S.all.profiles.filter(p=>p.role==="servant").length:'?')+' · fc='+(S.sfc||'-')+' · q='+(S.sq||'-')+'</small>':'')+'</div>');
 }
 function vSrv(){
-  const all=S.profiles.filter(p=>p.role==='servant'),free=all.filter(p=>p.active&&!srvClasses(p.id).length).length;
+  const all=S.profiles.filter(p=>p.role==='servant'||p.role==='secretary'),free=all.filter(p=>p.active&&!srvClasses(p.id).length).length;
   return credCard()+srvEditCard()+`<div class="card"><input id="srq" type="search" data-a="srvsearch" placeholder="ابحث باسم الخادم أو تليفونه" value="${esc(S.sq)}">
   <select data-a="srvfc"><option value="">كل الفصول</option><option value="_none"${S.sfc==='_none'?' selected':''}>غير مربوطين بفصل${free?' ('+free+')':''}</option>${opts(S.classes,cLabel,S.sfc)}</select>
   <p class="empty">الخدام الجداد بيتعملوا من تبويب "مستخدم جديد" أو "دعوات واتساب"، وبعدين تربطهم بفصل من هنا.</p></div>
@@ -378,7 +378,7 @@ function vAna(){
 }
 
 function vHome(){
-  const act=S.servees.filter(x=>x.active),srv=S.profiles.filter(p=>p.role==='servant'&&p.active),pend=S.profiles.filter(p=>p.pending&&!p.active);
+  const act=S.servees.filter(x=>x.active),srv=S.profiles.filter(p=>(p.role==='servant'||(p.role==='secretary'&&S.cs.some(c=>c.servant_id===p.id)))&&p.active),pend=S.profiles.filter(p=>p.pending&&!p.active);
   const P=S.att.filter(a=>a.status==='present').length,B=S.att.filter(a=>a.status==='absent').length;
   const bd=act.filter(x=>x.birth_date).map(x=>({x,...nextBday(x.birth_date)})).filter(o=>o.days<=7).sort((a,b)=>a.days-b.days);
   const lbl=o=>o.days===0?'النهارده':o.days===1?'بكرة':'بعد '+o.days+' أيام · '+o.date.toLocaleDateString('ar-EG',{day:'numeric',month:'long'});
@@ -1009,10 +1009,10 @@ async function mkInv(){
   S.invLink={url,title,msg};await load();render();
 }
 function vPeople(){
-  const sv=S.profiles.filter(p=>p.role==='servant'),pr=S.profiles.filter(p=>p.role==='parent');
+  const sv=S.profiles.filter(p=>p.role==='servant'||p.role==='secretary'),pr=S.profiles.filter(p=>p.role==='parent');
   return credCard()+`<div class="card"><h2>المستخدمين (${S.profiles.length})</h2><p class="empty">الحسابات الجديدة بتتعمل من تبويب "مستخدم جديد". هنا تعمل باسورد مؤقت جديد أو توقّف الحساب${isAdmin()?' أو تغيّر الدور':''}.</p>
   ${S.profiles.filter(p=>isAdmin()||(p.id!==S.p.id&&(p.role==='servant'||p.role==='parent'))).map(p=>`<div class="row ${p.active?'':'off'}"><div>${esc(p.full_name||'بدون اسم')}${p.role==='secretary'?badge(p.section):''}${p.pending&&!p.active?'<span class="bd" style="background:#fde9b8">مستني موافقة</span>':''}${p.phone?`<small dir="ltr" style="text-align:right">${esc(p.phone)}</small>`:''}${isSec()?`<small>${esc(ROLES[p.role]||'')}</small>`:''}</div><div class="acts"><button class="s" data-a="renameUser" data-id="${p.id}">الاسم</button><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button>${p.id!==S.p.id?`<button class="s${p.pending&&!p.active?' on':''}" data-a="togUser" data-id="${p.id}">${p.pending&&!p.active?'موافقة':(p.active?'إيقاف':'تفعيل')}</button>`:''}${isAdmin()?`<select data-a="role" data-id="${p.id}" style="margin:0;width:auto">${Object.entries(ROLES).map(([k,n])=>`<option value="${k}"${p.role===k?' selected':''}>${n}</option>`).join('')}</select>`:''}</div></div>`).join('')}</div>
-  <div class="card"><h2>ربط خادم بفصل</h2><select id="ls">${opts(sv,p=>p.full_name||'بدون اسم')}</select><select id="lc">${opts(S.classes,cLabel)}</select><button class="p" data-a="addCS">ربط</button>
+  <div class="card"><h2>ربط خادم بفصل</h2><select id="ls">${opts(sv,p=>(p.full_name||'بدون اسم')+(p.role==='secretary'?' (أمين خدمة)':''))}</select><select id="lc">${opts(S.classes,cLabel)}</select><button class="p" data-a="addCS">ربط</button>
   ${S.cs.map(x=>`<div class="row"><div>${esc(pname(x.servant_id))}<small>${esc(cname(x.class_id))}</small></div><button class="s d" data-a="delCS" data-id="${x.class_id}|${x.servant_id}">فك</button></div>`).join('')}</div>
   <div class="card"><h2>ربط ولي أمر بمخدوم</h2><select id="lp">${opts(pr,p=>p.full_name||'بدون اسم')}</select><select id="le">${opts(S.servees,s=>s.full_name)}</select><button class="p" data-a="addPL">ربط</button>
   ${S.pl.map(x=>`<div class="row"><div>${esc(pname(x.parent_id))}<small>${esc(sname(x.servee_id))}</small></div><button class="s d" data-a="delPL" data-id="${x.parent_id}|${x.servee_id}">فك</button></div>`).join('')}</div>`;
