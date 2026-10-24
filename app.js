@@ -614,7 +614,7 @@ async function loadPst(){const r=await sb.rpc('kh_push_status');S.pst=r.error?[]
 function vPst(){
   if(S.pst==null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
   const f=S.pstR||'',q=S.pstS||'',dt=x=>x?new Date(x).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}):'—';
-  const base=S.pst.filter(x=>!f||x.role===f),cnt={on:0,warn:0,off:0};base.forEach(x=>cnt[pstState(x)]++);
+  const vis=new Set(S.profiles.map(p=>p.id)),base=S.pst.filter(x=>vis.has(x.user_id)&&(!f||x.role===f)),cnt={on:0,warn:0,off:0};base.forEach(x=>cnt[pstState(x)]++);
   const ord={off:0,warn:1,on:2};
   const L=base.filter(x=>!q||pstState(x)===q).sort((a,b)=>ord[pstState(a)]-ord[pstState(b)]||String(a.full_name||'').localeCompare(String(b.full_name||''),'ar'));
   const msg=n=>encodeURIComponent('أهلاً '+n+'، عشان توصلك رسايل وتنبيهات خدمة إعدادي، افتح الرابط ده واضغط 🔔 ثم «تفعيل / إصلاح الاشتراك على الجهاز ده»: '+location.origin);
