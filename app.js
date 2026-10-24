@@ -581,7 +581,7 @@ const FK={call:'اتصال',visit:'زيارة',message:'رسالة'},FS={open:'�
 const bar=p=>`<div style="height:8px;background:var(--line);border-radius:4px;min-width:60px"><div style="width:${p||0}%;height:8px;background:var(--gold);border-radius:4px"></div></div>`;
 function vFollow(){
   if(S.ah===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
-  const H=histInfo(90),th=S.th||2,fu=S.fu||[],lastFu=id=>fu.find(f=>f.servee_id===id);
+  const H=histInfo(90),th=S.th||3,fu=S.fu||[],lastFu=id=>fu.find(f=>f.servee_id===id);
   const L=S.servees.filter(x=>x.active&&x.class_id&&(!S.f||x.class_id===S.f)).map(x=>({x,st:servStat(x,H)})).filter(o=>o.st.streak>=th).sort((a,b)=>b.st.streak-a.st.streak);
   let form='';
   if(S.fuf){const x=S.servees.find(y=>y.id===S.fuf);if(x)form=fuForm(x)}
@@ -590,7 +590,9 @@ function vFollow(){
     const tel=ph?`<a class="s" style="text-decoration:none;display:inline-block" href="tel:${ph}">اتصال</a>`:'';
     return `<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))} · ${absLine(st)}</small><small>الخادم المسؤول: ${respName(x)}</small>${lf?`<small>آخر افتقاد: ${FK[lf.kind]||''} ${fdate(lf.followup_date)} (${FS[lf.status]||''})</small>`:'<small>لسه ما اتفتقدش</small>'}</div></div><div class="acts">${tel}${wa}<button class="s on" data-a="fuOpen" data-id="${x.id}">تسجيل</button></div></div>`}).join('');
   const recent=fu.filter(f=>S.servees.some(x=>x.id===f.servee_id)).slice(0,30);
-  return form+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
+  const pk=S.servees.filter(x=>x.active&&(!S.f||x.class_id===S.f)).sort((p,q)=>(p.full_name||'').localeCompare(q.full_name||'','ar'));
+  const pickCard=`<div class="card"><h2>افتقاد أي مخدوم</h2><small style="display:block;margin-bottom:6px">لو عايز تفتقد حد من غير ما يكون غايب.</small><select id="fupick"><option value="">اختار المخدوم</option>${pk.map(x=>`<option value="${x.id}">${esc(x.full_name)}${x.class_id?' · '+esc(cname(x.class_id)):''}</option>`).join('')}</select><button class="s on" data-a="fuPick">تسجيل افتقاد</button></div>`;
+  return form+pickCard+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
   <div class="card"><h2>آخر الافتقادات (${recent.length})</h2>${recent.map(f=>`<div class="row"><div>${esc(sname(f.servee_id))}<small>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}${canManage()&&pname(f.servant_id)!=='؟'?' · '+esc(pname(f.servant_id)):''}</small>${f.note?`<small>${esc(f.note)}</small>`:''}</div><div class="acts"><span class="bd">${FS[f.status]||esc(f.status)}</span>${f.status==='open'?`<button class="s" data-a="fuDone" data-id="${f.id}">تم</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش افتقادات متسجلة.</div>'}</div>`;
 }
 function vRep(){
@@ -1244,6 +1246,7 @@ app.addEventListener('click',async e=>{
     for(let i=0;i<m.ok.length;i+=200){const r=await sb.from('servees').insert(m.ok.slice(i,i+200));if(!ok(r)){await load();render();return}}
     const n=m.ok.length;S.imp=null;await load();render();return toast('اتضاف '+n+' مخدوم');
   }
+  if(a==='fuPick'){const sid=v('fupick');if(!sid)return toast('اختار المخدوم');S.fuf=sid;render();return window.scrollTo(0,0)}
   if(a==='fuOpen'){S.fuf=id;render();return window.scrollTo(0,0)}
   if(a==='saveFu'){
     const r=await sb.from('followups').insert({servee_id:S.fuf,servant_id:S.p.id,kind:v('fk'),status:v('fs'),note:document.getElementById('fn').value.trim()||null,followup_date:v('fd')||today()});
