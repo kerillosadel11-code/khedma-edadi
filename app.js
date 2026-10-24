@@ -568,8 +568,8 @@ async function loadAnn(){const r=await sb.from('announcements').select('*').orde
 function vAnn(){
   if(S.an===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
   const adm=isAdmin();
-  return `<div class="card"><h2>إعلان جديد</h2><select id="asc" data-a="annscope">${adm?'<option value="all">كل الخدمة</option>':''}<option value="section">${adm?'قسم كامل':'قسمي كله'}</option><option value="class">فصل معين</option></select>
-  <div id="ascw" style="display:none">${adm?`<select id="asec"><option value="">اختار القسم</option><option value="boys"${S.sec==='boys'?' selected':''}>بنين</option><option value="girls"${S.sec==='girls'?' selected':''}>بنات</option></select>`:''}</div>
+  return `<div class="card"><h2>إعلان جديد</h2><select id="asc" data-a="annscope">${adm&&!S.sec?'<option value="all">كل الخدمة</option>':''}<option value="section">${adm?(S.sec?'كل '+SEC[S.sec]:'قسم كامل'):'قسمي كله'}</option><option value="class">فصل معين</option></select>
+  <div id="ascw" style="display:none">${adm?(S.sec?`<select id="asec"><option value="${S.sec}" selected>${SEC[S.sec]}</option></select>`:`<select id="asec"><option value="">اختار القسم</option><option value="boys">بنين</option><option value="girls">بنات</option></select>`):''}</div>
   <div id="aclw" style="display:none"><select id="acl"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
   <input id="at" maxlength="100" placeholder="عنوان الإعلان"><textarea id="ab" rows="4" maxlength="1000" placeholder="نص الإعلان (اختياري)"></textarea>
   <button class="p" data-a="annSend">إرسال</button><p class="empty">بيوصل للخدام وأولياء الأمور المعنيين كإشعار جوه التطبيق (🔔).</p></div>
@@ -587,10 +587,10 @@ function vMsg(){
   const st=tplOf('servant_msg')||{title:'',body:''};
   return `<div class="card"><h2>رسالة جديدة</h2>
   <select id="sm_au" data-a="msgau"><option value="servants">لخدام</option><option value="parents">لأولياء أمور</option></select>
-  <div id="sm_sv"><select id="sm_tg" data-a="msgtgt"><option value="all">${isAdmin()?'كل الخدام':'كل خدامي'}</option><option value="class">خدام فصل معين</option><option value="selected">خدام أختارهم (واحد أو أكتر)</option></select>
+  <div id="sm_sv"><select id="sm_tg" data-a="msgtgt"><option value="all">${isAdmin()?(S.sec?'كل خدام '+SEC[S.sec]:'كل الخدام'):'كل خدامي'}</option><option value="class">خدام فصل معين</option><option value="selected">خدام أختارهم (واحد أو أكتر)</option></select>
   <div id="sm_cw" style="display:none"><select id="sm_cl"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
   <div id="sm_sw" style="display:none;max-height:220px;overflow:auto;border:1px solid #ddd;border-radius:8px;padding:6px;margin:6px 0">${sv.map(p=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" class="smchk" value="${p.id}"> ${esc(p.full_name)}</label>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div></div>
-  <div id="sm_pa" style="display:none"><select id="sm_pt" data-a="msgpt"><option value="all">${isAdmin()?'كل أولياء الأمور':'كل أولياء أمور قسمي'}</option><option value="class">أولياء أمور فصل</option><option value="servee">أولياء أمور مخدوم معيّن</option><option value="one">ولي أمر معيّن</option></select>
+  <div id="sm_pa" style="display:none"><select id="sm_pt" data-a="msgpt"><option value="all">${isAdmin()?(S.sec?'كل أولياء أمور '+SEC[S.sec]:'كل أولياء الأمور'):'كل أولياء أمور قسمي'}</option><option value="class">أولياء أمور فصل</option><option value="servee">أولياء أمور مخدوم معيّن</option><option value="one">ولي أمر معيّن</option></select>
   <div id="sm_pcw" style="display:none"><select id="sm_pcl"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
   <div id="sm_psw" style="display:none"><select id="sm_ps"><option value="">اختار المخدوم</option>${S.servees.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.full_name)} — ${esc(cname(x.class_id))}</option>`).join('')}</select></div>
   <div id="sm_puw" style="display:none"><select id="sm_pu"><option value="">اختار ولي الأمر</option>${pr.map(p=>`<option value="${p.id}">${esc(p.full_name)}</option>`).join('')}</select></div></div>
@@ -1030,13 +1030,13 @@ app.addEventListener('click',async e=>{
       const tg=v('sm_tg'),cl=tg==='class'?v('sm_cl'):null,us=tg==='selected'?[...document.querySelectorAll('.smchk:checked')].map(x=>x.value):null;
       if(tg==='class'&&!cl)return toast('اختار الفصل');
       if(tg==='selected'&&!us.length)return toast('اختار خادم واحد على الأقل');
-      fn='kh_msg_servants';args={p_title:title||null,p_body:body,p_target:tg,p_class:cl,p_users:us};
+      fn='kh_msg_servants';args={p_title:title||null,p_body:body,p_target:tg,p_class:cl,p_users:us,p_section:(isAdmin()&&S.sec)||null};
     }else{
       const tg=v('sm_pt'),cl=tg==='class'?v('sm_pcl'):null,sv=tg==='servee'?v('sm_ps'):null,us=tg==='one'?v('sm_pu'):null;
       if(tg==='class'&&!cl)return toast('اختار الفصل');
       if(tg==='servee'&&!sv)return toast('اختار المخدوم');
       if(tg==='one'&&!us)return toast('اختار ولي الأمر');
-      fn='kh_msg_parents';args={p_title:title||null,p_body:body,p_target:tg,p_class:cl,p_servee:sv,p_user:us};
+      fn='kh_msg_parents';args={p_title:title||null,p_body:body,p_target:tg,p_class:cl,p_servee:sv,p_user:us,p_section:(isAdmin()&&S.sec)||null};
     }
     if(!confirm('إرسال الرسالة دلوقتي؟'))return;
     const {data,error}=await sb.rpc(fn,args);
