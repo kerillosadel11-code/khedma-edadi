@@ -207,9 +207,10 @@ function svList(){
   const L=svFiltered();
   return `<h2>المخدومين (${L.length})</h2>`+L.slice(0,S.lim).map(svRow).join('')+(L.length>S.lim?`<button class="s" data-a="more" style="width:100%;margin-top:8px">عرض المزيد (${L.length-S.lim})</button>`:'')+(L.length?'':'<div class="empty">مفيش مخدومين بالشكل ده.</div>');
 }
+const esvOpts=(cid,sel)=>{const L=classServants(cid);return `<option value="">${L.length?'الخادم المسئول: كل خدام الفصل':'الخادم المسئول: مفيش خدام في الفصل'}</option>`+L.map(p=>`<option value="${p.id}"${p.id===sel?' selected':''}>${esc(p.full_name||'؟')}</option>`).join('')};
 function svEditCard(){
   const s=S.servees.find(x=>x.id===S.ed);if(!s)return'';
-  return `<div class="card" style="border-color:var(--gold)"><h2>تعديل: ${esc(s.full_name)}</h2><input id="en" value="${esc(s.full_name)}" placeholder="الاسم بالكامل"><div class="two"><input id="ep" type="tel" dir="ltr" value="${esc(s.phone||'')}" placeholder="التليفون"><input id="eb" type="date" value="${esc(s.birth_date||'')}" aria-label="تاريخ الميلاد"></div><select id="ec"><option value="">بدون فصل</option>${opts(S.classes,cLabel,s.class_id)}</select><input id="ea" value="${esc(s.address||'')}" placeholder="العنوان"><textarea id="eno" rows="2" placeholder="ملاحظات">${esc(s.notes||'')}</textarea><button class="p" data-a="saveServee">حفظ</button><button class="s" data-a="cancelEdit" style="margin-top:8px">إلغاء</button></div>`;
+  return `<div class="card" style="border-color:var(--gold)"><h2>تعديل: ${esc(s.full_name)}</h2><input id="en" value="${esc(s.full_name)}" placeholder="الاسم بالكامل"><div class="two"><input id="ep" type="tel" dir="ltr" value="${esc(s.phone||'')}" placeholder="التليفون"><input id="eb" type="date" value="${esc(s.birth_date||'')}" aria-label="تاريخ الميلاد"></div><select id="ec" data-a="ecChange"><option value="">بدون فصل</option>${opts(S.classes,cLabel,s.class_id)}</select>${canManage()?`<select id="esv" aria-label="الخادم المسئول">${esvOpts(s.class_id,s.servant_id)}</select>`:''}<input id="ea" value="${esc(s.address||'')}" placeholder="العنوان"><textarea id="eno" rows="2" placeholder="ملاحظات">${esc(s.notes||'')}</textarea><button class="p" data-a="saveServee">حفظ</button><button class="s" data-a="cancelEdit" style="margin-top:8px">إلغاء</button></div>`;
 }
 function impCard(){
   const m=S.imp;if(!m)return'';
@@ -1000,7 +1001,7 @@ app.addEventListener('click',async e=>{
   if(a==='cancelEdit'){S.ed=null;S.edc=null;S.fuf=null;return render()}
   if(a==='saveServee'){
     const sv=S.servees.find(x=>x.id===S.ed);if(!sv)return;if(!v('en'))return toast('اكتب الاسم');
-    const r=await sb.from('servees').update({full_name:v('en'),phone:v('ep')||null,birth_date:v('eb')||null,class_id:v('ec')||null,address:v('ea')||null,notes:v('eno')||null}).eq('id',sv.id);
+    const r=await sb.from('servees').update({full_name:v('en'),phone:v('ep')||null,birth_date:v('eb')||null,class_id:v('ec')||null,address:v('ea')||null,notes:v('eno')||null,...(document.getElementById('esv')?{servant_id:v('esv')||null}:{})}).eq('id',sv.id);
     if(!ok(r))return;S.ed=null;await load();render();return toast('تم الحفظ');
   }
   if(a==='saveClass'){
@@ -1192,6 +1193,7 @@ app.addEventListener('change',async e=>{
   if(b.dataset.a==='filter'){S.f=b.value;S.lim=50;return render()}
   if(b.dataset.a==='annscope'){const x=b.value;const w=document.getElementById('ascw'),c=document.getElementById('aclw');if(w)w.style.display=(x==='section'&&isAdmin())?'block':'none';if(c)c.style.display=x==='class'?'block':'none';return}
   if(b.dataset.a==='msgau'){const x=b.value,sv=document.getElementById('sm_sv'),pa=document.getElementById('sm_pa'),bd=document.getElementById('sm_b'),ti=document.getElementById('sm_t');sv.style.display=x==='servants'?'block':'none';pa.style.display=x==='parents'?'block':'none';const se=document.getElementById('sm_se');if(se)se.style.display=x==='secs'?'block':'none';const t=tplOf(x==='parents'?'parent_msg':'servant_msg'),o=tplOf(x==='parents'?'servant_msg':'parent_msg');if(t&&(!bd.value.trim()||(o&&bd.value===o.body))){bd.value=t.body;ti.value=t.title}return}
+  if(b.dataset.a==='ecChange'){const e=document.getElementById('esv');if(e)e.innerHTML=esvOpts(b.value,null);return}
   if(b.dataset.a==='assignSv'){
     const x=S.servees.find(y=>y.id===b.dataset.id);if(!x)return;
     const val=b.value||null,r=await sb.from('servees').update({servant_id:val}).eq('id',x.id);
