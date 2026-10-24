@@ -165,14 +165,14 @@ const cname=id=>{const c=S.classes.find(c=>c.id===id);return c?cLabel(c):'بدو
 const pname=id=>(S.profiles.find(c=>c.id===id)||{}).full_name||'؟';
 const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
 
-const NAVIC={home:'🏠',mycls:'🧑‍🏫',mysv:'🧒',mypr:'👪',classes:'🏫',servees:'🧒',srv:'🤝',people:'👥',add:'➕',inv:'💬',att:'✅',sat:'🙋',prep:'📖',follow:'📞',comp:'🏆',ann:'📢',rep:'📊',audit:'🛡️',notif:'🔔'};
+const NAVIC={home:'🏠',mycls:'🧑‍🏫',mysv:'🧒',mypr:'👪',classes:'🏫',servees:'🧒',srv:'🤝',people:'👥',add:'➕',inv:'💬',att:'✅',sat:'🙋',prep:'📖',follow:'📞',comp:'🏆',ann:'📢',msg:'✉️',set:'⚙️',rep:'📊',audit:'🛡️',notif:'🔔'};
 function render(){
   const adm=canManage();
   if(S.cards)return app.innerHTML=head()+vCards();
   if(S.pf)return app.innerHTML=head()+vProfile();
   if(!adm&&!['mycls','mysv','mypr','att','prep','sat','follow','comp','notif'].includes(S.tab))S.tab='mycls';
-  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل']]:[]):[['mycls','فصلي'],['mysv','المخدومين'],['mypr','أولياء الأمور'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['sat','حضوري']];
-  app.innerHTML=head()+`<main>${{mycls:vMyClass,mysv:vMyServees,mypr:vMyParents,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn}[S.tab]()}</main><nav class="bn">${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${n}</span></button>`).join('')}</nav>`;
+  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['msg','الرسائل'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل'],['set','الإعدادات']]:[]):[['mycls','فصلي'],['mysv','المخدومين'],['mypr','أولياء الأمور'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['sat','حضوري']];
+  app.innerHTML=head()+`<main>${{mycls:vMyClass,mysv:vMyServees,mypr:vMyParents,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn,msg:vMsg,set:vSet}[S.tab]()}</main><nav class="bn">${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${n}</span></button>`).join('')}</nav>`;
   const on=document.querySelector('nav.bn .on');if(on)on.scrollIntoView({inline:'nearest',block:'nearest'});
 }
 function vClasses(){
@@ -575,6 +575,39 @@ function vAnn(){
   <button class="p" data-a="annSend">إرسال</button><p class="empty">بيوصل للخدام وأولياء الأمور المعنيين كإشعار جوه التطبيق (🔔).</p></div>
   <div class="card"><h2>آخر الإعلانات (${S.an.length})</h2>${S.an.map(a=>`<div class="row"><div>${esc(a.title)}<small>${a.scope==='all'?'كل الخدمة':a.scope==='section'?'قسم '+(SEC[a.section]||''):'فصل '+esc(cname(a.class_id))} · وصل ${a.sent_count} · ${new Date(a.created_at).toLocaleDateString('ar-EG')}</small>${a.body?`<small style="white-space:pre-wrap">${esc(a.body)}</small>`:''}</div></div>`).join('')||'<div class="empty">لسه ما بعتش إعلانات.</div>'}</div>`;
 }
+const MSGERR={FORBIDDEN:'مش مسموح لك بالإرسال ده',BAD_BODY:'اكتب نص الرسالة',BAD_TARGET:'اختار مين هيوصله',NO_RECIPIENTS:'مفيش حد مطابق (ولي الأمر لازم يكون مربوط بحساب)',TOO_MANY:'بعت كتير، استنى دقيقة وجرّب تاني'};
+const tplOf=k=>(S.tpl||[]).find(t=>t.key===k);
+const tplRender=(x,vars)=>String(x||'').replace(/\{(\w+)\}/g,(m,k)=>k in vars?vars[k]:m);
+async function loadTpl(){const r=await sb.from('message_templates').select('*').order('key');S.tpl=r.error?[]:(r.data||[]);if(r.error)toast('تعذّر تحميل الرسايل الجاهزة: '+r.error.message)}
+async function loadMsg(){await loadTpl();const r=await sb.from('staff_messages').select('*').order('created_at',{ascending:false}).limit(30);S.msgs=r.error?[]:(r.data||[]);if(r.error)toast('تعذّر تحميل الرسائل: '+r.error.message)}
+function vMsg(){
+  if(S.msgs==null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
+  const sv=servList(),pr=S.profiles.filter(p=>p.role==='parent'&&p.active),dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});
+  const tl=m=>(m.audience==='parents'?'أولياء أمور · ':'خدام · ')+(m.target==='all'?'الكل':m.target==='class'?'فصل '+esc(cname(m.class_id)):m.target==='servee'?'أهل '+esc(sname(m.servee_id)):m.target==='one'?'ولي أمر معيّن':'مختارين');
+  const st=tplOf('servant_msg')||{title:'',body:''};
+  return `<div class="card"><h2>رسالة جديدة</h2>
+  <select id="sm_au" data-a="msgau"><option value="servants">لخدام</option><option value="parents">لأولياء أمور</option></select>
+  <div id="sm_sv"><select id="sm_tg" data-a="msgtgt"><option value="all">${isAdmin()?'كل الخدام':'كل خدامي'}</option><option value="class">خدام فصل معين</option><option value="selected">خدام أختارهم (واحد أو أكتر)</option></select>
+  <div id="sm_cw" style="display:none"><select id="sm_cl"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
+  <div id="sm_sw" style="display:none;max-height:220px;overflow:auto;border:1px solid #ddd;border-radius:8px;padding:6px;margin:6px 0">${sv.map(p=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" class="smchk" value="${p.id}"> ${esc(p.full_name)}</label>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div></div>
+  <div id="sm_pa" style="display:none"><select id="sm_pt" data-a="msgpt"><option value="all">${isAdmin()?'كل أولياء الأمور':'كل أولياء أمور قسمي'}</option><option value="class">أولياء أمور فصل</option><option value="servee">أولياء أمور مخدوم معيّن</option><option value="one">ولي أمر معيّن</option></select>
+  <div id="sm_pcw" style="display:none"><select id="sm_pcl"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
+  <div id="sm_psw" style="display:none"><select id="sm_ps"><option value="">اختار المخدوم</option>${S.servees.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.full_name)} — ${esc(cname(x.class_id))}</option>`).join('')}</select></div>
+  <div id="sm_puw" style="display:none"><select id="sm_pu"><option value="">اختار ولي الأمر</option>${pr.map(p=>`<option value="${p.id}">${esc(p.full_name)}</option>`).join('')}</select></div></div>
+  <input id="sm_t" maxlength="80" placeholder="العنوان (اختياري)" value="${esc(st.title)}"><textarea id="sm_b" rows="5" maxlength="1000" placeholder="نص الرسالة">${esc(st.body)}</textarea>
+  <p class="empty">اكتب <b>{name}</b> وهتتبدّل بأول اسمين من اسم كل مستلم، و<b>{servee}</b> باسم ابنه (لأولياء الأمور). بتوصل كإشعار على الموبايل وجوه التطبيق (🔔)، وتقدر تشوف مين قراها.</p>
+  <button class="p" data-a="msgSend">إرسال</button></div>
+  <div class="card"><h2>آخر الرسائل (${S.msgs.length})</h2>${S.msgs.map(m=>`<div class="row" style="flex-wrap:wrap"><div style="flex:1;min-width:0">${esc(m.title)}<small>${tl(m)} · وصل ${m.sent_count} · ${dt(m.created_at)}</small><small style="white-space:pre-wrap">${esc(m.body)}</small></div><button class="s" data-a="msgOpen" data-id="${m.id}">${S.msgOpen===m.id?'إخفاء':'مين قرا؟'}</button>${S.msgOpen===m.id?`<div style="flex-basis:100%;padding-top:8px">${(S.msgSt||[]).map(r=>`<small>${r.is_read?'✅':'⏳'} ${esc(r.full_name||'؟')}</small>`).join('')||'<small>مفيش بيانات.</small>'}</div>`:''}</div>`).join('')||'<div class="empty">لسه ما بعتش رسائل.</div>'}</div>`;
+}
+function vSet(){
+  if(S.tpl==null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
+  const cards=S.tpl.map(t=>`<div class="card"><h2>${esc(t.label)}</h2><small>${esc(t.hint||'')}</small>
+  ${t.key.startsWith('bday')?`<label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="tp_en_${t.key}"${t.enabled?' checked':''}> مفعّلة (بتتبعت تلقائي)</label>`:''}
+  <input id="tp_t_${t.key}" maxlength="80" value="${esc(t.title)}"><textarea id="tp_b_${t.key}" rows="5" maxlength="1000">${esc(t.body)}</textarea>
+  <div class="empty" id="tp_pv_${t.key}" style="white-space:pre-wrap;text-align:right"></div>
+  <button class="p" data-a="tplSave" data-id="${t.key}">حفظ</button> <button class="s" data-a="tplPrev" data-id="${t.key}">معاينة</button> <button class="s" data-a="tplReset" data-id="${t.key}">رجّع الافتراضي</button></div>`).join('');
+  return pushCard()+`<div class="card"><h2>الإشعارات</h2><button class="s" data-a="diag">🩺 فحص الإشعارات واختبارها</button><p class="empty">فعّل الإشعارات على جهازك من الكارت اللي فوق. الرسايل التلقائية تحت جاهزة، وبتتبدّل فيها {name} بأول اسمين من اسم المستلم، وتقدر تعدّل نصها.</p></div>`+cards;
+}
 async function loadComp(){
   const [c,p]=await Promise.all([sb.from('competitions').select('*').order('starts_on',{ascending:false}),fetchAll(()=>sb.from('points').select('*').order('created_at',{ascending:false}).order('id'))]);
   if(c.error)toast('تعذّر تحميل المسابقات: '+c.error.message);
@@ -898,7 +931,7 @@ app.addEventListener('click',async e=>{
   if(a==='out'){await sb.auth.signOut();return login()}
   if(a==='diag')return diagOpen();
   if(a==='nt')return ntOpen(b);
-  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(['follow','rep','home','mycls','mysv'].includes(id))await loadHist();if(['mycls','mypr'].includes(id))await loadMates();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
+  if(a==='tab'){S.tab=id;if(id==='audit')await loadAudit();if(['follow','rep','home','mycls','mysv'].includes(id))await loadHist();if(['mycls','mypr'].includes(id))await loadMates();if(id==='comp')await loadComp();if(id==='ann')await loadAnn();if(id==='msg')await loadMsg();if(id==='set'){S.pushSt=await pushState();await loadTpl()}if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
   if(a==='joinGo')return joinGo();
   if(a==='joinhome'){history.replaceState(null,'',location.pathname);return boot()}
   if(a==='mkInv')return mkInv();
@@ -969,6 +1002,50 @@ app.addEventListener('click',async e=>{
     const {data,error}=await sb.rpc('kh_announce',{p_title:title,p_body:body||null,p_scope:sc,p_class:cl,p_section:sec});
     if(error)return toast(error.message==='FORBIDDEN'?'مش مسموح لك بالإرسال ده':rpcErr(error));
     toast('اتبعت لـ '+data+' شخص');await loadAnn();return render();
+  }
+  if(a==='msgSend'){
+    const au=v('sm_au'),title=v('sm_t'),body=document.getElementById('sm_b').value.trim();
+    if(!body)return toast('اكتب نص الرسالة');
+    let fn,args;
+    if(au==='servants'){
+      const tg=v('sm_tg'),cl=tg==='class'?v('sm_cl'):null,us=tg==='selected'?[...document.querySelectorAll('.smchk:checked')].map(x=>x.value):null;
+      if(tg==='class'&&!cl)return toast('اختار الفصل');
+      if(tg==='selected'&&!us.length)return toast('اختار خادم واحد على الأقل');
+      fn='kh_msg_servants';args={p_title:title||null,p_body:body,p_target:tg,p_class:cl,p_users:us};
+    }else{
+      const tg=v('sm_pt'),cl=tg==='class'?v('sm_pcl'):null,sv=tg==='servee'?v('sm_ps'):null,us=tg==='one'?v('sm_pu'):null;
+      if(tg==='class'&&!cl)return toast('اختار الفصل');
+      if(tg==='servee'&&!sv)return toast('اختار المخدوم');
+      if(tg==='one'&&!us)return toast('اختار ولي الأمر');
+      fn='kh_msg_parents';args={p_title:title||null,p_body:body,p_target:tg,p_class:cl,p_servee:sv,p_user:us};
+    }
+    if(!confirm('إرسال الرسالة دلوقتي؟'))return;
+    const {data,error}=await sb.rpc(fn,args);
+    if(error)return toast(MSGERR[error.message]||('حصل خطأ: '+error.message));
+    toast('اتبعتت لـ '+data+(au==='servants'?' خادم':' ولي أمر'));S.msgOpen=null;await loadMsg();return render();
+  }
+  if(a==='msgOpen'){
+    if(S.msgOpen===id){S.msgOpen=null;return render()}
+    const r=await sb.rpc('kh_msg_status',{p_msg:id});
+    if(r.error)return toast('تعذّر تحميل التفاصيل: '+r.error.message);
+    S.msgOpen=id;S.msgSt=r.data||[];return render();
+  }
+  if(a==='tplPrev'){
+    const el=document.getElementById('tp_pv_'+id);
+    const vars={name:'كيرلس عادل',servee:'مريم جورج',class:'أولى',age:'13'};
+    el.textContent='معاينة:\n'+tplRender(document.getElementById('tp_t_'+id).value,vars)+'\n'+tplRender(document.getElementById('tp_b_'+id).value,vars);return;
+  }
+  if(a==='tplSave'){
+    const en=document.getElementById('tp_en_'+id),row={title:v('tp_t_'+id),body:document.getElementById('tp_b_'+id).value};
+    if(!row.title)return toast('اكتب العنوان');
+    if(en)row.enabled=en.checked;
+    if(ok(await sb.from('message_templates').update(row).eq('key',id))){toast('اتحفظت');await loadTpl();return render()}
+    return;
+  }
+  if(a==='tplReset'){
+    const t=tplOf(id);if(!t||!confirm('ترجّع النص الافتراضي؟ التعديلات هتتمسح.'))return;
+    if(ok(await sb.from('message_templates').update({title:t.default_title,body:t.default_body}).eq('key',id))){toast('اترجّع الافتراضي');await loadTpl();return render()}
+    return;
   }
   if(a==='compAdd'){
     if(!v('mt'))return toast('اكتب اسم المسابقة');if(!v('mc'))return toast('اختار الفصل');
@@ -1044,6 +1121,9 @@ app.addEventListener('change',async e=>{
   if(b.dataset.a==='attDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='filter'){S.f=b.value;S.lim=50;return render()}
   if(b.dataset.a==='annscope'){const x=b.value;const w=document.getElementById('ascw'),c=document.getElementById('aclw');if(w)w.style.display=(x==='section'&&isAdmin())?'block':'none';if(c)c.style.display=x==='class'?'block':'none';return}
+  if(b.dataset.a==='msgau'){const x=b.value,sv=document.getElementById('sm_sv'),pa=document.getElementById('sm_pa'),bd=document.getElementById('sm_b'),ti=document.getElementById('sm_t');sv.style.display=x==='servants'?'block':'none';pa.style.display=x==='parents'?'block':'none';const t=tplOf(x==='servants'?'servant_msg':'parent_msg'),o=tplOf(x==='servants'?'parent_msg':'servant_msg');if(t&&(!bd.value.trim()||(o&&bd.value===o.body))){bd.value=t.body;ti.value=t.title}return}
+  if(b.dataset.a==='msgtgt'){const x=b.value,c=document.getElementById('sm_cw'),w=document.getElementById('sm_sw');if(c)c.style.display=x==='class'?'block':'none';if(w)w.style.display=x==='selected'?'block':'none';return}
+  if(b.dataset.a==='msgpt'){const x=b.value;for(const [k,id] of [['class','sm_pcw'],['servee','sm_psw'],['one','sm_puw']]){const e=document.getElementById(id);if(e)e.style.display=x===k?'block':'none'}return}
   if(b.dataset.a==='pc'){S.pc=b.value;return render()}
   if(b.dataset.a==='th'){S.th=+b.value;return render()}
   if(b.dataset.a==='rc'){S.rc=b.value;return render()}
