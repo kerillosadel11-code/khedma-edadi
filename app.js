@@ -179,7 +179,17 @@ function vClasses(){
   const ec=S.classes.find(c=>c.id===S.edc);
   const edit=ec?`<div class="card" style="border-color:var(--gold)"><h2>تعديل الفصل</h2><input id="ecn" value="${esc(ec.name)}" placeholder="اسم الفصل"><input id="ecs" value="${esc(ec.stage||'')}" placeholder="المرحلة (اختياري)">${isAdmin()?`<select id="ecsec"><option value="">اختار القسم</option><option value="boys"${ec.section==='boys'?' selected':''}>بنين</option><option value="girls"${ec.section==='girls'?' selected':''}>بنات</option></select>`:''}<button class="p" data-a="saveClass">حفظ</button><button class="s" data-a="cancelEdit" style="margin-top:8px">إلغاء</button></div>`:'';
   return edit+`<div class="card"><h2>إضافة فصل</h2><input id="cn" placeholder="اسم الفصل (مثال: أولى إعدادي)"><input id="cs" placeholder="المرحلة (اختياري)">${isSec()?`<select id="csec" disabled><option>${SEC[S.p.section]}</option></select>`:`<select id="csec"><option value="">اختار القسم</option><option value="boys"${S.sec==='boys'?' selected':''}>بنين</option><option value="girls"${S.sec==='girls'?' selected':''}>بنات</option></select>`}<button class="p" data-a="addClass">إضافة الفصل</button></div>
-  <div class="card"><h2>الفصول (${S.classes.length})</h2>${S.classes.map(c=>`<div class="row"><div>${esc(c.name)}${badge(c.section)}<small>${esc(c.stage||'')} ${S.servees.filter(s=>s.class_id===c.id&&s.active).length} مخدوم</small></div><div class="acts"><button class="s" data-a="editClass" data-id="${c.id}">تعديل</button><button class="s" data-a="promoteClass" data-id="${c.id}">ترقية</button><button class="s d" data-a="delClass" data-id="${c.id}">حذف</button></div></div>`).join('')||'<div class="empty">لسه مفيش فصول. أضف أول فصل من فوق.</div>'}</div>`;
+  <div class="card"><h2>الفصول (${S.classes.length})</h2>${S.classes.map(c=>`<div class="row"><div>${esc(c.name)}${badge(c.section)}<small>${esc(c.stage||'')} ${S.servees.filter(s=>s.class_id===c.id&&s.active).length} مخدوم · ${S.cs.filter(x=>x.class_id===c.id).length} خادم</small></div><div class="acts"><button class="s${S.cso===c.id?' on':''}" data-a="classOpen" data-id="${c.id}">${S.cso===c.id?'إخفاء':'الخدام والمخدومين'}</button><button class="s" data-a="editClass" data-id="${c.id}">تعديل</button><button class="s" data-a="promoteClass" data-id="${c.id}">ترقية</button><button class="s d" data-a="delClass" data-id="${c.id}">حذف</button></div></div>${S.cso===c.id?classDetail(c):''}`).join('')||'<div class="empty">لسه مفيش فصول. أضف أول فصل من فوق.</div>'}</div>`;
+}
+/* تفاصيل الفصل: الخدام + المخدومين وجنب كل مخدوم ولي أمره (للأمين وأبونا) */
+const contactLinks=raw=>{const n=normPhone(raw);return n?`<a href="tel:${n}">اتصال</a><a href="https://wa.me/2${n}" target="_blank" rel="noopener">واتساب</a>`:''};
+function classDetail(c){
+  const srv=S.cs.filter(x=>x.class_id===c.id).map(x=>S.profiles.find(p=>p.id===x.servant_id)).filter(Boolean).sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ar'));
+  const sv=S.servees.filter(x=>x.class_id===c.id&&x.active).sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ar'));
+  const guard=sid=>S.pl.filter(l=>l.servee_id===sid).map(l=>S.profiles.find(p=>p.id===l.parent_id)).filter(Boolean);
+  const srvRows=srv.map(p=>{const ph=p.contact_phone||p.phone;return `<div class="row"><div>${esc(p.full_name||'بدون اسم')}${p.active?'':'<span class="bd" style="background:#f3d6d2">موقوف</span>'}${ph?`<small dir="ltr" style="text-align:right">${esc(ph)}</small>`:''}</div><div class="cnt" style="margin:0">${contactLinks(ph)}</div></div>`}).join('')||'<div class="empty">مفيش خدام مربوطين بالفصل ده.</div>';
+  const svRows=sv.map(s=>{const g=guard(s.id);return `<div class="row"><div class="who">${av(s,36)}<div>${esc(s.full_name)}${s.phone?`<small dir="ltr" style="text-align:right">${esc(s.phone)}</small>`:''}${g.length?g.map(p=>{const ph=p.contact_phone||p.phone;return `<small>ولي الأمر: ${esc(p.full_name||'بدون اسم')}${ph?` · <span dir="ltr">${esc(ph)}</span>`:''}</small>`}).join(''):'<small style="color:var(--red)">ولي الأمر: مش مسجّل</small>'}</div></div><div class="cnt" style="margin:0;flex-direction:column;gap:4px">${g.map(p=>contactLinks(p.contact_phone||p.phone)).join('')||contactLinks(s.phone)}</div></div>`}).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>';
+  return `<div class="srv open"><div class="srvd"><h3>الخدام (${srv.length})</h3>${srvRows}<h3>المخدومين وأولياء أمورهم (${sv.length})</h3>${svRows}</div></div>`;
 }
 const nz=t=>String(t||'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').trim();
 function svFiltered(){
@@ -1114,6 +1124,7 @@ app.addEventListener('click',async e=>{
     const r=await sb.from('profiles').update({full_name:n,contact_phone:np,birth_date:v('xb')||null,address:v('xa')||null,notes:v('xo')||null}).eq('id',S.sed);
     if(!ok(r))return;S.sed=null;await load();render();return toast('تم الحفظ');
   }
+  if(a==='classOpen'){S.cso=S.cso===id?null:id;return render()}
   if(a==='srvOpen'){S.sso=S.sso===id?null:id;return render()}
   if(a==='sec'){
     if(!isAdmin()||S.sec===id)return;
