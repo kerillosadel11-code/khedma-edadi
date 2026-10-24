@@ -170,8 +170,8 @@ function render(){
   const adm=canManage();
   if(S.cards)return app.innerHTML=head()+vCards();
   if(S.pf)return app.innerHTML=head()+vProfile();
-  if(!adm&&!['mycls','mysv','mypr','att','prep','sat','follow','comp','notif'].includes(S.tab))S.tab='mycls';
-  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['msg','الرسائل'],['pst','حالة الإشعارات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل'],['set','الإعدادات']]:[]):[['mycls','فصلي'],['mysv','المخدومين'],['mypr','أولياء الأمور'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['sat','حضوري']];
+  if(!adm&&!['mycls','mysv','mypr','att','prep','sat','follow','comp','notif','msg'].includes(S.tab))S.tab='mycls';
+  const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['msg','الرسائل'],['pst','حالة الإشعارات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل'],['set','الإعدادات']]:[]):[['mycls','فصلي'],['mysv','المخدومين'],['mypr','أولياء الأمور'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['msg','الرسائل'],['sat','حضوري']];
   app.innerHTML=head()+`<main>${{mycls:vMyClass,mysv:vMyServees,mypr:vMyParents,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,prep:vPrep,home:vHome,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn,msg:vMsg,pst:vPst,set:vSet}[S.tab]()}</main><nav class="bn">${T.map(([k,n])=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${n}</span></button>`).join('')}</nav>`;
   const on=document.querySelector('nav.bn .on');if(on)on.scrollIntoView({inline:'nearest',block:'nearest'});
 }
@@ -576,7 +576,7 @@ function ntOpen(b){
 async function loadNotifs(){const r=await sb.from('notifications').select('*').eq('user_id',S.p.id).order('created_at',{ascending:false}).limit(50);S.nt=r.error?[]:(r.data||[])}
 function vNotif(){
   const L=S.nt||[],n=unread(),dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});
-  return pushCard()+`<div class="card"><button class="s" data-a="diag">🩺 فحص الإشعارات واختبارها</button> <button class="s" data-a="outAll">تسجيل الخروج من كل الأجهزة</button></div><div class="card"><h2>الإشعارات${n?' ('+n+' جديد)':''}</h2>${n?'<button class="s" data-a="readAll" style="margin-bottom:8px">تحديد الكل كمقروء</button>':''}${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div><div class="acts">${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}${String(x.title||'').startsWith('✉️')?`<button class="s${S.rpn===x.id?' on':''}" data-a="replyOpen" data-id="${x.id}">رد</button>`:''}</div>${S.rpn===x.id?`<div style="flex-basis:100%"><textarea id="rp_b" rows="3" maxlength="500" data-a="rpdraft" placeholder="اكتب ردك...">${esc(S.rpd||'')}</textarea><button class="p" data-a="replySend" data-id="${x.id}">إرسال الرد</button></div>`:''}</div>`).join('')||'<div class="empty">مفيش إشعارات.</div>'}</div>`;
+  return pushCard()+`<div class="card"><button class="s" data-a="diag">🩺 فحص الإشعارات واختبارها</button> <button class="s" data-a="outAll">تسجيل الخروج من كل الأجهزة</button></div><div class="card"><h2>الإشعارات${n?' ('+n+' جديد)':''}</h2>${n?'<button class="s" data-a="readAll" style="margin-bottom:8px">تحديد الكل كمقروء</button>':''}${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div><div class="acts">${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}${isMsgN(x)?`<button class="s${S.rpn===x.id?' on':''}" data-a="replyOpen" data-id="${x.id}">رد</button>`:''}</div>${S.rpn===x.id?`<div style="flex-basis:100%"><textarea id="rp_b" rows="3" maxlength="500" data-a="rpdraft" placeholder="اكتب ردك...">${esc(S.rpd||'')}</textarea><button class="p" data-a="replySend" data-id="${x.id}">إرسال الرد</button></div>`:''}</div>`).join('')||'<div class="empty">مفيش إشعارات.</div>'}</div>`;
 }
 async function loadAnn(){const r=await sb.from('announcements').select('*').order('created_at',{ascending:false}).limit(30);S.an=r.error?[]:(r.data||[]).filter(a=>!secOn()||a.scope==='all'||a.section===S.sec||(a.class_id&&S.classes.some(c=>c.id===a.class_id)));if(r.error)toast('تعذّر تحميل الإعلانات: '+r.error.message)}
 function vAnn(){
@@ -593,9 +593,27 @@ const MSGERR={FORBIDDEN:'مش مسموح لك بالإرسال ده',BAD_BODY:'�
 const tplOf=k=>(S.tpl||[]).find(t=>t.key===k);
 const tplRender=(x,vars)=>String(x||'').replace(/\{(\w+)\}/g,(m,k)=>k in vars?vars[k]:m);
 async function loadTpl(){const r=await sb.from('message_templates').select('*').order('key');S.tpl=r.error?[]:(r.data||[]);if(r.error)toast('تعذّر تحميل الرسايل الجاهزة: '+r.error.message)}
-async function loadMsg(){await loadTpl();const r=await sb.from('staff_messages').select('*').order('created_at',{ascending:false}).limit(30);S.msgs=r.error?[]:(r.data||[]);if(r.error)toast('تعذّر تحميل الرسائل: '+r.error.message)}
+async function loadMsg(){
+  if(canManage()){await loadTpl();const r=await sb.from('staff_messages').select('*').order('created_at',{ascending:false}).limit(30);S.msgs=r.error?[]:(r.data||[]);if(r.error)toast('تعذّر تحميل الرسائل: '+r.error.message)}else S.msgs=[];
+  const rr=await sb.from('message_replies').select('*').eq('from_user',S.p.id).order('created_at',{ascending:false}).limit(30);S.rps=rr.error?[]:(rr.data||[]);
+  await loadNotifs();
+}
+const isMsgN=x=>{const t=String(x.title||'');return t.startsWith('✉️')||t.startsWith('↩️')};
 function vMsg(){
   if(S.msgs==null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
+  const mgr=canManage(),mb=(S.mbox==='in'||S.mbox==='out'||(S.mbox==='new'&&mgr))?S.mbox:(mgr?'new':'in'),nIn=(S.nt||[]).filter(x=>isMsgN(x)&&!x.is_read).length;
+  const T=(mgr?[['new','✍️ رسالة جديدة']]:[]).concat([['in','📥 وارد'+(nIn?' ('+nIn+')':'')],['out','📤 صادر']]);
+  return `<div class="card"><div class="two">${T.map(([k,n])=>`<button class="s${mb===k?' on':''}" data-a="mbox" data-id="${k}">${n}</button>`).join('')}</div></div>`+(mb==='new'?vMsgNew():mb==='in'?vInbox():vOutbox());
+}
+function vInbox(){
+  const dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'}),L=(S.nt||[]).filter(isMsgN);
+  return `<div class="card"><h2>الوارد (${L.length})</h2>${L.map(x=>`<div class="row" style="${x.is_read?'':'background:#fff8e6;border-radius:8px;padding:10px'}"><div><b>${esc(x.title)}</b>${x.body?`<small style="white-space:pre-wrap">${esc(x.body)}</small>`:''}<small>${dt(x.created_at)}</small></div><div class="acts">${x.is_read?'':`<button class="s" data-a="readN" data-id="${x.id}">تم</button>`}<button class="s${S.rpn===x.id?' on':''}" data-a="replyOpen" data-id="${x.id}">رد</button></div>${S.rpn===x.id?`<div style="flex-basis:100%"><textarea id="rp_b" rows="3" maxlength="500" data-a="rpdraft" placeholder="اكتب ردك...">${esc(S.rpd||'')}</textarea><button class="p" data-a="replySend" data-id="${x.id}">إرسال الرد</button></div>`:''}</div>`).join('')||'<div class="empty">مفيش رسائل واردة.</div>'}</div>`;
+}
+function vOutbox(){
+  const dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});
+  return (canManage()?vSent():'')+`<div class="card"><h2>الردود اللي بعتها (${(S.rps||[]).length})</h2>${(S.rps||[]).map(r=>`<div class="row"><div><b>↩️ إلى ${esc(r.to_name||'؟')}</b><small style="white-space:pre-wrap">${esc(r.body)}</small><small>${dt(r.created_at)}</small></div></div>`).join('')||'<div class="empty">لسه ما بعتش ردود.</div>'}</div>`;
+}
+function vMsgNew(){
   const sv=servList(),pr=S.profiles.filter(p=>p.role==='parent'&&p.active),dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});
   const tl=m=>(m.audience==='parents'?'أولياء أمور · ':'خدام · ')+(m.target==='all'?'الكل':m.target==='class'?'فصل '+esc(cname(m.class_id)):m.target==='servee'?'أهل '+esc(sname(m.servee_id)):m.target==='one'?'ولي أمر معيّن':'مختارين');
   const st=tplOf('servant_msg')||{title:'',body:''};
@@ -611,8 +629,11 @@ function vMsg(){
   <div id="sm_puw" style="display:none"><select id="sm_pu"><option value="">اختار ولي الأمر</option>${pr.map(p=>`<option value="${p.id}">${esc(p.full_name)}</option>`).join('')}</select></div></div>
   <input id="sm_t" maxlength="80" placeholder="العنوان (اختياري)" value="${esc(st.title)}"><textarea id="sm_b" rows="5" maxlength="1000" placeholder="نص الرسالة">${esc(st.body)}</textarea>
   <p class="empty">اكتب <b>{name}</b> وهتتبدّل بأول اسمين من اسم كل مستلم، و<b>{servee}</b> باسم ابنه (لأولياء الأمور). بتوصل كإشعار على الموبايل وجوه التطبيق (🔔)، وتقدر تشوف مين قراها.</p>
-  <button class="p" data-a="msgSend">إرسال</button></div>
-  <div class="card"><h2>آخر الرسائل (${S.msgs.length})</h2>${S.msgs.map(m=>`<div class="row" style="flex-wrap:wrap"><div style="flex:1;min-width:0">${esc(m.title)}<small>${tl(m)} · وصل ${m.sent_count} · ${dt(m.created_at)}</small><small style="white-space:pre-wrap">${esc(m.body)}</small></div><button class="s" data-a="msgOpen" data-id="${m.id}">${S.msgOpen===m.id?'إخفاء':'مين قرا؟'}</button>${S.msgOpen===m.id?`<div style="flex-basis:100%;padding-top:8px">${(S.msgSt||[]).map(r=>`<small>${r.is_read?'✅':'⏳'} ${esc(r.full_name||'؟')}</small>`).join('')||'<small>مفيش بيانات.</small>'}</div>`:''}</div>`).join('')||'<div class="empty">لسه ما بعتش رسائل.</div>'}</div>`;
+  <button class="p" data-a="msgSend">إرسال</button></div>`;
+}
+function vSent(){
+  const dt=x=>new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'}),tl=m=>(m.audience==='parents'?'أولياء أمور · ':'خدام · ')+(m.target==='all'?'الكل':m.target==='class'?'فصل '+esc(cname(m.class_id)):m.target==='servee'?'أهل '+esc(sname(m.servee_id)):m.target==='one'?'ولي أمر معيّن':'مختارين');
+  return `<div class="card"><h2>رسائلي المبعوتة (${S.msgs.length})</h2>${S.msgs.map(m=>`<div class="row" style="flex-wrap:wrap"><div style="flex:1;min-width:0">${esc(m.title)}<small>${tl(m)} · وصل ${m.sent_count} · ${dt(m.created_at)}</small><small style="white-space:pre-wrap">${esc(m.body)}</small></div><button class="s" data-a="msgOpen" data-id="${m.id}">${S.msgOpen===m.id?'إخفاء':'مين قرا؟'}</button>${S.msgOpen===m.id?`<div style="flex-basis:100%;padding-top:8px">${(S.msgSt||[]).map(r=>`<small>${r.is_read?'✅':'⏳'} ${esc(r.full_name||'؟')}</small>`).join('')||'<small>مفيش بيانات.</small>'}</div>`:''}</div>`).join('')||'<div class="empty">لسه ما بعتش رسائل.</div>'}</div>`;
 }
 function vSet(){
   if(S.tpl==null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
@@ -1026,13 +1047,14 @@ app.addEventListener('click',async e=>{
   if(a==='pushOn'){await pushEnable();S.pushSt=await pushState();return paint()}
   if(a==='pushOff'){await pushDisable();S.pushSt=await pushState();return paint()}
   if(a==='bell'){S.pushSt=await pushState();await loadNotifs();if(S.p.role==='parent')S.pbell=!S.pbell;else S.tab='notif';return paint()}
+  if(a==='mbox'){S.mbox=id;S.rpn=null;return render()}
   if(a==='replyOpen'){S.rpn=S.rpn===id?null:id;S.rpd='';return paint()}
   if(a==='replySend'){
     const body=document.getElementById('rp_b').value.trim();if(!body)return toast('اكتب الرد');
     const {error}=await sb.rpc('kh_reply',{p_notification:id,p_body:body});
     if(error)return toast(MSGERR[error.message]||('حصل خطأ: '+error.message));
     await sb.from('notifications').update({is_read:true}).eq('id',id);
-    S.rpn=null;S.rpd='';await loadNotifs();toast('اتبعت الرد');return paint();
+    S.rpn=null;S.rpd='';await loadMsg();toast('اتبعت الرد');return paint();
   }
   if(a==='readAll'){const r=await sb.from('notifications').update({is_read:true}).eq('user_id',S.p.id).eq('is_read',false);if(!ok(r))return;await loadNotifs();return paint()}
   if(a==='readN'){const r=await sb.from('notifications').update({is_read:true}).eq('id',id);if(!ok(r))return;await loadNotifs();return paint()}
