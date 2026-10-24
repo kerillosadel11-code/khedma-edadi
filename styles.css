@@ -116,3 +116,22 @@ h2 small{font-weight:400;color:var(--mut);font-size:12px;margin-inline-start:6px
 .li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0eadc;cursor:pointer}.li:last-child{border:0}
 .dot{width:9px;height:9px;border-radius:50%;flex:none}.li>div{flex:1;font-size:14px;min-width:0}.li small{display:block;color:var(--mut);font-size:12px}
 .li em{font-style:normal;font-weight:700}.li u{text-decoration:none;color:#b9b2a0}
+/* شريط سفلي + قايمة "المزيد" (موبايل وكمبيوتر) */
+nav.bn{position:fixed;top:auto;bottom:0;left:0;right:0;width:auto;flex-direction:row;justify-content:center;gap:0;overflow:visible;background:#fff;border:0;border-top:1px solid var(--line);padding:4px 0 calc(6px + env(safe-area-inset-bottom));z-index:20;box-shadow:0 -2px 12px #0001}
+nav.bn button{flex:1 1 0;max-width:150px;width:auto;padding:6px 2px;font-size:11.5px;border:0;border-top:3px solid transparent}
+nav.bn button i{font-size:22px}
+nav.bn button.on{border-top-color:var(--gold);border-right-color:transparent;background:none}
+nav.bn button span{display:block}
+body:has(nav.bn){padding-right:0;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+@media (max-width:480px){nav.bn button{font-size:10.5px;padding:5px 1px}nav.bn button i{font-size:20px}}
+.dotb{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);vertical-align:middle}
+.sheet-bg{position:fixed;inset:0;background:#0006;z-index:30}
+.sheet{position:fixed;bottom:0;left:0;right:0;max-width:720px;margin:0 auto;max-height:82vh;overflow-y:auto;background:var(--bg);border-radius:20px 20px 0 0;padding:14px 16px calc(18px + env(safe-area-inset-bottom));z-index:31;box-shadow:0 -6px 24px #0003}
+.sheet-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}.sheet-h b{font-size:17px}
+.sheet-h button{border:0;background:#fff;border:1px solid var(--line);border-radius:50%;width:34px;height:34px;font-size:15px}
+.sheet h4{margin:12px 2px 6px;font-size:13px;color:var(--mut)}
+.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.sg button{display:flex;flex-direction:column;align-items:center;gap:0;padding:10px 2px;background:#fff;border:1px solid var(--line);border-radius:14px;font:inherit;font-size:12px;line-height:1.35;color:var(--ink);text-align:center}
+.sg button i{font-style:normal;font-size:24px}.sg button.on{border-color:var(--gold);background:#fffaf0;font-weight:700}
+@media (max-width:380px){.sg{grid-template-columns:repeat(3,1fr)}}
+#t{bottom:calc(84px + env(safe-area-inset-bottom))}
