@@ -5,7 +5,7 @@ const v=id=>document.getElementById(id).value.trim();
 const ROLES={admin:'أدمن',secretary:'أمين خدمة',servant:'خادم',parent:'ولي أمر'};
 const SEC={boys:'بنين',girls:'بنات'};
 const isAdmin=()=>S.p&&S.p.role==='admin',isSec=()=>S.p&&S.p.role==='secretary',canManage=()=>isAdmin()||isSec();
-const roleLabel=p=>(ROLES[p.role]||p.role)+((p.role==='secretary'&&p.section)?' '+SEC[p.section]:'');
+const roleLabel=p=>p.self_servee_id?'مخدوم':(ROLES[p.role]||p.role)+((p.role==='secretary'&&p.section)?' '+SEC[p.section]:'');
 const badge=sc=>sc&&SEC[sc]?`<span class="bd">${SEC[sc]}</span>`:'';
 const cLabel=c=>c.name+(isAdmin()&&c.section?' · '+SEC[c.section]:'');
 function toast(m){const t=document.getElementById('t');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3000)}
@@ -98,17 +98,23 @@ async function loadParent(){
   r.forEach(ok);[S.servees,S.classes,S.hist]=r.map(x=>x.data||[]);
   const pt=await sb.from('servee_points').select('servee_id,total_points').in('servee_id',ids);
   S.pts=pt.error?{}:Object.fromEntries((pt.data||[]).map(x=>[x.servee_id,x.total_points]));
+  if(S.p.self_servee_id){const c=await sb.from('competitions').select('*').order('starts_on',{ascending:false});S.cmp=c.error?[]:(c.data||[]).filter(k=>!k.class_id||(S.servees[0]&&k.class_id===S.servees[0].class_id))}
   await loadNotifs();
   await loadPhotos();
 }
 const fdate=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
+function servCmpCard(){
+  const td=today(),L=(S.cmp||[]).filter(c=>!c.ends_on||c.ends_on>=td);
+  return `<div class="card"><h2>المسابقات</h2>${L.map(c=>`<div class="row"><div>${esc(c.title||c.name||'مسابقة')}<small>${c.starts_on?'من '+fdate(c.starts_on):''}${c.ends_on?' · لحد '+fdate(c.ends_on):''}</small></div></div>`).join('')||'<div class="empty">مفيش مسابقات مفتوحة دلوقتي.</div>'}</div>`;
+}
 function vParent(){
-  if(!S.servees.length)return `<main>${S.pbell?vNotif():''}<div class="card"><h2>أهلاً ${esc(S.p.full_name)}</h2><div class="empty">لسه مفيش ابن مربوط بحسابك. كلّم أبونا يربطه.</div></div></main>`;
+  const me=!!S.p.self_servee_id;
+  if(!S.servees.length)return `<main>${S.pbell?vNotif():''}<div class="card"><h2>أهلاً ${esc(S.p.full_name)}</h2><div class="empty">${me?'حسابك لسه مش مربوط بملفك. كلّم أبونا.':'لسه مفيش ابن مربوط بحسابك. كلّم أبونا يربطه.'}</div></div></main>`;
   return `<main>${S.pbell?vNotif():''}<h2 style="margin:0 0 10px">أهلاً ${esc(S.p.full_name)}</h2>`+S.servees.map(x=>{
     const H=S.hist.filter(h=>h.servee_id===x.id),P=H.filter(h=>h.status==='present').length,B=H.length-P,pc=H.length?Math.round(P*100/H.length):0;
     return `<div class="card"><div class="who">${av(x,64)}<div><b style="font-size:18px">${esc(x.full_name)}</b><small>${esc(cname(x.class_id))}</small></div></div>
     <div class="cnt" style="margin-top:12px"><span>حاضر ${P}</span><span>غايب ${B}</span>${H.length?`<span>نسبة الحضور ${pc}%</span>`:''}${(S.pts||{})[x.id]>0?`<span>النقاط ${S.pts[x.id]}</span>`:''}</div>
-    <h2 style="margin-top:8px">آخر الأسابيع</h2>${H.slice(0,12).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':'var(--red)'}">${h.status==='present'?'حاضر':'غايب'}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`}).join('')+`</main>`;
+    <h2 style="margin-top:8px">آخر الأسابيع</h2>${H.slice(0,12).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':'var(--red)'}">${h.status==='present'?'حاضر':'غايب'}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`}).join('')+(me?servCmpCard():'')+`</main>`;
 }
 const unread=()=>(S.nt||[]).filter(n=>!n.is_read).length;
 const head=()=>`<header><b>خدمة إعدادي</b><span><a href="#" data-a="bell" style="color:#fff;text-decoration:none" aria-label="الإشعارات">🔔${unread()?` <b style="background:var(--red);border-radius:10px;padding:0 6px;font-size:12px">${unread()}</b>`:''}</a> · <a href="#" data-a="diag" aria-label="فحص الإشعارات" style="color:#fff;text-decoration:none">🩺<i id="pdot" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;background:${S.pushSt==='on'?'#3ecf8e':S.pushSt?'#ff6b5e':'#999'}"></i></a> · ${esc(S.p.full_name)} · ${esc(roleLabel(S.p))} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>${secBar()}`;
@@ -134,6 +140,7 @@ async function loadAdmin(){
   const r=await Promise.all([sb.from('classes').select('*').order('created_at'),fetchAll(()=>sb.from('servees').select('*').order('full_name').order('id')),sb.from('profiles').select('*').order('full_name'),sb.from('class_servants').select('*'),sb.from('parent_links').select('*')]);
   r.forEach(ok);
   [S.classes,S.servees,S.profiles,S.cs,S.pl]=r.map(x=>x.data||[]);
+  {const sp=new Map(S.profiles.filter(p=>p.self_servee_id).map(p=>[p.id,p.self_servee_id]));if(sp.size)S.pl=S.pl.filter(l=>sp.get(l.parent_id)!==l.servee_id)}
   S.all={classes:S.classes,servees:S.servees,profiles:S.profiles,cs:S.cs,pl:S.pl};applySec();
 }
 /* ===== مبدّل القسم لأبونا: الكل / بنين / بنات (الفلترة في التطبيق بعد التحميل) ===== */
@@ -216,7 +223,7 @@ const svAssigned=s=>s.servant_id?S.profiles.find(p=>p.id===s.servant_id):null;
 const svServants=s=>{const a=svAssigned(s);return a?[a]:classServants(s.class_id)};
 const assignSel=s=>{const cl=classServants(s.class_id),a=svAssigned(s);const L=a&&!cl.some(p=>p.id===a.id)?cl.concat([a]):cl;return `<select data-a="assignSv" data-id="${s.id}" aria-label="الخادم المسئول" style="margin:6px 0 0"><option value="">${cl.length?'— خدام الفصل كلهم (بدون تعيين) —':'مفيش خدام في الفصل'}</option>${L.map(p=>`<option value="${p.id}"${s.servant_id===p.id?' selected':''}>${esc(p.full_name||'؟')}</option>`).join('')}</select>`};
 function svRow(s){
-  return `<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}${badge(s.section)}${s.active?'':'<span class="bd" style="background:#f3d6d2">مؤرشف</span>'}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}${!s.active&&s.archive_reason?' · '+esc(s.archive_reason):''}</small>${canManage()&&s.class_id?`<small>${svAssigned(s)?'الخادم المسئول':'خدام الفصل'}: ${svServants(s).map(p=>esc(p.full_name||'؟')).join(' · ')||'<span style="color:var(--red)">مفيش خادم مربوط بالفصل</span>'}</small>`:''}</div></div><div class="acts"><button class="s on" data-a="pf" data-id="${s.id}">الملف</button><button class="s" data-a="editServee" data-id="${s.id}">تعديل</button>${canManage()&&s.active?`<button class="s" data-a="parInv" data-id="${s.id}">دعوة ولي أمر</button>`:''}<button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button>${s.active?`<button class="s" data-a="archServee" data-id="${s.id}">أرشفة</button>`:`<button class="s on" data-a="restServee" data-id="${s.id}">استرجاع</button>`}${canManage()?`<button class="s d" data-a="delServee" data-id="${s.id}">حذف</button>`:''}</div></div>`;
+  return `<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}${badge(s.section)}${s.active?'':'<span class="bd" style="background:#f3d6d2">مؤرشف</span>'}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}${!s.active&&s.archive_reason?' · '+esc(s.archive_reason):''}</small>${canManage()&&s.class_id?`<small>${svAssigned(s)?'الخادم المسئول':'خدام الفصل'}: ${svServants(s).map(p=>esc(p.full_name||'؟')).join(' · ')||'<span style="color:var(--red)">مفيش خادم مربوط بالفصل</span>'}</small>`:''}</div></div><div class="acts"><button class="s on" data-a="pf" data-id="${s.id}">الملف</button><button class="s" data-a="editServee" data-id="${s.id}">تعديل</button>${canManage()&&s.active?`<button class="s" data-a="parInv" data-id="${s.id}">دعوة ولي أمر</button>`:''}${isAdmin()&&s.active?`<button class="s" data-a="mkServeeAcc" data-id="${s.id}">${S.profiles.some(p=>p.self_servee_id===s.id)?'باسورد جديد للمخدوم':'حساب دخول للمخدوم'}</button>`:''}<button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button>${s.active?`<button class="s" data-a="archServee" data-id="${s.id}">أرشفة</button>`:`<button class="s on" data-a="restServee" data-id="${s.id}">استرجاع</button>`}${canManage()?`<button class="s d" data-a="delServee" data-id="${s.id}">حذف</button>`:''}</div></div>`;
 }
 function svList(){
   const L=svFiltered();
@@ -232,7 +239,7 @@ function impCard(){
   return `<div class="card" style="border-color:var(--gold)"><h2>معاينة الاستيراد · ${esc(cname(m.cid))}</h2><div class="cnt"><span>جديد ${m.ok.length}</span><span>مكرر (هيتخطّى) ${m.dup}</span><span>بدون اسم ${m.bad}</span></div>${m.ok.slice(0,8).map(r=>`<div class="row"><div>${esc(r.full_name)}<small>${esc(r.phone||'')} ${esc(r.birth_date||'')}</small></div></div>`).join('')}${m.ok.length>8?`<div class="empty">و ${m.ok.length-8} كمان...</div>`:''}<button class="p" data-a="csvGo"${m.ok.length?'':' disabled'}>استيراد ${m.ok.length} مخدوم</button><button class="s" data-a="csvCancel" style="margin-top:8px">إلغاء</button></div>`;
 }
 function vServees(){
-  return svEditCard()+impCard()+`<div class="card"><h2>إضافة مخدوم</h2><input id="sn" placeholder="الاسم بالكامل"><div class="two"><input id="sp" type="tel" placeholder="التليفون" dir="ltr"><input id="sb" type="date" aria-label="تاريخ الميلاد"></div>
+  return credCard()+svEditCard()+impCard()+`<div class="card"><h2>إضافة مخدوم</h2><input id="sn" placeholder="الاسم بالكامل"><div class="two"><input id="sp" type="tel" placeholder="التليفون" dir="ltr"><input id="sb" type="date" aria-label="تاريخ الميلاد"></div>
   <select id="sc" data-a="scChange"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select>${canManage()?`<select id="ssv" aria-label="الخادم المسئول">${esvOpts(null,null)}</select>`:''}<input id="sa" placeholder="العنوان (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
   <div class="card"><h2>استيراد من ملف CSV</h2><select id="icl2"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><input type="file" accept=".csv,.txt" data-a="csvPick"><p class="empty">الأعمدة: الاسم، التليفون، تاريخ الميلاد، العنوان، ملاحظات. من Excel احفظ الملف كـ CSV UTF-8.</p></div>
   <div class="card"><input id="sq" type="search" data-a="search" placeholder="ابحث بالاسم أو التليفون أو الكود" value="${esc(S.q)}"><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="stfilter"><option value="act"${S.st==='act'?' selected':''}>الشغّالين</option><option value="arch"${S.st==='arch'?' selected':''}>المؤرشفين</option><option value="all"${S.st==='all'?' selected':''}>الكل</option></select></div><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button>
@@ -863,7 +870,7 @@ function vSet(){
   <button class="p" data-a="tplSave" data-id="${t.key}">حفظ</button> <button class="s" data-a="tplPrev" data-id="${t.key}">معاينة</button> <button class="s" data-a="tplReset" data-id="${t.key}">رجّع الافتراضي</button></div>`).join('');
   return pushCard()+`<div class="card"><h2>الإشعارات</h2><button class="s" data-a="diag">🩺 فحص الإشعارات واختبارها</button><p class="empty">فعّل الإشعارات على جهازك من الكارت اللي فوق. الرسايل التلقائية تحت جاهزة، وبتتبدّل فيها {name} بأول اسمين من اسم المستلم، وتقدر تعدّل نصها.</p></div>`+cards;
 }
-const PST_ROLE={servant:'خادم',parent:'ولي أمر',secretary:'أمين خدمة'};
+const PST_ROLE={servant:'خادم',parent:'ولي أمر',secretary:'أمين خدمة'};const pstRole=x=>x.self_servee_id?'مخدوم':(PST_ROLE[x.role]||'');
 const pstState=x=>x.subs===0?'off':((x.sent_30===0&&x.failed_30>0)?'warn':'on');
 async function loadPst(){const r=await sb.rpc('kh_push_status');S.pst=r.error?[]:(r.data||[]);if(r.error)toast('تعذّر تحميل حالة الإشعارات: '+r.error.message)}
 function vPst(){
@@ -1048,6 +1055,14 @@ async function run(a,id){
     btn.disabled=false;
     if(x.error)return toast(x.error);
     S.created=x;
+  }
+  else if(a==='mkServeeAcc'){
+    if(!isAdmin())return;const sv=S.servees.find(x=>x.id===id);if(!sv)return;
+    const ex=S.profiles.find(p=>p.self_servee_id===id);
+    if(ex){if(!confirm('هيتعمل باسورد مؤقت جديد لحساب '+sv.full_name+'. متأكد؟'))return;const x=await fn({action:'reset',user_id:ex.id});if(x.error)return toast(x.error);S.created=x;}
+    else{if(!sv.class_id)return toast('اربط المخدوم بفصل الأول (تعديل ← الفصل)، وبعدها اعمل له حساب');const ph=normPhone(prompt('رقم تليفون المخدوم (هو اسم الدخول):',normPhone(sv.phone||'')||'')||'');if(!ph)return toast('رقم التليفون مش صحيح (مثال: 01012345678)');
+      const x=await fn({role:'servee',servee_id:id,phone:ph});if(x.error)return toast(x.error);S.created=x;}
+    S.tab='servees';
   }
   else if(a==='resetPw'){
     if(!confirm('هيتعمل باسورد مؤقت جديد والباسورد القديم هيبطل. متأكد؟'))return;
