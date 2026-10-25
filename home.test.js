@@ -3,7 +3,7 @@ const { load } = require('./helpers');
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const base = S => load('app.js', ['fname', 'fdate', 'servCmpCard', 'vParent'], {
-  S, esc, today: () => '2026-10-25', av: () => '<i class="av"></i>', cname: () => 'أولى إعدادي', vNotif: () => ''
+  S, esc, today: () => '2026-10-25', av: () => '<i class="av"></i>', cname: () => 'أولى إعدادي', vNotif: () => '', parentMassBlock: () => ''
 });
 const count = (h, t) => h.split(t).length - 1;
 

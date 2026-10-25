@@ -154,7 +154,7 @@ const head=()=>`<header class="${S.p.role==='parent'?'hp':''}"><b>خدمة إع�
 async function load(){
   if(canManage())await loadAdmin();
   else{
-    const r=await Promise.all([sb.from('classes').select('*').order('created_at'),fetchAll(()=>sb.from('servees').select('*').order('full_name').order('id')),sb.from('class_servants').select('*')]);
+    const r=await Promise.all([sb.from('classes').select('*').order('created_at'),loadServees(),sb.from('class_servants').select('*')]);
     r.forEach(ok);[S.classes,S.servees,S.cs]=r.map(x=>x.data||[]);S.profiles=[];S.pl=[];
   }
   S.inv=[];if(canManage()){const ri=await sb.from('invites').select('*').order('created_at',{ascending:false});S.inv=ri.error?[]:(ri.data||[]).filter(i=>!secOn()||!i.section||i.section===S.sec)}
@@ -163,15 +163,16 @@ async function load(){
   if(!canManage())await loadMates();
 }
 async function loadExtra(){
-  const d0=new Date(Date.now()-90*864e5).toISOString().slice(0,10);
-  const [a,b,c]=await Promise.all([sb.from('servant_attendance').select('servant_id,att_date,status').gte('att_date',d0),sb.from('lesson_prep').select('*').order('prep_date',{ascending:false}).limit(200),sb.from('servant_mass_attendance').select('servant_id,att_date,status').gte('att_date',d0)]);
-  S.sa=a.error?[]:(a.data||[]);S.lp=b.error?[]:(b.data||[]);S.sma=c.error?[]:(c.data||[]);
+  const d0=ago(90);
+  let [A,M]=await Promise.all([packedLoad('sa','kh_srv_packed',90,'servant_id'),packedLoad('sma','kh_srvmass_packed',90,'servant_id')]);
+  const [a,b,c]=await Promise.all([A?null:sb.from('servant_attendance').select('servant_id,att_date,status').gte('att_date',d0),sb.from('lesson_prep').select('*').order('prep_date',{ascending:false}).limit(200),M?null:sb.from('servant_mass_attendance').select('servant_id,att_date,status').gte('att_date',d0)]);
+  S.sa=A||(a.error?[]:(a.data||[]));S.lp=b.error?[]:(b.data||[]);S.sma=M||(c.error?[]:(c.data||[]));
   if(secOn()){const pu=new Set(S.profiles.map(q=>q.id)),cu=new Set(S.classes.map(c=>c.id));S.sa=S.sa.filter(x=>pu.has(x.servant_id));S.sma=S.sma.filter(x=>pu.has(x.servant_id));S.lp=S.lp.filter(x=>cu.has(x.class_id))}
   await loadDuty();
   await loadNotifs();
 }
 async function loadAdmin(){
-  const r=await Promise.all([sb.from('classes').select('*').order('created_at'),fetchAll(()=>sb.from('servees').select('*').order('full_name').order('id')),sb.from('profiles').select('*').order('full_name'),sb.from('class_servants').select('*'),sb.from('parent_links').select('*')]);
+  const r=await Promise.all([sb.from('classes').select('*').order('created_at'),loadServees(),sb.from('profiles').select('*').order('full_name'),sb.from('class_servants').select('*'),sb.from('parent_links').select('*')]);
   r.forEach(ok);
   [S.classes,S.servees,S.profiles,S.cs,S.pl]=r.map(x=>x.data||[]);
   {const sp=new Map(S.profiles.filter(p=>p.self_servee_id).map(p=>[p.id,p.self_servee_id]));if(sp.size)S.pl=S.pl.filter(l=>sp.get(l.parent_id)!==l.servee_id)}
@@ -673,8 +674,8 @@ const KV={db:null,
 const HIST_FULL_TTL=7*864e5,HIST_RECENT=21,PK={p:'present',a:'absent',e:'excused'};
 /* الرد المضغوط من السيرفر: {ids:[uuid...], d:{تاريخ:{p:[فهارس],a:[...],e:[...]}}} */
 function packedToDays(x){const ids=(x&&x.ids)||[],d=(x&&x.d)||{},out={};for(const dt in d){const o=d[dt]||{};out[dt]={};for(const k in PK)out[dt][k]=(o[k]||[]).map(i=>ids[i]).filter(Boolean)}return out}
-function daysToRows(days,d0){const rows=[];for(const dt in days){if(dt<d0)continue;const o=days[dt];for(const k in PK)for(const id of o[k]||[])rows.push({servee_id:id,att_date:dt,status:PK[k]})}return rows}
-async function packedLoad(key,rpc,days){
+function daysToRows(days,d0,idk='servee_id'){const rows=[];for(const dt in days){if(dt<d0)continue;const o=days[dt];for(const k in PK)for(const id of o[k]||[])rows.push({[idk]:id,att_date:dt,status:PK[k]})}return rows}
+async function packedLoad(key,rpc,days,idk){
   if(S._noRpc&&S._noRpc[rpc])return null;
   const ck=key+':'+S.p.id,from=ago(days),rf=ago(HIST_RECENT),c=await KV.get(ck);
   const fresh=!!(c&&c.days&&c.full&&Date.now()-c.full<HIST_FULL_TTL&&c.from<=from),pf=fresh?rf:from;
@@ -683,12 +684,31 @@ async function packedLoad(key,rpc,days){
   const nd=packedToDays(r.data);let merged;
   if(fresh){merged={};for(const dt in c.days)if(dt<pf)merged[dt]=c.days[dt];Object.assign(merged,nd)}else merged=nd;
   await KV.set(ck,{full:fresh?c.full:Date.now(),from:fresh?c.from:from,days:merged});
-  return daysToRows(merged,from);
+  return daysToRows(merged,from,idk);
 }
 async function cachePatch(key,date,rows){
   try{if(!S.p)return;const ck=key+':'+S.p.id,c=await KV.get(ck);if(!c||!c.days)return;
     const o={p:[],a:[],e:[]},M={present:'p',absent:'a',excused:'e'};rows.forEach(r=>{const k=M[r.status];if(k)o[k].push(r.servee_id)});
     c.days[date]=o;await KV.set(ck,c)}catch(_){}
+}
+/* قايمة المخدومين: بتتحفظ على الجهاز وكل فتحة بنجيب اللي اتغيّر بس (محتاجة عمود updated_at من ملف 40) */
+const SV_TTL=3*864e5,svCmp=(a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ar')||(a.id<b.id?-1:1),maxUp=rows=>rows.reduce((m,x)=>x.updated_at>m?x.updated_at:m,'');
+async function loadServees(){
+  const ck='sv:'+(S.p?S.p.id:''),c=await KV.get(ck);
+  if(c&&c.rows&&c.since&&c.full&&Date.now()-c.full<SV_TTL&&!S._noSvDelta){
+    const since=new Date(Date.parse(c.since)-12e4).toISOString();
+    const [d,i]=await Promise.all([fetchAll(()=>sb.from('servees').select('*').gte('updated_at',since).order('id')),fetchAll(()=>sb.from('servees').select('id').order('id'))]);
+    if(!d.error&&!i.error){
+      const alive=new Set((i.data||[]).map(x=>x.id)),m=new Map(c.rows.filter(x=>alive.has(x.id)).map(x=>[x.id,x]));
+      (d.data||[]).forEach(x=>{if(alive.has(x.id))m.set(x.id,x)});
+      const rows=[...m.values()].sort(svCmp);await KV.set(ck,{full:c.full,since:maxUp(rows)||c.since,rows});
+      return{data:rows,error:null};
+    }
+    S._noSvDelta=true;
+  }
+  const r=await fetchAll(()=>sb.from('servees').select('*').order('full_name').order('id'));
+  if(!r.error){const rows=r.data||[];if(rows.length&&rows[0].updated_at!==undefined)await KV.set(ck,{full:Date.now(),since:maxUp(rows),rows})}
+  return r;
 }
 async function loadHist(days=90){
   const [rows]=await Promise.all([packedLoad('ah','kh_att_packed',days),loadFu()]);
@@ -699,14 +719,12 @@ async function loadHist(days=90){
 /* ===== كارت صحة النظام (أبونا بس) ===== */
 const mbf=n=>Math.round((n||0)/1048576)+' MB';
 function healthCard(){
-  const h=S.hl;let body='<small style="display:block;margin-bottom:8px">بيقيس حجم قاعدة البيانات والصور وآخر نسخة احتياطية. نقل البيانات (Egress) مش بيتقاس من التطبيق، شوفه من Supabase ← Usage.</small>';
+  const h=S.hl;let body='<small style="display:block;margin-bottom:8px">بيقيس حجم قاعدة البيانات والصور. نقل البيانات (Egress) مش بيتقاس من التطبيق، شوفه من Supabase ← Usage.</small>';
   if(h==='load')body+='<div class="empty">جاري الفحص...</div>';
   else if(h&&h.err)body+=`<div class="empty">${esc(h.err)}</div>`;
   else if(h){
     const bar=(t,v,lim)=>{const p=Math.min(100,Math.round(v*100/lim)),c=p>=90?'var(--red)':p>=75?'#e3b55a':'#2f8a55';return `<div class="row"><div style="flex:1">${t}<small>${mbf(v)} من ${mbf(lim)} (${p}%)${p>=90?' · قريب جداً من الحد':p>=75?' · بيقرّب من الحد':''}</small><div class="bar2"><div style="width:${p}%;background:${c}"></div></div></div></div>`};
-    const b=h.backup,dd=b?Math.floor((Date.now()-new Date(b.at))/864e5):null,bad=!b||!b.ok||dd>9;
     body+=bar('قاعدة البيانات (الحد المجاني 500MB)',h.db_bytes,500*1048576)+bar('الصور والملفات (الحد المجاني 1GB)',h.storage_bytes,1024*1048576)
-      +`<div class="row"><div>آخر نسخة احتياطية<small>${b?(b.ok?'نجحت':'فشلت')+' · من '+dd+' يوم':'لسه مفيش نسخة اتسجّلت'}</small></div><span class="bd" style="background:${bad?'#f3d6d2':'#d6efe0'}">${bad?'محتاجة انتباه':'تمام'}</span></div>`
       +`<small style="display:block;margin-top:6px">${h.servees} مخدوم · ${h.attendance_rows} سجل حضور · ${h.audit_rows} سجل عمليات</small>`;
   }
   return `<div class="card"><h2>🩺 صحة النظام</h2>${body}<div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="s on" data-a="health">فحص دلوقتي</button><button class="s" data-a="clrCache">مسح كاش السجل</button></div></div>`;
@@ -714,7 +732,7 @@ function healthCard(){
 async function loadHealth(){
   S.hl='load';render();
   const r=await sb.rpc('kh_health');
-  S.hl=r.error?{err:/kh_health|PGRST202|42883/.test(JSON.stringify(r.error))?'محتاج تشغّل ملف 28_perf_rpc.sql على Supabase مرة واحدة.':'تعذّر الفحص: '+r.error.message}:r.data;
+  S.hl=r.error?{err:/kh_health|PGRST202|42883/.test(JSON.stringify(r.error))?'محتاج تشغّل ملف 40_perf_rpc.sql على Supabase مرة واحدة.':'تعذّر الفحص: '+r.error.message}:r.data;
   render();
 }
 function ensureHist(days=90){

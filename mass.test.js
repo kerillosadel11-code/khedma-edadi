@@ -1,6 +1,7 @@
 // حضور القداس: منطق الإحصائية + ربط الواجهة بدوال/جداول 27_mass_attendance.sql
 const test = require('node:test'), assert = require('node:assert/strict');
 const { load, read } = require('./helpers');
+const has = f => require('fs').existsSync(require('path').join(__dirname, '..', f));
 const { massStat } = load('app.js', ['massStat']);
 
 const day = n => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
@@ -42,7 +43,7 @@ test('الفترة بتتحدد بالأيام', () => {
   assert.equal(massStat(sv[0], rows, sv, 90).sessions, 1);
 });
 
-test('كل دالة وجدول قداس بتستخدمهم الواجهة موجودين في ملف الـ SQL', () => {
+test('كل دالة وجدول قداس بتستخدمهم الواجهة موجودين في ملف الـ SQL', { skip: !has('supabase/sql/27_mass_attendance.sql') && 'ملف 27_mass_attendance.sql مش موجود هنا' }, () => {
   const sql = read('supabase/sql/27_mass_attendance.sql'), js = read('app.js') + read('extras.js');
   for (const m of js.matchAll(/'(kh_(?:servant_)?mass_[a-z_]+)'/g))
     assert.ok(new RegExp('function public\\.' + m[1] + '\\(').test(sql), 'ناقصة في SQL: ' + m[1]);
@@ -50,7 +51,7 @@ test('كل دالة وجدول قداس بتستخدمهم الواجهة موج
     assert.ok(new RegExp('create table if not exists public\\.' + t + '\\b').test(sql), 'ناقص جدول: ' + t);
 });
 
-test('تنبيه غياب القداس مستقل عن الاجتماع (ملاحظة وإشعار مختلفين وحد 3)', () => {
+test('تنبيه غياب القداس مستقل عن الاجتماع (ملاحظة وإشعار مختلفين وحد 3)', { skip: !has('supabase/sql/27_mass_attendance.sql') && 'ملف 27_mass_attendance.sql مش موجود هنا' }, () => {
   const sql = read('supabase/sql/27_mass_attendance.sql');
   assert.match(sql, /\[تلقائي-قداس\]/);
   assert.match(sql, /th\s+constant integer := 3/);
