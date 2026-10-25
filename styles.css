@@ -147,3 +147,6 @@ body:has(nav.bn){padding-right:0;padding-bottom:calc(76px + env(safe-area-inset-
 .who small{display:block;color:var(--mut);font-size:13px;margin-top:2px}
 .cnt{flex-wrap:wrap;gap:8px}
 .cnt>span{border:1px solid var(--line);border-radius:999px;padding:2px 12px;line-height:1.7}
+
+/* هيدر أنضف على الموبايل: الدور يختفي، وعند المخدوم/ولي الأمر الاسم كمان (موجود في التحية) */
+@media (max-width:480px){header{padding:10px 12px}header b{font-size:16px}header span{font-size:13px}header span .hr,header.hp span .hn{display:none}}

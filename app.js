@@ -108,22 +108,24 @@ async function loadParent(){
   await loadNotifs();
   await loadPhotos();
 }
+const fname=n=>String(n||'').trim().split(/\s+/)[0]||'';
 const fdate=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
 function servCmpCard(){
   const td=today(),L=(S.cmp||[]).filter(c=>!c.ends_on||c.ends_on>=td);
+  if(!L.length)return '';
   return `<div class="card"><h2>المسابقات</h2>${L.map(c=>`<div class="row"><div>${esc(c.title||c.name||'مسابقة')}<small>${c.starts_on?'من '+fdate(c.starts_on):''}${c.ends_on?' · لحد '+fdate(c.ends_on):''}</small></div></div>`).join('')||'<div class="empty">مفيش مسابقات مفتوحة دلوقتي.</div>'}</div>`;
 }
 function vParent(){
   const me=!!S.p.self_servee_id;
-  if(!S.servees.length)return `<main>${S.pbell?vNotif():''}<div class="card"><h2>أهلاً ${esc(S.p.full_name)}</h2><div class="empty">${me?'حسابك لسه مش مربوط بملفك. كلّم أبونا.':'لسه مفيش ابن مربوط بحسابك. كلّم أبونا يربطه.'}</div></div></main>`;
-  return `<main>${S.pbell?vNotif():''}<h2 style="margin:0 0 10px">أهلاً ${esc(S.p.full_name)}</h2>`+S.servees.map(x=>{
+  if(!S.servees.length)return `<main>${S.pbell?vNotif():''}<div class="card"><h2>أهلاً ${esc(fname(S.p.full_name))}</h2><div class="empty">${me?'حسابك لسه مش مربوط بملفك. كلّم أبونا.':'لسه مفيش ابن مربوط بحسابك. كلّم أبونا يربطه.'}</div></div></main>`;
+  return `<main>${S.pbell?vNotif():''}<h2 style="margin:0 0 10px">أهلاً ${esc(fname(S.p.full_name))}</h2>`+S.servees.map(x=>{
     const H=S.hist.filter(h=>h.servee_id===x.id),P=H.filter(h=>h.status==='present').length,B=H.filter(h=>h.status==='absent').length,E=H.filter(h=>h.status==='excused').length,pc=P+B?Math.round(P*100/(P+B)):0;
-    return `<div class="card"><div class="who">${av(x,64)}<div><b style="font-size:18px">${esc(x.full_name)}</b><small>${esc(cname(x.class_id))}</small></div></div>
+    return `<div class="card"><div class="who">${av(x,64)}<div><b style="font-size:18px">${esc(me?cname(x.class_id):x.full_name)}</b>${me?'':`<small>${esc(cname(x.class_id))}</small>`}</div></div>
     <div class="cnt" style="margin-top:12px"><span>حاضر ${P}</span><span>غايب ${B}</span>${E?`<span>معتذر ${E}</span>`:''}${P+B?`<span>نسبة الحضور ${pc}%</span>`:''}${(S.pts||{})[x.id]>0?`<span>النقاط ${S.pts[x.id]}</span>`:''}</div>
     <h2 style="margin-top:8px">آخر الأسابيع</h2>${H.slice(0,12).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':h.status==='excused'?'var(--mut)':'var(--red)'}">${h.status==='present'?'حاضر':h.status==='excused'?'معتذر':'غايب'}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`}).join('')+(me?servCmpCard():'')+`</main>`;
 }
 const unread=()=>(S.nt||[]).filter(n=>!n.is_read).length;
-const head=()=>`<header><b>خدمة إعدادي</b><span><a href="#" data-a="bell" style="color:#fff;text-decoration:none" aria-label="الإشعارات">🔔${unread()?` <b style="background:var(--red);border-radius:10px;padding:0 6px;font-size:12px">${unread()}</b>`:''}</a> · <a href="#" data-a="diag" aria-label="فحص الإشعارات" style="color:#fff;text-decoration:none">🩺<i id="pdot" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;background:${S.pushSt==='on'?'#3ecf8e':S.pushSt?'#ff6b5e':'#999'}"></i></a> · ${esc(S.p.full_name)} · ${esc(roleLabel(S.p))} · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>${secBar()}`;
+const head=()=>`<header class="${S.p.role==='parent'?'hp':''}"><b>خدمة إعدادي</b><span><a href="#" data-a="bell" style="color:#fff;text-decoration:none" aria-label="الإشعارات">🔔${unread()?` <b style="background:var(--red);border-radius:10px;padding:0 6px;font-size:12px">${unread()}</b>`:''}</a> · <a href="#" data-a="diag" aria-label="فحص الإشعارات" style="color:#fff;text-decoration:none">🩺<i id="pdot" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;background:${S.pushSt==='on'?'#3ecf8e':S.pushSt?'#ff6b5e':'#999'}"></i></a> <span class="hn"> · ${esc(S.p.full_name)}</span><span class="hr"> · ${esc(roleLabel(S.p))}</span> · <a href="#" data-a="out" style="color:#fff">خروج</a></span></header>${secBar()}`;
 async function load(){
   if(canManage())await loadAdmin();
   else{

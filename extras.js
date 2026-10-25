@@ -227,11 +227,11 @@ function parentCards(){
   const spc=S.servees.filter(x=>X.par.sp[x.id]);
   if(spc.length)h+=`<div class="card"><h2>نقاط الحضور المنتظم</h2>${spc.map(x=>{const o=X.par.sp[x.id];return `<div class="row"><div>${S.servees.length>1?esc(x.full_name):'نقاطك'}<small>أطول حضور متتالي: ${o.best} اجتماع</small></div><b>${o.pts} نقطة</b></div>`}).join('')}<p class="empty" style="padding:6px 0 0">كل حضور = نقطة، وكل 4 حضور ورا بعض = +5 مكافأة.</p></div>`;
   const evs=X.par.ev.filter(e=>S.servees.some(x=>inScope(e,x)));
-  h+=`<div class="card"><h2>الفعاليات والرحلات</h2>${evs.map(e=>{
+  if(evs.length)h+=`<div class="card"><h2>الفعاليات والرحلات</h2>${evs.map(e=>{
     const kids=S.servees.filter(x=>inScope(e,x));
     return `<div class="row" style="align-items:flex-start;flex-wrap:wrap"><div style="flex:1;min-width:60%"><b>${esc(e.title)}</b> <span class="bd">${KIND[e.kind]||''}</span>
       <small>${fdate(e.event_date)}${e.event_time?' · '+tm(e.event_time):''}${e.place?' · '+esc(e.place):''}</small>${e.note?`<small>${esc(e.note)}</small>`:''}</div>
-      <div style="width:100%">${kids.map(x=>`<div class="row" style="border:0;padding:4px 0"><div>${kids.length>1?esc(x.full_name):'هتيجي؟'}</div><div class="acts">${rsvBtns(e,x,X.par.rs)}</div></div>`).join('')}</div></div>`}).join('')||'<div class="empty">مفيش فعاليات جاية دلوقتي.</div>'}</div>`;
+      <div style="width:100%">${kids.map(x=>`<div class="row" style="border:0;padding:4px 0"><div>${kids.length>1?esc(x.full_name):'هتيجي؟'}</div><div class="acts">${rsvBtns(e,x,X.par.rs)}</div></div>`).join('')}</div></div>`}).join('')}</div>`;
   return h;
 }
 
