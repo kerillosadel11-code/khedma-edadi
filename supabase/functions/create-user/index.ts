@@ -10,10 +10,17 @@ const json = (b: unknown, s = 200) =>
     headers: { ...cors, "Content-Type": "application/json" },
   });
 
+// باسورد مؤقت عشوائي 10 حروف (rejection sampling عشان كل حرف احتماله متساوي من غير انحياز)
 const genPass = () => {
   const a = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const r = crypto.getRandomValues(new Uint8Array(8));
-  return Array.from(r, (x) => a[x % a.length]).join("");
+  const lim = 256 - (256 % a.length);
+  let out = "";
+  while (out.length < 10) {
+    for (const x of crypto.getRandomValues(new Uint8Array(16))) {
+      if (x < lim && out.length < 10) out += a[x % a.length];
+    }
+  }
+  return out;
 };
 
 Deno.serve(async (req) => {
