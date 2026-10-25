@@ -4,7 +4,7 @@ const fs = require('fs'), path = require('path'), cp = require('child_process');
 const root = path.join(__dirname, '..'), rd = f => fs.readFileSync(path.join(root, f), 'utf8');
 
 test('كل ملفات JS سليمة (node --check)', () => {
-  for (const f of ['app.js', 'finance.js', 'extras.js', 'offline.js', 'mail.js', 'update.js', 'sw.js', 'scripts/bump-version.js'])
+  for (const f of ['app.js', 'finance.js', 'extras.js', 'xlsx.js', 'offline.js', 'mail.js', 'update.js', 'sw.js', 'scripts/bump-version.js'])
     cp.execFileSync(process.execPath, ['--check', path.join(root, f)]);
 });
 

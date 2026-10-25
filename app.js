@@ -249,7 +249,7 @@ function impCard(){
 function vServees(){
   return credCard()+svEditCard()+impCard()+`<div class="card"><h2>إضافة مخدوم</h2><input id="sn" placeholder="الاسم بالكامل"><div class="two"><input id="sp" type="tel" placeholder="التليفون" dir="ltr"><input id="sb" type="date" aria-label="تاريخ الميلاد"></div>
   <select id="sc" data-a="scChange"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select>${canManage()?`<select id="ssv" aria-label="الخادم المسئول">${esvOpts(null,null)}</select>`:''}<input id="sa" placeholder="العنوان (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
-  <div class="card"><h2>استيراد من ملف CSV</h2><select id="icl2"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><input type="file" accept=".csv,.txt" data-a="csvPick"><p class="empty">الأعمدة: الاسم، التليفون، تاريخ الميلاد، العنوان، ملاحظات. من Excel احفظ الملف كـ CSV UTF-8.</p></div>
+  <div class="card"><h2>استيراد من ملف Excel</h2><button class="s" data-x="tpl" style="margin-bottom:8px">⬇️ تحميل نموذج Excel فاضي</button><select id="icl2"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><input type="file" accept=".xlsx,.csv,.txt" data-a="csvPick"><p class="empty">حمّل النموذج، املاه في Excel (الاسم، التليفون، تاريخ الميلاد، العنوان، ملاحظات)، واحفظه، وارفعه هنا. بيقبل كمان ملفات CSV.</p></div>
   <div class="card"><input id="sq" type="search" data-a="search" placeholder="ابحث بالاسم أو التليفون أو الكود" value="${esc(S.q)}"><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="stfilter"><option value="act"${S.st==='act'?' selected':''}>الشغّالين</option><option value="arch"${S.st==='arch'?' selected':''}>المؤرشفين</option><option value="all"${S.st==='all'?' selected':''}>الكل</option></select></div><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button>
   <div id="sl">${svList()}</div></div>`;
 }
@@ -428,9 +428,9 @@ function vAudit(){
     return `<div class="row"><div><b>${OPL[a.op]||a.op}</b> ${TBL[a.table_name]||esc(a.table_name)}${nm?' · '+esc(nm):''}<small>${esc(pname(a.actor)==='؟'?'النظام':pname(a.actor))} · ${new Date(a.at).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'})}</small>${det?`<small>${esc(det)}</small>`:''}</div></div>`}).join('')||'<div class="empty">مفيش عمليات.</div>'}</div>`;
 }
 function parseCSV(t){const rows=[];let r=[],c='',q=false;t=t.replace(/^\uFEFF/,'');for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch==='"'){if(t[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}else if(ch==='"')q=true;else if(ch===','||ch===';'||ch==='\t'){r.push(c);c=''}else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&t[i+1]==='\n')i++;r.push(c);c='';if(r.some(x=>x.trim()))rows.push(r);r=[]}else c+=ch}r.push(c);if(r.some(x=>x.trim()))rows.push(r);return rows}
-const nd=x=>{x=String(x||'').replace(/[\u0660-\u0669]/g,c=>c.charCodeAt(0)-0x660).trim();let m=x.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/),y,mo,d;if(m){y=m[1];mo=m[2];d=m[3]}else{m=x.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);if(!m)return null;d=m[1];mo=m[2];y=m[3]}const s=`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`,t=new Date(s+'T00:00:00');return isNaN(t)||t.getMonth()+1!==+mo?null:s};
+const nd=x=>{x=String(x||'').replace(/[\u0660-\u0669]/g,c=>c.charCodeAt(0)-0x660).trim();if(/^\d{5}(\.\d+)?$/.test(x)&&+x>=10000&&+x<=60000)x=new Date(Math.round((+x-25569)*864e5)).toISOString().slice(0,10);let m=x.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/),y,mo,d;if(m){y=m[1];mo=m[2];d=m[3]}else{m=x.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);if(!m)return null;d=m[1];mo=m[2];y=m[3]}const s=`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`,t=new Date(s+'T00:00:00');return isNaN(t)||t.getMonth()+1!==+mo?null:s};
 function buildImport(text,cid){
-  const R=parseCSV(text);if(!R.length)return null;
+  const R=Array.isArray(text)?text:parseCSV(text);if(!R.length)return null;
   const col={name:0,phone:1,birth:2,addr:3,notes:4},h=R[0].map(nz),isH=h.some(x=>x.includes('اسم')||x==='name');
   if(isH){const f=(...ks)=>h.findIndex(x=>ks.some(k=>x.includes(k)));col.name=f('اسم','name');col.phone=f('تليفون','موبايل','phone','mobile');col.birth=f('ميلاد','birth');col.addr=f('عنوان','address');col.notes=f('ملاحظ','note')}
   const exP=new Set(S.servees.map(x=>normPhone(x.phone||'')).filter(Boolean)),exN=new Set(S.servees.map(x=>nz(x.full_name))),seen=new Set(),ok=[];let dup=0,bad=0;
@@ -1513,7 +1513,13 @@ app.addEventListener('change',async e=>{
   if(b.dataset.a==='csvPick'){
     const f=b.files&&b.files[0],cid=document.getElementById('icl2').value;
     if(!f)return;if(!cid){b.value='';return toast('اختار الفصل الأول')}
-    const t=await f.text(),m=buildImport(t,cid);b.value='';
+    let m;
+    try{
+      if(/\.xlsx$/i.test(f.name)){if(typeof xlsxRows!=='function')throw new Error('NO_XLSX');m=buildImport(await xlsxRows(await f.arrayBuffer()),cid)}
+      else if(/\.xls$/i.test(f.name)){b.value='';return toast('ملف xls القديم مش مدعوم. احفظه كـ xlsx من Excel (حفظ باسم) وارفعه تاني')}
+      else m=buildImport(await f.text(),cid);
+    }catch(e){b.value='';return toast(e&&e.message==='NO_DECOMP'?'المتصفح ده قديم على قراءة Excel. حدّثه أو احفظ الملف CSV':'مقدرتش أقرا الملف. اتأكد إنه xlsx سليم أو استخدم النموذج')}
+    b.value='';
     if(!m)return toast('الملف فاضي أو مش مقروء');
     S.imp=m;return render();
   }

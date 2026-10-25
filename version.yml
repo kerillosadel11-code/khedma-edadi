@@ -8,6 +8,7 @@ on:
       - 'app.js'
       - 'finance.js'
       - 'extras.js'
+      - 'xlsx.js'
       - 'offline.js'
       - 'mail.js'
       - 'update.js'
