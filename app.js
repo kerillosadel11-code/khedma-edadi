@@ -33,7 +33,7 @@ S.sec=(()=>{try{const x=localStorage.getItem('khedma_sec');return x==='boys'||x=
 const av=(s,z=44)=>{const u=S.photos[s.id];return u?`<img class="av" src="${u}" alt="" style="width:${z}px;height:${z}px">`:`<span class="av" style="width:${z}px;height:${z}px;font-size:${Math.round(z/2.4)}px">${esc((s.full_name||'؟').trim().charAt(0))}</span>`};
 function qrImg(code){if(!code)return'';const q=qrcode(0,'M');q.addData(code);q.make();return `<img src="${q.createDataURL(4,4)}" alt="QR">`}
 const rpcErr=e=>({NOT_FOUND:'الكود ده مش معروف',FORBIDDEN:'المخدوم ده مش في فصلك',INACTIVE:'المخدوم ده موقوف',BAD_DATE:'التاريخ ده في المستقبل',BAD_STATUS:'حالة غير صحيحة',BAD_TITLE:'اكتب عنوان الإعلان',BAD_SECTION:'اختار القسم',BAD_SCOPE:'نطاق غير صحيح',BAD_POINTS:'عدد النقاط غير مسموح (من 1 لـ 50)',BAD_COMP:'المسابقة دي مش لفصل المخدوم ده'}[e.message]||e.message);
-async function loadAtt(){let r=await sb.from('attendance_days').select('servee_id,status,note').eq('att_date',S.date);if(r.error)r=await sb.from('attendance_days').select('servee_id,status').eq('att_date',S.date);if(ok(r))S.att=fSv(r.data||[]);await loadMassAtt()}
+async function loadAtt(){let r=await sb.from('attendance_days').select('servee_id,status,note').eq('att_date',S.date);if(r.error)r=await sb.from('attendance_days').select('servee_id,status').eq('att_date',S.date);if(ok(r))S.att=fSv(r.data||[]);if(S.ah!==null){S.ah=S.ah.filter(x=>x.att_date!==S.date).concat(S.att.map(a=>({servee_id:a.servee_id,att_date:S.date,status:a.status})));S._cms=null}await loadMassAtt()}
 async function loadMassAtt(){const r=await sb.from('mass_attendance').select('servee_id,status,note').eq('att_date',S.date);S.matt=r.error?[]:fSv(r.data||[]);S.mah=(S.mah||[]).filter(x=>x.att_date!==S.date).concat(S.matt.map(a=>({servee_id:a.servee_id,att_date:S.date,status:a.status})))}
 async function loadPhotos(){
   const ps=S.servees.filter(x=>x.photo_path);S.photos={};
@@ -139,7 +139,8 @@ async function load(){
     r.forEach(ok);[S.classes,S.servees,S.cs]=r.map(x=>x.data||[]);S.profiles=[];S.pl=[];
   }
   S.inv=[];if(canManage()){const ri=await sb.from('invites').select('*').order('created_at',{ascending:false});S.inv=ri.error?[]:(ri.data||[]).filter(i=>!secOn()||!i.section||i.section===S.sec)}
-  await Promise.all([loadAtt(),loadPhotos(),loadExtra(),loadHist()]);
+  S.ah=null;S.fu=null;S.ahDays=0;S.mahDays=0;S.mah=[];S._cms=null;
+  await Promise.all([loadAtt(),loadPhotos(),loadExtra()]);
   if(!canManage())await loadMates();
 }
 async function loadExtra(){
@@ -193,6 +194,9 @@ function render(){
   if(S.cards)return app.innerHTML=head()+vCards();
   if(S.pf)return app.innerHTML=head()+vProfile();
   if(!adm&&!['mycls','mysv','mypr','att','prep','sat','duty','follow','comp','notif','msg'].includes(S.tab))S.tab='mycls';
+  if(S.p&&S.p.role!=='parent'){const hd=HIST_TABS[S.tab];
+    if(hd&&(S.ah===null||(S.ahDays||0)<hd)&&!S._hp)ensureHist(hd).then(()=>render());
+    if(MASS_TABS.has(S.tab)&&(S.mahDays||0)<90&&!S._mp)ensureMass().then(()=>render())}
   const T=adm?[['home','الرئيسية'],['classes','الفصول'],['servees','المخدومين'],['srv','الخدام'],['people','المستخدمين'+(S.profiles.some(p=>p.pending&&!p.active)?' ('+S.profiles.filter(p=>p.pending&&!p.active).length+')':'')],['add','مستخدم جديد'],['inv','دعوات واتساب'],['att','حضور المخدومين'],['sat','حضور الخدام'],['duty','توزيعة الأسبوع'+dutyBadge()],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['ann','الإعلانات'],['msg','الرسائل'],['pst','حالة الإشعارات'],['ana','التحليلات'],['rep','التقارير']].concat(isAdmin()?[['audit','السجل'],['set','الإعدادات']]:[]):[['mycls','فصلي'],['duty','توزيعتي'+dutyBadge()],['mysv','المخدومين'],['mypr','أولياء الأمور'],['att','حضور المخدومين'],['prep','تحضير الدرس'],['follow','الافتقاد'],['comp','المسابقات'],['msg','الرسائل'],['sat','حضوري']];
   const nm=Object.fromEntries(T),has=k=>k in nm;
   const PRI=(adm?['home','classes','att','ana']:['mycls','duty','att','msg']).filter(has);
@@ -637,12 +641,27 @@ function vPrep(){
   ${mg?`<div class="card"><h2>لسه ما جهّزوش في ${fdate(S.pd)} (${miss.length})</h2>${miss.map(c=>`<div class="row"><div>${esc(cLabel(c))}</div></div>`).join('')||'<div class="empty">كل الفصول جاهزة.</div>'}</div>`:''}
   <div class="card"><h2>تحضيرات الفصل (${L.length})</h2>${L.map(p=>`<div class="row"><div>${fdate(p.prep_date)}<span class="bd">${PST[p.status]||''}</span>${p.approved?'<span class="bd" style="background:#cfeedd">معتمد</span>':''}<small>${esc(p.topic||'من غير موضوع')}</small></div><div class="acts"><button class="s" data-a="prepOpen" data-id="${p.prep_date}">فتح</button>${mg&&p.status==='ready'?`<button class="s${p.approved?' on':''}" data-a="prepApp" data-id="${p.id}">${p.approved?'إلغاء الاعتماد':'اعتماد'}</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش تحضير للفصل ده.</div>'}</div>`;
 }
-async function loadHist(){
-  const d0=new Date(Date.now()-90*864e5).toISOString().slice(0,10);
-  const [a,f]=await Promise.all([fetchAll(()=>sb.from('attendance_days').select('servee_id,att_date,status').gte('att_date',d0).order('att_date',{ascending:false}).order('servee_id')),fetchAll(()=>sb.from('followups').select('*').order('followup_date',{ascending:false}).order('created_at',{ascending:false}))]);
+/* سجل الحضور بيتحمّل عند الحاجة بس (مش مع كل فتحة) عشان نقل البيانات على Supabase */
+const HIST_TABS={home:90,classes:90,mycls:90,mysv:90,follow:90,rep:90,ana:90},MASS_TABS=new Set(['rep']);
+async function loadFu(){const f=await fetchAll(()=>sb.from('followups').select('*').order('followup_date',{ascending:false}).order('created_at',{ascending:false}));S.fu=fSv(f.error?[]:(f.data||[]))}
+async function loadHist(days=90){
+  const d0=ago(days);
+  const [a]=await Promise.all([fetchAll(()=>sb.from('attendance_days').select('servee_id,att_date,status').gte('att_date',d0).order('att_date',{ascending:false}).order('servee_id')),loadFu()]);
   if(a.error)toast('تعذّر تحميل سجل الحضور: '+a.error.message);
-  S.ah=fSv(a.error?[]:(a.data||[]));S.fu=fSv(f.error?[]:(f.data||[]));
-  await loadMassHist(d0);
+  S.ah=fSv(a.error?[]:(a.data||[]));S.ahDays=days;S.ahAt=Date.now();S._cms=null;
+}
+function ensureHist(days=90){
+  if(S.ah!==null&&(S.ahDays||0)>=days)return Promise.resolve();
+  if(S._hp&&(S._hpDays||0)>=days)return S._hp;
+  S._hpDays=days;
+  const p=S._hp=loadHist(days).catch(()=>{if(S.ah===null)S.ah=[];S.ahDays=days;toast('تعذّر تحميل سجل الحضور')}).finally(()=>{if(S._hp===p)S._hp=null});
+  return p;
+}
+function ensureMass(){
+  if((S.mahDays||0)>=90)return Promise.resolve();
+  if(S._mp)return S._mp;
+  const p=S._mp=loadMassHist(ago(90)).catch(()=>{S.mah=S.mah||[]}).finally(()=>{S.mahDays=90;if(S._mp===p)S._mp=null});
+  return p;
 }
 async function loadMassHist(d0){const r=await fetchAll(()=>sb.from('mass_attendance').select('servee_id,att_date,status').gte('att_date',d0).order('att_date',{ascending:false}).order('servee_id'));S.mah=r.error?[]:fSv(r.data||[])}
 function histInfo(days){
@@ -1235,7 +1254,7 @@ function vMyParents(){return myPage('pr')}
 /* ---------- ملف المخدوم ---------- */
 async function openProfile(id){
   S.pf=id;S.pfPar=null;S.fuf=null;render();window.scrollTo(0,0);
-  const [r]=await Promise.all([sb.rpc('kh_servee_parents',{p_servee:id}),S.pr===null?loadComp():null,S.ah===null?loadHist():null]);
+  const [r]=await Promise.all([sb.rpc('kh_servee_parents',{p_servee:id}),S.pr===null?loadComp():null,ensureHist(90),ensureMass()]);
   if(S.pf!==id)return;
   S.pfPar=r.error?[]:(r.data||[]);render();
 }
@@ -1321,7 +1340,7 @@ app.addEventListener('click',async e=>{
   if(a==='out'){await sb.auth.signOut();return login()}
   if(a==='diag')return diagOpen();
   if(a==='nt')return ntOpen(b);
-  if(a==='more'){S.more=!S.more;return render()}if(a==='moreX'){S.more=false;return render()}if(a==='tab'){S.more=false;S.tab=id;if(id==='audit')await loadAudit();if(['follow','rep','home','mycls','mysv'].includes(id))await loadHist();if(['mycls','mypr'].includes(id))await loadMates();if(id==='comp')await loadComp();if(id==='duty')await loadDuty();if(id==='ann')await loadAnn();if(id==='msg')await loadMsg();if(id==='pst')await loadPst();if(id==='set'){S.pushSt=await pushState();await loadTpl()}if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
+  if(a==='more'){S.more=!S.more;return render()}if(a==='moreX'){S.more=false;return render()}if(a==='tab'){S.more=false;S.tab=id;if(id==='audit')await loadAudit();if(['mycls','mypr'].includes(id))await loadMates();if(id==='comp')await loadComp();if(id==='duty')await loadDuty();if(id==='ann')await loadAnn();if(id==='msg')await loadMsg();if(id==='pst')await loadPst();if(id==='set'){S.pushSt=await pushState();await loadTpl()}if(id==='notif'){S.pushSt=await pushState();await loadNotifs()}return render()}
   if(a==='joinGo')return joinGo();
   if(a==='joinhome'){history.replaceState(null,'',location.pathname);return boot()}
   if(a==='mkInv')return mkInv();
@@ -1362,9 +1381,9 @@ app.addEventListener('click',async e=>{
   if(a==='fuOpen'){S.fuf=id;render();return window.scrollTo(0,0)}
   if(a==='saveFu'){
     const r=await sb.from('followups').insert({servee_id:S.fuf,servant_id:S.p.id,kind:v('fk'),status:v('fs'),note:document.getElementById('fn').value.trim()||null,followup_date:v('fd')||today()});
-    if(!ok(r))return;if(v('fs')==='done')await sb.from('followups').update({status:'done'}).eq('servee_id',S.fuf).eq('status','open').like('note','[تلقائي]%');S.fuf=null;await loadHist();render();return toast('اتسجّل');
+    if(!ok(r))return;if(v('fs')==='done')await sb.from('followups').update({status:'done'}).eq('servee_id',S.fuf).eq('status','open').like('note','[تلقائي]%');S.fuf=null;await loadFu();render();return toast('اتسجّل');
   }
-  if(a==='fuDone'){const r=await sb.from('followups').update({status:'done'}).eq('id',id);if(!ok(r))return;await loadHist();return render()}
+  if(a==='fuDone'){const r=await sb.from('followups').update({status:'done'}).eq('id',id);if(!ok(r))return;await loadFu();return render()}
   if(a==='exp'){
     const H=histInfo(S.rd||56),d=today();
     if(id==='servees'){
