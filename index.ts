@@ -1,131 +1,91 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+// Supabase Edge Function: send-push  (Verify JWT = OFF، والحماية بـ x-push-secret)
+// بتتنادى من Database Webhook على INSERT في جدول notifications
+// وبتسجّل كل محاولة في جدول push_log (ملف 17) عشان فحص الإشعارات في التطبيق يتتبّعها.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import webpush from "npm:web-push@3.6.7";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-const json = (b: unknown, s = 200) =>
-  new Response(JSON.stringify(b), {
-    status: s,
-    headers: { ...cors, "Content-Type": "application/json" },
-  });
+const SECRET = Deno.env.get("PUSH_SECRET") ?? "";
+let vapidErr = "";
+try {
+  webpush.setVapidDetails(
+    "mailto:" + (Deno.env.get("VAPID_SUBJECT") ?? "admin@khedma.app"),
+    Deno.env.get("VAPID_PUBLIC_KEY")!,
+    Deno.env.get("VAPID_PRIVATE_KEY")!,
+  );
+} catch (e) {
+  vapidErr = "مفاتيح VAPID مش متظبطة في Secrets الدالة: " + String((e as any)?.message ?? e).slice(0, 100);
+}
+const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-const genPass = () => {
-  const a = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const r = crypto.getRandomValues(new Uint8Array(8));
-  return Array.from(r, (x) => a[x % a.length]).join("");
+const log = async (row: Record<string, unknown>) => {
+  try { await admin.from("push_log").insert(row); } catch (_) { /* التسجيل مش لازم يوقّف الإرسال */ }
 };
+const hint = (c: number) =>
+  c === 401 || c === 403 ? "مفتاح VAPID في الدالة مش مطابق لمفتاح التطبيق"
+  : c === 404 || c === 410 ? "الاشتراك منتهي واتمسح، لازم المستخدم يفعّل الإشعارات تاني"
+  : c === 413 ? "الرسالة كبيرة"
+  : c === 429 ? "ضغط كبير على خدمة الإشعارات"
+  : c >= 500 ? "خدمة الإشعارات عند جوجل/آبل مش متاحة مؤقتًا"
+  : "خطأ " + c;
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  try {
-    const url = Deno.env.get("SUPABASE_URL")!;
-    const auth = req.headers.get("Authorization") ?? "";
-    const caller = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: auth } },
-    });
-    const { data: { user } } = await caller.auth.getUser();
-    if (!user) return json({ error: "لازم تسجّل دخول" }, 401);
+  let body: any = null;
+  try { body = await req.json(); } catch { /* بنتعامل معاه تحت */ }
+  const rec = body?.record;
 
-    const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: me } = await admin
-      .from("profiles").select("role,active").eq("id", user.id).single();
-    if (!me || !me.active || me.role !== "admin") {
-      return json({ error: "للأدمن فقط" }, 403);
+  if (!SECRET || req.headers.get("x-push-secret") !== SECRET) {
+    // نسجّل المحاولة بس لو الإشعار حقيقي (عشان ما حدش يبوّظ السجل بطلبات وهمية)
+    if (rec?.id && rec?.user_id) {
+      const { data } = await admin.from("notifications").select("id").eq("id", rec.id).eq("user_id", rec.user_id).maybeSingle();
+      if (data) {
+        await log({
+          notification_id: String(rec.id), user_id: rec.user_id,
+          error: SECRET ? "الهيدر x-push-secret في الـ Webhook مش مطابق لـ PUSH_SECRET" : "PUSH_SECRET مش متظبط في Secrets الدالة",
+        });
+      }
     }
-
-    const b = await req.json();
-
-    if (b.action === "reset") {
-      const { data: u, error: ge } = await admin.auth.admin.getUserById(b.user_id);
-      if (ge || !u?.user) return json({ error: "الحساب مش موجود" }, 404);
-      const password = genPass();
-      const meta = { ...(u.user.user_metadata || {}), must_change: true };
-      const { error: ue } = await admin.auth.admin.updateUserById(b.user_id, {
-        password,
-        user_metadata: meta,
-      });
-      if (ue) return json({ error: ue.message }, 400);
-      const { data: p } = await admin
-        .from("profiles").select("full_name").eq("id", b.user_id).single();
-      const phone = (u.user.email || "").split("@")[0];
-      return json({ name: p?.full_name || phone, login: phone, phone, password });
-    }
-
-    let name = String(b.name || "").trim();
-    const phone = String(b.phone || "");
-    const role = b.role;
-    let servee: { full_name: string; section: string | null } | null = null;
-    if (role === "servee") {
-      if (!b.servee_id) return json({ error: "اختار المخدوم" }, 400);
-      const { data: sv } = await admin.from("servees").select("full_name,section,active,class_id").eq("id", b.servee_id).maybeSingle();
-      if (!sv || !sv.active) return json({ error: "المخدوم مش موجود أو مؤرشف" }, 400);
-      if (!sv.class_id) return json({ error: "اربط المخدوم بفصل الأول" }, 400);
-      const { data: ex } = await admin.from("profiles").select("id").eq("self_servee_id", b.servee_id).maybeSingle();
-      if (ex) return json({ error: "المخدوم ده عنده حساب بالفعل" }, 400);
-      servee = sv;
-      name = sv.full_name;
-    }
-    if (!name) return json({ error: "اكتب الاسم" }, 400);
-    if (!/^01[0125]\d{8}$/.test(phone)) return json({ error: "رقم التليفون مش صحيح" }, 400);
-    if (role !== "servant" && role !== "parent" && role !== "servee") {
-      return json({ error: "الدور غير صحيح" }, 400);
-    }
-    if (role === "servant" && !b.class_id) return json({ error: "اختار الفصل" }, 400);
-    if (role === "parent" && !b.servee_id) return json({ error: "اختار المخدوم" }, 400);
-
-    // القسم بييجي من الفصل أو المخدوم نفسه (مش من الطلب)
-    let section: string | null = null;
-    if (role === "servant") {
-      const { data: cl } = await admin.from("classes").select("section").eq("id", b.class_id).maybeSingle();
-      if (!cl) return json({ error: "الفصل مش موجود" }, 400);
-      section = cl.section ?? null;
-    } else if (role === "servee") {
-      section = servee!.section ?? null;
-    } else {
-      const { data: sv } = await admin.from("servees").select("section").eq("id", b.servee_id).maybeSingle();
-      if (!sv) return json({ error: "المخدوم مش موجود" }, 400);
-      section = sv.section ?? null;
-    }
-
-    const password = genPass();
-    const { data: c, error: ce } = await admin.auth.admin.createUser({
-      email: phone + "@khedma.app",
-      password,
-      email_confirm: true,
-      user_metadata: { must_change: true, full_name: name },
-    });
-    if (ce || !c?.user) {
-      const m = ce?.message || "Create failed";
-      const dup = /already|registered|exists/i.test(m);
-      return json({ error: dup ? "الرقم ده مسجّل قبل كده" : m }, 400);
-    }
-    const id = c.user.id;
-
-    const rollback = async (msg: string) => {
-      await admin.auth.admin.deleteUser(id);
-      return json({ error: msg }, 400);
-    };
-
-    const { error: pe } = await admin
-      .from("profiles").upsert({
-        id, full_name: name, phone, role: role === "servee" ? "parent" : role, section, active: true, pending: false,
-        ...(role === "servee" ? { self_servee_id: b.servee_id } : {}),
-      });
-    if (pe) return await rollback(pe.message);
-
-    if (role === "servant") {
-      const { error } = await admin
-        .from("class_servants").insert({ servant_id: id, class_id: b.class_id });
-      if (error) return await rollback(error.message);
-    } else {
-      const { error } = await admin
-        .from("parent_links").insert({ parent_id: id, servee_id: b.servee_id });
-      if (error) return await rollback(error.message);
-    }
-
-    return json({ name, login: phone, phone, password });
-  } catch (e) {
-    return json({ error: String((e as Error).message || e) }, 500);
+    return new Response("forbidden", { status: 403 });
   }
+  if (!body) return new Response("bad", { status: 400 });
+  if (body?.type !== "INSERT" || !rec?.user_id) return new Response("ignored");
+
+  const nid = String(rec.id ?? "");
+  if (vapidErr) {
+    await log({ notification_id: nid, user_id: rec.user_id, error: vapidErr });
+    return new Response("vapid", { status: 500 });
+  }
+
+  const { data: subs, error: se } = await admin.from("push_subscriptions").select("*").eq("user_id", rec.user_id);
+  if (se) {
+    await log({ notification_id: nid, user_id: rec.user_id, error: "تعذّر قراءة اشتراكات الأجهزة: " + se.message });
+    return new Response("subs error", { status: 500 });
+  }
+  if (!subs?.length) {
+    await log({ notification_id: nid, user_id: rec.user_id, subs: 0, error: "الحساب ده مفيهوش أي جهاز مفعّل الإشعارات (هيشوف الإشعار جوه التطبيق بس)" });
+    return new Response("no subs");
+  }
+
+  const payload = JSON.stringify({ title: rec.title ?? "خدمة إعدادي", body: (rec.body ?? "").slice(0, 200) });
+  let sent = 0, failed = 0, removed = 0;
+  const detail: any[] = [];
+  await Promise.all(subs.map(async (s: any) => {
+    let host = "؟";
+    try { host = new URL(s.endpoint).host; } catch (_) { /* endpoint تالف */ }
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 86400 });
+      sent++; detail.push({ host, status: "ok" });
+    } catch (e: any) {
+      failed++;
+      const code = Number(e?.statusCode) || 0;
+      detail.push({ host, status: code, msg: String(e?.body ?? e?.message ?? "").slice(0, 120) });
+      if (code === 404 || code === 410) { removed++; await admin.from("push_subscriptions").delete().eq("id", s.id); }
+    }
+  }));
+
+  const firstBad = detail.find((d) => d.status !== "ok");
+  await log({
+    notification_id: nid, user_id: rec.user_id, subs: subs.length, sent, failed, removed, detail,
+    error: sent === 0 && firstBad ? "فشل الإرسال لكل الأجهزة: " + hint(Number(firstBad.status) || 0) : null,
+  });
+  return new Response(JSON.stringify({ sent, failed }), { headers: { "Content-Type": "application/json" } });
 });

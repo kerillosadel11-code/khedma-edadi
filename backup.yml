@@ -4,6 +4,7 @@ name: Weekly DB backup
 # لازم تضيف 2 Secrets في GitHub: Settings > Secrets and variables > Actions
 #   SUPABASE_DB_URL     رابط Session pooler (بورت 5432) من Supabase > Connect
 #   BACKUP_PASSPHRASE   باسورد طويل بتختاره (احفظه في مكان تاني! من غيره النسخة ما تتفتحش)
+#   BACKUP_REPORT_SECRET (اختياري) نفس السر اللي في supabase/sql/25_backup_alert_invited_by.sql، عشان نتيجة النسخة توصل لأبونا كإشعار
 on:
   schedule:
     - cron: "0 1 * * 5"
@@ -52,3 +53,17 @@ jobs:
           path: backup-*.tar.gpg
           retention-days: 90
           if-no-files-found: error
+
+      - name: Notify admin in the app (success or failure)
+        if: always()
+        continue-on-error: true
+        env:
+          REPORT_SECRET: ${{ secrets.BACKUP_REPORT_SECRET }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [ -z "$REPORT_SECRET" ]; then echo "BACKUP_REPORT_SECRET مش متضاف، هنتخطى الإشعار"; exit 0; fi
+          OK=false; [ "$JOB_STATUS" = "success" ] && OK=true
+          curl -sS --fail-with-body -X POST "https://radvrgthxxtesjitzkil.supabase.co/rest/v1/rpc/kh_backup_report" \
+            -H "apikey: sb_publishable_UFK-e5F6zuI2qZ2P5KVjiw_LrE33N_k" \
+            -H "Content-Type: application/json" \
+            -d "{\"p_secret\":\"$REPORT_SECRET\",\"p_ok\":$OK,\"p_msg\":\"$JOB_STATUS\"}"

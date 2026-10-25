@@ -52,12 +52,23 @@ Deno.serve(async (req) => {
       return json({ name: p?.full_name || phone, login: phone, phone, password });
     }
 
-    const name = String(b.name || "").trim();
+    let name = String(b.name || "").trim();
     const phone = String(b.phone || "");
     const role = b.role;
+    let servee: { full_name: string; section: string | null } | null = null;
+    if (role === "servee") {
+      if (!b.servee_id) return json({ error: "اختار المخدوم" }, 400);
+      const { data: sv } = await admin.from("servees").select("full_name,section,active,class_id").eq("id", b.servee_id).maybeSingle();
+      if (!sv || !sv.active) return json({ error: "المخدوم مش موجود أو مؤرشف" }, 400);
+      if (!sv.class_id) return json({ error: "اربط المخدوم بفصل الأول" }, 400);
+      const { data: ex } = await admin.from("profiles").select("id").eq("self_servee_id", b.servee_id).maybeSingle();
+      if (ex) return json({ error: "المخدوم ده عنده حساب بالفعل" }, 400);
+      servee = sv;
+      name = sv.full_name;
+    }
     if (!name) return json({ error: "اكتب الاسم" }, 400);
     if (!/^01[0125]\d{8}$/.test(phone)) return json({ error: "رقم التليفون مش صحيح" }, 400);
-    if (role !== "servant" && role !== "parent") {
+    if (role !== "servant" && role !== "parent" && role !== "servee") {
       return json({ error: "الدور غير صحيح" }, 400);
     }
     if (role === "servant" && !b.class_id) return json({ error: "اختار الفصل" }, 400);
@@ -69,6 +80,8 @@ Deno.serve(async (req) => {
       const { data: cl } = await admin.from("classes").select("section").eq("id", b.class_id).maybeSingle();
       if (!cl) return json({ error: "الفصل مش موجود" }, 400);
       section = cl.section ?? null;
+    } else if (role === "servee") {
+      section = servee!.section ?? null;
     } else {
       const { data: sv } = await admin.from("servees").select("section").eq("id", b.servee_id).maybeSingle();
       if (!sv) return json({ error: "المخدوم مش موجود" }, 400);
@@ -95,7 +108,10 @@ Deno.serve(async (req) => {
     };
 
     const { error: pe } = await admin
-      .from("profiles").upsert({ id, full_name: name, phone, role, section, active: true, pending: false });
+      .from("profiles").upsert({
+        id, full_name: name, phone, role: role === "servee" ? "parent" : role, section, active: true, pending: false,
+        ...(role === "servee" ? { self_servee_id: b.servee_id } : {}),
+      });
     if (pe) return await rollback(pe.message);
 
     if (role === "servant") {

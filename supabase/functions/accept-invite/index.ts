@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
       const isServant = inv.role === "servant";
       const auto = !isServant;
       const { error: pe } = await admin.from("profiles").upsert(
-        { id: uid, full_name: name, phone, role: inv.role, section, active: auto, pending: !auto },
+        { id: uid, full_name: name, phone, role: inv.role, section, active: auto, pending: !auto, invited_by: inv.created_by },
         { onConflict: "id" },
       );
       if (pe) throw pe;
