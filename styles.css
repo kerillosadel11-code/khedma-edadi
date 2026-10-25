@@ -141,3 +141,9 @@ body:has(nav.bn){padding-right:0;padding-bottom:calc(76px + env(safe-area-inset-
 .sg button i{font-style:normal;font-size:24px}.sg button.on{border-color:var(--gold);background:#fffaf0;font-weight:700}
 @media (max-width:380px){.sg{grid-template-columns:repeat(3,1fr)}}
 #t{bottom:calc(84px + env(safe-area-inset-bottom))}
+
+/* بطاقة المخدوم: اسم الفصل تحت الاسم، والأعداد في كبسولات */
+.who b{display:block;line-height:1.4}
+.who small{display:block;color:var(--mut);font-size:13px;margin-top:2px}
+.cnt{flex-wrap:wrap;gap:8px}
+.cnt>span{border:1px solid var(--line);border-radius:999px;padding:2px 12px;line-height:1.7}
