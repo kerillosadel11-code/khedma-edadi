@@ -245,7 +245,7 @@ function vServees(){
   <div class="card"><input id="sq" type="search" data-a="search" placeholder="ابحث بالاسم أو التليفون أو الكود" value="${esc(S.q)}"><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="stfilter"><option value="act"${S.st==='act'?' selected':''}>الشغّالين</option><option value="arch"${S.st==='arch'?' selected':''}>المؤرشفين</option><option value="all"${S.st==='all'?' selected':''}>الكل</option></select></div><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button>
   <div id="sl">${svList()}</div></div>`;
 }
-function srvStats(id){const H=S.sa.filter(x=>x.servant_id===id),P=H.filter(x=>x.status==='present').length;return{n:H.length,P,A:H.filter(x=>x.status==='absent').length,E:H.filter(x=>x.status==='excused').length,pct:H.length?Math.round(P*100/H.length):null}}
+function srvStats(id){const H=S.sa.filter(x=>x.servant_id===id),P=H.filter(x=>x.status==='present').length;return{n:H.length,P,A:H.filter(x=>x.status==='absent').length,E:H.filter(x=>x.status==='excused').length,pct:P+H.filter(x=>x.status==='absent').length?Math.round(P*100/(P+H.filter(x=>x.status==='absent').length)):null}}
 const srvClasses=id=>S.cs.filter(x=>x.servant_id===id).map(x=>S.classes.find(c=>c.id===x.class_id)).filter(Boolean);
 function srvFiltered(){
   const q=nz(S.sq);
@@ -294,7 +294,7 @@ function meetStats(days){
   S.servees.forEach(x=>{if(x.active&&x.class_id)(act[x.class_id]=act[x.class_id]||[]).push(x)});
   const pctC={},tot={};
   for(const cid in H.datesByC){const L=act[cid]||[];if(!L.length)continue;
-    for(const d of H.datesByC[cid]){const pr=L.filter(x=>(H.byS[x.id]||{})[d]==='present').length;(pctC[cid]=pctC[cid]||{})[d]=Math.round(pr*100/L.length);const t=tot[d]=tot[d]||{p:0,n:0};t.p+=pr;t.n+=L.length}}
+    for(const d of H.datesByC[cid]){const L2=L.filter(x=>(H.byS[x.id]||{})[d]!=='excused');if(!L2.length)continue;const pr=L2.filter(x=>(H.byS[x.id]||{})[d]==='present').length;(pctC[cid]=pctC[cid]||{})[d]=Math.round(pr*100/L2.length);const t=tot[d]=tot[d]||{p:0,n:0};t.p+=pr;t.n+=L2.length}}
   const dates=Object.keys(tot).sort();
   return{H,act,dates,pctC,series:dates.map(d=>Math.round(tot[d].p*100/tot[d].n))};
 }
@@ -302,10 +302,10 @@ const clsLast=(ms,cid)=>{const o=ms.pctC[cid]||{},k=Object.keys(o).sort();return
 const clsRecent=(ms,cid,n)=>{const o=ms.pctC[cid]||{},k=Object.keys(o).sort().slice(-n);return k.length?Math.round(k.reduce((s,d)=>s+o[d],0)/k.length):null};
 function srvSeries(){
   const ids=new Set(servList().map(p=>p.id)),by={};
-  for(const r of S.sa){if(!ids.has(r.servant_id))continue;const a=by[r.att_date]=by[r.att_date]||{p:0,n:0};a.n++;if(r.status==='present')a.p++}
+  for(const r of S.sa){if(!ids.has(r.servant_id))continue;if(r.status==='excused')continue;const a=by[r.att_date]=by[r.att_date]||{p:0,n:0};a.n++;if(r.status==='present')a.p++}
   const dates=Object.keys(by).sort();return{dates,series:dates.map(d=>Math.round(by[d].p*100/by[d].n))};
 }
-const srvPct=(id,days)=>{const d0=ago(days),r=S.sa.filter(x=>x.servant_id===id&&x.att_date>=d0),pr=r.filter(x=>x.status==='present').length;return{n:r.length,pct:r.length?Math.round(pr*100/r.length):null}};
+const srvPct=(id,days)=>{const d0=ago(days),r=S.sa.filter(x=>x.servant_id===id&&x.att_date>=d0&&x.status!=='excused'),pr=r.filter(x=>x.status==='present').length;return{n:r.length,pct:r.length?Math.round(pr*100/r.length):null}};
 function delta(a){
   if(a.length<2)return'<i>—</i>';const d=a[a.length-1]-a[a.length-2];
   return d===0?'<i>ثابت عن الاجتماع اللي قبله</i>':`<i class="${d>0?'up':'dn'}">${d>0?'▲':'▼'} ${Math.abs(d)}% عن الاجتماع اللي قبله</i>`;
@@ -458,7 +458,7 @@ const attList=()=>servList().concat(secList());
 function vSat(){
   if(!canManage()){
     const H=S.sa.filter(x=>x.servant_id===S.p.id).sort((a,b)=>b.att_date.localeCompare(a.att_date)),P=H.filter(x=>x.status==='present').length;
-    return `<div class="card"><h2>حضوري</h2><div class="cnt"><span>حاضر ${P}</span><span>غايب ${H.filter(x=>x.status==='absent').length}</span><span>معتذر ${H.filter(x=>x.status==='excused').length}</span>${H.length?`<span>نسبة الحضور ${Math.round(P*100/H.length)}%</span>`:''}</div></div>
+    return `<div class="card"><h2>حضوري</h2><div class="cnt"><span>حاضر ${P}</span><span>غايب ${H.filter(x=>x.status==='absent').length}</span><span>معتذر ${H.filter(x=>x.status==='excused').length}</span>${P+H.filter(x=>x.status==='absent').length?`<span>نسبة الحضور ${Math.round(P*100/(P+H.filter(x=>x.status==='absent').length))}%</span>`:''}</div></div>
     <div class="card"><h2>آخر الأيام</h2>${H.slice(0,30).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':h.status==='excused'?'var(--mut)':'var(--red)'}">${SST[h.status]}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`;
   }
   const L=attList(),A=Object.fromEntries(S.sa.filter(x=>x.att_date===S.date).map(x=>[x.servant_id,x.status]));
@@ -614,7 +614,7 @@ function vRep(){
     <div class="card"><h2>المخدومين (${st.length})</h2>${st.map(({x,st:t})=>`<div class="row"><div>${esc(x.full_name)}<small>حاضر ${t.present} من ${t.sessions}${t.streak>=2?' · غايب '+t.streak+' ورا بعض':''}</small></div><div style="width:40%;text-align:left">${t.pct===null?'—':t.pct+'%'}${bar(t.pct)}</div></div>`).join('')||'<div class="empty">مفيش مخدومين.</div>'}</div>`}
   let sv='';
   if(canManage()&&S.profiles.length){const d0=new Date(Date.now()-days*864e5).toISOString().slice(0,10);
-    const L=attList().map(p=>{const r=S.sa.filter(x=>x.servant_id===p.id&&x.att_date>=d0),pr=r.filter(x=>x.status==='present').length;return{p,pr,ab:r.filter(x=>x.status==='absent').length,ex:r.filter(x=>x.status==='excused').length,n:r.length,pct:r.length?Math.round(pr*100/r.length):null}}).sort((a,b)=>(a.pct??101)-(b.pct??101));
+    const L=attList().map(p=>{const r=S.sa.filter(x=>x.servant_id===p.id&&x.att_date>=d0),pr=r.filter(x=>x.status==='present').length;return{p,pr,ab:r.filter(x=>x.status==='absent').length,ex:r.filter(x=>x.status==='excused').length,n:r.length,pct:pr+r.filter(x=>x.status==='absent').length?Math.round(pr*100/(pr+r.filter(x=>x.status==='absent').length)):null}}).sort((a,b)=>(a.pct??101)-(b.pct??101));
     sv=`<div class="card"><h2>حضور الخدام (${L.length})</h2><button class="s" data-a="exp" data-id="servants" style="margin-bottom:8px">تصدير Excel (CSV)</button>${L.map(o=>`<div class="row"><div>${esc(o.p.full_name||'بدون اسم')}${o.p.role==='secretary'?'<span class="bd">أمين</span>':''}${isAdmin()?badge(o.p.section):''}<small>حاضر ${o.pr} · غايب ${o.ab} · معتذر ${o.ex}</small></div><div style="width:40%;text-align:left">${o.pct===null?'—':o.pct+'%'}${bar(o.pct)}</div></div>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div>`}
   return `<div class="card"><h2>تقارير الحضور</h2><div class="two"><select data-a="rc"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.rc)}</select><select data-a="rd">${[[28,'آخر 4 أسابيع'],[56,'آخر 8 أسابيع'],[90,'آخر 90 يوم']].map(([n,l])=>`<option value="${n}"${days===n?' selected':''}>${l}</option>`).join('')}</select></div></div>
   <div class="card"><h2>الفصول</h2><button class="s" data-a="exp" data-id="servees" style="margin-bottom:8px">تصدير Excel (CSV)</button>${crow.map(o=>`<div class="row"><div>${esc(cLabel(o.c))}<small>${o.act.length} مخدوم · ${o.ds.length} اجتماع</small></div><div style="width:40%;text-align:left">${o.avg===null?'—':o.avg+'%'}${bar(o.avg)}</div></div>`).join('')||'<div class="empty">مفيش فصول.</div>'}</div>${det}${sv}`;
