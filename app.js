@@ -21,6 +21,26 @@ function normPhone(raw){
   if(d.startsWith('0020'))d='0'+d.slice(4);else if(d.startsWith('20')&&d.length===12)d='0'+d.slice(2);else if(d.length===10&&d[0]==='1')d='0'+d;
   return /^01[0125]\d{8}$/.test(d)?d:null;
 }
+/* فحص بيانات المخدوم الجديد (بيتطبّق على الإضافة والاستيراد، مش على تعديل المخدومين القدام) */
+const nameParts=n=>String(n||'').trim().split(/\s+/).filter(Boolean),isQuadName=n=>nameParts(n).length>=4;
+const QUAD_MSG='الاسم لازم يكون رباعي (4 كلمات على الأقل)',PH_MSG='لازم موبايل مصري 11 رقم يبدأ بـ 010 أو 011 أو 012 أو 015';
+function checkNewServee(o){
+  const e=[],c={},t=x=>String(x==null?'':x).trim(),nm=nameParts(o.name).join(' ');
+  if(!nm)e.push('اكتب اسم المخدوم');else if(!isQuadName(nm))e.push(QUAD_MSG);
+  c.full_name=nm;
+  if(!o.class_id)e.push('اختار الفصل');c.class_id=o.class_id||null;
+  if(!o.servant_id)e.push('اختار الخادم المسئول');c.servant_id=o.servant_id||null;
+  const ph=(raw,label)=>{const x=t(raw);if(!x)return null;const q=normPhone(x);if(!q)e.push(label+' غلط: '+PH_MSG);return q};
+  c.phone=ph(o.phone,'رقم هاتف المخدوم');c.father_phone=ph(o.father_phone,'رقم هاتف الأب');c.mother_phone=ph(o.mother_phone,'رقم هاتف الأم');
+  if(!t(o.father_phone)&&!t(o.mother_phone))e.push('اكتب رقم هاتف الأب أو الأم (واحد منهم كفاية)');
+  const bd=t(o.birth_date);
+  if(!bd)e.push('اكتب تاريخ الميلاد');else if(!/^\d{4}-\d{2}-\d{2}$/.test(bd)||isNaN(Date.parse(bd))||bd>new Date().toISOString().slice(0,10)||bd<'1980-01-01')e.push('تاريخ الميلاد مش منطقي');
+  c.birth_date=bd||null;
+  [['address','العنوان'],['school','اسم المدرسة'],['confession_father','أب الاعتراف']].forEach(([k,l])=>{c[k]=t(o[k]);if(!c[k])e.push('اكتب '+l)});
+  c.notes=t(o.notes)||null;
+  return{errors:e,clean:c};
+}
+const errToast=e=>e[0]+(e.length>1?' (+'+(e.length-1)+' كمان)':'');
 const toEmail=x=>{if(x.includes('@'))return x;const p=normPhone(x);return p?p+'@'+EMAIL_DOMAIN:null};
 async function fn(body,name='create-user'){
   const {data,error}=await sb.functions.invoke(name,{body});
@@ -86,9 +106,10 @@ async function joinScreen(t){
   app.innerHTML=joinWrap('<h1>دعوة للانضمام</h1><p>بنتأكد من الدعوة...</p>');
   const x=await fn({action:'peek',token:t},'accept-invite');
   if(x.error)return app.innerHTML=joinWrap(`<h1>الدعوة مش شغّالة</h1><p class="err">${esc(x.error)}</p><a href="#" data-a="joinhome">الدخول للتطبيق</a>`);
+  S.joinRole=x.role;
   const who=x.role==='secretary'?'أمين خدمة '+(SEC[x.section]||''):x.role==='parent'?'ولي أمر '+esc(x.servee_name||''):'خادم في فصل '+esc(x.class_name||'');
   app.innerHTML=joinWrap(`<h1>أهلاً بيك في خدمة إعدادي</h1><p>دعوة للانضمام كـ <b>${who}</b></p>
-  <input id="jn" placeholder="الاسم بالكامل"><input id="jp" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
+  <input id="jn" placeholder="الاسم بالكامل (رباعي)"><input id="jp" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
   <input id="j1" type="password" placeholder="اختار باسورد (8 حروف على الأقل)" autocomplete="new-password" dir="ltr"><input id="j2" type="password" placeholder="أكّد الباسورد" autocomplete="new-password" dir="ltr">
   <button class="p" data-a="joinGo">انضمام</button><p class="err" id="err"></p>${x.role==='servant'?'<p class="empty">بعد التسجيل، حسابك هيستنى موافقة أمين الخدمة.</p>':x.role==='parent'?'<p class="empty">بعد التسجيل هتدخل على طول وتتابع حضور ابنك.</p>':''}`);
 }
@@ -96,6 +117,7 @@ async function joinGo(){
   const t=joinTok(),er=document.getElementById('err'),n=v('jn'),ph=normPhone(v('jp')),p1=document.getElementById('j1').value,p2=document.getElementById('j2').value;
   if(!t)return;
   if(!n)return er.textContent='اكتب اسمك.';
+  if(S.joinRole!=='parent'&&!isQuadName(n))return er.textContent=QUAD_MSG+'.';
   if(!ph)return er.textContent='رقم التليفون مش صحيح (مثال: 01012345678).';
   if(p1.length<8)return er.textContent='الباسورد لازم يكون 8 حروف على الأقل.';
   if(p1!==p2)return er.textContent='الباسورد مش متطابق.';
@@ -270,15 +292,18 @@ function svList(){
 const esvOpts=(cid,sel)=>{const L=classServants(cid);return `<option value="">${!cid?'الخادم المسئول: اختار الفصل الأول':L.length?'الخادم المسئول: كل خدام الفصل':'الخادم المسئول: مفيش خدام في الفصل'}</option>`+L.map(p=>`<option value="${p.id}"${p.id===sel?' selected':''}>${esc(p.full_name||'؟')}</option>`).join('')};
 function svEditCard(){
   const s=S.servees.find(x=>x.id===S.ed);if(!s)return'';
-  return `<div class="card" style="border-color:var(--gold)"><h2>تعديل: ${esc(s.full_name)}</h2><input id="en" value="${esc(s.full_name)}" placeholder="الاسم بالكامل"><div class="two"><input id="ep" type="tel" dir="ltr" value="${esc(s.phone||'')}" placeholder="التليفون"><input id="eb" type="date" value="${esc(s.birth_date||'')}" aria-label="تاريخ الميلاد"></div><select id="ec" data-a="ecChange"><option value="">بدون فصل</option>${opts(S.classes,cLabel,s.class_id)}</select>${canManage()?`<select id="esv" aria-label="الخادم المسئول">${esvOpts(s.class_id,s.servant_id)}</select>`:''}<input id="ea" value="${esc(s.address||'')}" placeholder="العنوان"><textarea id="eno" rows="2" placeholder="ملاحظات">${esc(s.notes||'')}</textarea><button class="p" data-a="saveServee">حفظ</button><button class="s" data-a="cancelEdit" style="margin-top:8px">إلغاء</button></div>`;
+  return `<div class="card" style="border-color:var(--gold)"><h2>تعديل: ${esc(s.full_name)}</h2><input id="en" value="${esc(s.full_name)}" placeholder="الاسم بالكامل"><div class="two"><input id="ep" type="tel" dir="ltr" value="${esc(s.phone||'')}" placeholder="التليفون"><input id="eb" type="date" value="${esc(s.birth_date||'')}" aria-label="تاريخ الميلاد"></div><select id="ec" data-a="ecChange"><option value="">بدون فصل</option>${opts(S.classes,cLabel,s.class_id)}</select>${canManage()?`<select id="esv" aria-label="الخادم المسئول">${esvOpts(s.class_id,s.servant_id)}</select>`:''}<div class="two"><input id="efp" type="tel" dir="ltr" value="${esc(s.father_phone||'')}" placeholder="رقم هاتف الأب"><input id="emp" type="tel" dir="ltr" value="${esc(s.mother_phone||'')}" placeholder="رقم هاتف الأم"></div><input id="ea" value="${esc(s.address||'')}" placeholder="العنوان"><input id="esch" value="${esc(s.school||'')}" placeholder="اسم المدرسة التابع لها"><input id="ecf" value="${esc(s.confession_father||'')}" placeholder="أب الاعتراف"><textarea id="eno" rows="2" placeholder="ملاحظات">${esc(s.notes||'')}</textarea><button class="p" data-a="saveServee">حفظ</button><button class="s" data-a="cancelEdit" style="margin-top:8px">إلغاء</button></div>`;
 }
 function impCard(){
   const m=S.imp;if(!m)return'';
-  return `<div class="card" style="border-color:var(--gold)"><h2>معاينة الاستيراد · ${esc(cname(m.cid))}</h2><div class="cnt"><span>جديد ${m.ok.length}</span><span>مكرر (هيتخطّى) ${m.dup}</span><span>بدون اسم ${m.bad}</span></div>${m.ok.slice(0,8).map(r=>`<div class="row"><div>${esc(r.full_name)}<small>${esc(r.phone||'')} ${esc(r.birth_date||'')}</small></div></div>`).join('')}${m.ok.length>8?`<div class="empty">و ${m.ok.length-8} كمان...</div>`:''}<button class="p" data-a="csvGo"${m.ok.length?'':' disabled'}>استيراد ${m.ok.length} مخدوم</button><button class="s" data-a="csvCancel" style="margin-top:8px">إلغاء</button></div>`;
+  return `<div class="card" style="border-color:var(--gold)"><h2>معاينة الاستيراد · ${esc(cname(m.cid))}</h2><div class="cnt"><span>جديد ${m.ok.length}</span><span>مكرر (هيتخطّى) ${m.dup}</span><span>مرفوض ${(m.rej||[]).length}</span></div>${(m.rej||[]).length?`<div class="card" style="border-color:var(--red)"><h2>مرفوض (${m.rej.length}) · صلّحهم في الملف وارفعه تاني</h2>${m.rej.slice(0,15).map(x=>`<div class="row"><div>صف ${x.row} · ${esc(x.name)}<small>${x.why.map(esc).join('، ')}</small></div></div>`).join('')}${m.rej.length>15?`<div class="empty">و ${m.rej.length-15} كمان...</div>`:''}</div>`:''}${m.ok.slice(0,8).map(r=>`<div class="row"><div>${esc(r.full_name)}<small>${esc(r.phone||'')} ${esc(r.birth_date||'')}</small></div></div>`).join('')}${m.ok.length>8?`<div class="empty">و ${m.ok.length-8} كمان...</div>`:''}<button class="p" data-a="csvGo"${m.ok.length?'':' disabled'}>استيراد ${m.ok.length} مخدوم</button><button class="s" data-a="csvCancel" style="margin-top:8px">إلغاء</button></div>`;
 }
 function vServees(){
-  return credCard()+svEditCard()+impCard()+`<div class="card"><h2>إضافة مخدوم</h2><input id="sn" placeholder="الاسم بالكامل"><div class="two"><input id="sp" type="tel" placeholder="التليفون" dir="ltr"><input id="sb" type="date" aria-label="تاريخ الميلاد"></div>
-  <select id="sc" data-a="scChange"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select>${canManage()?`<select id="ssv" aria-label="الخادم المسئول">${esvOpts(null,null)}</select>`:''}<input id="sa" placeholder="العنوان (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
+  return credCard()+svEditCard()+impCard()+`<div class="card"><h2>إضافة مخدوم</h2><p class="empty" style="margin:0 0 8px">اللي عليه * إجباري. الاسم رباعي، وتليفون الأب أو الأم كفاية.</p><input id="sn" placeholder="الاسم بالكامل (رباعي) *">
+  <select id="sc" data-a="scChange"><option value="">الفصل *</option>${opts(S.classes,cLabel)}</select>${canManage()?`<select id="ssv" aria-label="الخادم المسئول">${esvOpts(null,null).replace('الخادم المسئول:','الخادم المسئول *:')}</select>`:''}
+  <div class="two"><input id="sfp" type="tel" placeholder="رقم هاتف الأب *" dir="ltr"><input id="smp" type="tel" placeholder="رقم هاتف الأم *" dir="ltr"></div>
+  <input id="sp" type="tel" placeholder="رقم هاتف المخدوم (اختياري)" dir="ltr"><label class="empty" style="display:block;margin:6px 0 2px">تاريخ الميلاد *</label><input id="sb" type="date" aria-label="تاريخ الميلاد">
+  <input id="sa" placeholder="العنوان *"><input id="ssch" placeholder="اسم المدرسة التابع لها *"><input id="scf" placeholder="أب الاعتراف *"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
   <div class="card"><h2>استيراد من ملف Excel</h2><button class="s" data-x="tpl" style="margin-bottom:8px">⬇️ تحميل نموذج Excel فاضي</button><select id="icl2"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><input type="file" accept=".xlsx,.csv,.txt" data-a="csvPick"><p class="empty">حمّل النموذج، املاه في Excel (الاسم، التليفون، تاريخ الميلاد، العنوان، ملاحظات)، واحفظه، وارفعه هنا. بيقبل كمان ملفات CSV.</p></div>
   <div class="card"><input id="sq" type="search" data-a="search" placeholder="ابحث بالاسم أو التليفون أو الكود" value="${esc(S.q)}"><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="stfilter"><option value="act"${S.st==='act'?' selected':''}>الشغّالين</option><option value="arch"${S.st==='arch'?' selected':''}>المؤرشفين</option><option value="all"${S.st==='all'?' selected':''}>الكل</option></select></div><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button>
   <div id="sl">${svList()}</div></div>`;
@@ -448,7 +473,7 @@ function vHome0(){
 }
 const TBL={profiles:'مستخدم',servees:'مخدوم',classes:'فصل',class_servants:'ربط خادم بفصل',parent_links:'ربط ولي أمر',invites:'دعوة'};
 const OPL={INSERT:'إضافة',UPDATE:'تعديل',DELETE:'حذف'};
-const FLD={full_name:'الاسم',name:'الاسم',phone:'التليفون',role:'الدور',active:'التفعيل',pending:'الموافقة',section:'القسم',class_id:'الفصل',address:'العنوان',contact_phone:'رقم التواصل',notes:'ملاحظات',birth_date:'الميلاد',stage:'المرحلة',revoked:'ملغاة',archived_at:'الأرشفة',archive_reason:'سبب الأرشفة'};
+const FLD={full_name:'الاسم',name:'الاسم',phone:'التليفون',father_phone:'هاتف الأب',mother_phone:'هاتف الأم',school:'المدرسة',confession_father:'أب الاعتراف',role:'الدور',active:'التفعيل',pending:'الموافقة',section:'القسم',class_id:'الفصل',address:'العنوان',contact_phone:'رقم التواصل',notes:'ملاحظات',birth_date:'الميلاد',stage:'المرحلة',revoked:'ملغاة',archived_at:'الأرشفة',archive_reason:'سبب الأرشفة'};
 async function loadAudit(){const r=await sb.from('audit_log').select('*').order('at',{ascending:false}).limit(200);S.aud=r.error?[]:(r.data||[]);S.audErr=r.error?r.error.message:''}
 function fv(k,x){if(x===null||x===undefined||x==='')return'—';if(typeof x==='boolean')return x?'نعم':'لا';if(k==='class_id')return cname(x);if(k==='role')return ROLES[x]||x;if(k==='section')return SEC[x]||x;if(k==='archived_at')return fdate(String(x).slice(0,10));return String(x)}
 function vAudit(){
@@ -462,17 +487,37 @@ function parseCSV(t){const rows=[];let r=[],c='',q=false;t=t.replace(/^\uFEFF/,'
 const nd=x=>{x=String(x||'').replace(/[\u0660-\u0669]/g,c=>c.charCodeAt(0)-0x660).trim();if(/^\d{5}(\.\d+)?$/.test(x)&&+x>=10000&&+x<=60000)x=new Date(Math.round((+x-25569)*864e5)).toISOString().slice(0,10);let m=x.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/),y,mo,d;if(m){y=m[1];mo=m[2];d=m[3]}else{m=x.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);if(!m)return null;d=m[1];mo=m[2];y=m[3]}const s=`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`,t=new Date(s+'T00:00:00');return isNaN(t)||t.getMonth()+1!==+mo?null:s};
 function buildImport(text,cid){
   const R=Array.isArray(text)?text:parseCSV(text);if(!R.length)return null;
-  const col={name:0,phone:1,birth:2,addr:3,notes:4},h=R[0].map(nz),isH=h.some(x=>x.includes('اسم')||x==='name');
-  if(isH){const f=(...ks)=>h.findIndex(x=>ks.some(k=>x.includes(k)));col.name=f('اسم','name');col.phone=f('تليفون','موبايل','phone','mobile');col.birth=f('ميلاد','birth');col.addr=f('عنوان','address');col.notes=f('ملاحظ','note')}
-  const exP=new Set(S.servees.map(x=>normPhone(x.phone||'')).filter(Boolean)),exN=new Set(S.servees.map(x=>nz(x.full_name))),seen=new Set(),ok=[];let dup=0,bad=0;
-  for(const r of R.slice(isH?1:0)){
-    const g=i=>i>=0&&r[i]!==undefined?String(r[i]).trim():'',name=g(col.name);
-    if(!name){bad++;continue}
-    const ph=g(col.phone),np=normPhone(ph),key=nz(name)+'|'+(np||'');
-    if((np&&exP.has(np))||exN.has(nz(name))||seen.has(key)){dup++;continue}
-    seen.add(key);ok.push({full_name:name,phone:np||ph||null,birth_date:nd(g(col.birth)),address:g(col.addr)||null,notes:g(col.notes)||null,class_id:cid});
+  const col={name:0,srv:-1,phone:1,fph:-1,mph:-1,birth:2,addr:3,school:-1,conf:-1,notes:4},h=R[0].map(nz),isH=h.some(x=>x.includes('اسم')||x==='name');
+  if(isH){
+    const hasP=x=>/هاتف|تليفون|موبايل|phone|mobile/.test(x),f=p=>h.findIndex(p);
+    col.name=f(x=>(x.includes('اسم')||x==='name')&&!x.includes('مدرس')&&!x.includes('خادم'));
+    col.srv=f(x=>x.includes('خادم')||x.includes('مسئول')||x.includes('مسؤول'));
+    col.fph=f(x=>hasP(x)&&/(^|\s)(ال)?اب($|\s)|father/.test(x));
+    col.mph=f(x=>hasP(x)&&/(^|\s)(ال)?ام($|\s)|mother/.test(x));
+    col.phone=f((x,i)=>hasP(x)&&i!==col.fph&&i!==col.mph);
+    col.birth=f(x=>x.includes('ميلاد')||x.includes('birth'));
+    col.addr=f(x=>x.includes('عنوان')||x.includes('address'));
+    col.school=f(x=>x.includes('مدرس')||x.includes('school'));
+    col.conf=f(x=>x.includes('اعتراف'));
+    col.notes=f(x=>x.includes('ملاحظ')||x.includes('note'));
   }
-  return{cid,ok,dup,bad};
+  const pool=classServants(cid)||[],all=(S.profiles||[]).filter(p=>p.active&&p.role==='servant'),pn=p=>nz(p.full_name||'');
+  const findSrv=nm=>{const k=nz(nm);if(!k)return null;let m=pool.filter(p=>pn(p)===k);if(m.length===1)return m[0];m=all.filter(p=>pn(p)===k);if(m.length===1)return m[0];m=pool.filter(p=>pn(p)&&(pn(p).includes(k)||k.includes(pn(p))));return m.length===1?m[0]:null};
+  const exP=new Set(S.servees.map(x=>normPhone(x.phone||'')).filter(Boolean)),exN=new Set(S.servees.map(x=>nz(x.full_name))),seen=new Set(),ok=[],rej=[];let dup=0,bad=0;
+  R.slice(isH?1:0).forEach((r,ri)=>{
+    const g=i=>i>=0&&r[i]!==undefined?String(r[i]).trim():'',name=g(col.name),rowNo=ri+(isH?2:1);
+    if(!r.some(c=>String(c==null?'':c).trim()))return;
+    if(!name){bad++;rej.push({row:rowNo,name:'(بدون اسم)',why:['اكتب اسم المخدوم']});return}
+    const ph=g(col.phone),np=normPhone(ph),key=nz(name)+'|'+(np||'');
+    if((np&&exP.has(np))||exN.has(nz(name))||seen.has(key)){dup++;return}
+    const sn=g(col.srv),sv=findSrv(sn);
+    const chk=checkNewServee({name,class_id:cid,servant_id:sv?sv.id:'',phone:ph,father_phone:g(col.fph),mother_phone:g(col.mph),birth_date:nd(g(col.birth)),address:g(col.addr),school:g(col.school),confession_father:g(col.conf),notes:g(col.notes)});
+    if(!sv&&!chk.errors.includes('اختار الخادم المسئول'))chk.errors.push('اختار الخادم المسئول');
+    if(!sv)chk.errors[chk.errors.indexOf('اختار الخادم المسئول')]=sn?'الخادم المسئول «'+sn+'» مش موجود في خدام الفصل':'اكتب الخادم المسئول';
+    if(chk.errors.length){rej.push({row:rowNo,name,why:chk.errors});return}
+    seen.add(key);ok.push(chk.clean);
+  });
+  return{cid,ok,dup,bad,rej};
 }
 function vAtt(){
   if(isMass())return vAttMass();
@@ -1154,7 +1199,7 @@ function credCard(){
   ${c.warning?`<p class="err">${esc(c.warning)}</p>`:''}<p class="empty">الباسورد مش هيظهر تاني بعد ما تقفل الكارت، ابعته دلوقتي.</p>${wa}<button class="s" data-a="dismiss">تم</button></div>`;
 }
 function vAdd(){
-  return credCard()+`<div class="card"><h2>إضافة مستخدم</h2><input id="un" placeholder="الاسم بالكامل"><input id="up" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
+  return credCard()+`<div class="card"><h2>إضافة مستخدم</h2><input id="un" placeholder="الاسم بالكامل (رباعي للخدام والأمناء)"><input id="up" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
   <select id="ur" data-a="newrole">${Object.entries(ROLES).filter(([k])=>isAdmin()||k==='servant'||k==='parent').map(([k,n])=>`<option value="${k}"${k==='servant'?' selected':''}>${n}</option>`).join('')}</select>
   <div id="usc" style="display:none"><select id="usec"><option value="">اختار قسم أمين الخدمة</option><option value="boys"${S.sec==='boys'?' selected':''}>بنين</option><option value="girls"${S.sec==='girls'?' selected':''}>بنات</option></select></div>
   <div id="uc"><select id="ucl"><option value="">اختار فصل الخادم</option>${opts(S.classes,cLabel)}</select></div>
@@ -1217,14 +1262,18 @@ async function run(a,id){
   let r;
   if(a==='addClass'){if(!v('cn'))return toast('اكتب اسم الفصل');if(isAdmin()&&!v('csec'))return toast('اختار قسم الفصل');r=await sb.from('classes').insert({name:v('cn'),stage:v('cs')||null,section:isSec()?S.p.section:v('csec')})}
   else if(a==='delClass'){if(S.servees.some(x=>x.class_id===id))return toast('انقل أو أرشف المخدومين اللي في الفصل ده الأول');if(!confirm('حذف الفصل؟'))return;r=await sb.from('classes').delete().eq('id',id)}
-  else if(a==='addServee'){if(!v('sn'))return toast('اكتب اسم المخدوم');
-    {const np=normPhone(v('sp')||''),dup=S.servees.find(x=>(np&&normPhone(x.phone||'')===np)||nz(x.full_name)===nz(v('sn')));if(dup&&!confirm('فيه مخدوم بنفس الاسم أو التليفون: '+dup.full_name+'. تضيفه برضه؟'))return}
-    if(!canManage()){const cid=acid();if(!cid)return toast('مفيش فصل مربوط بيك');
-      r=await sb.rpc('kh_servant_add_servee',{p_name:v('sn'),p_phone:v('sp')||null,p_birth:v('sb')||null,p_class:cid,p_address:v('sa')||null,p_notes:v('sno')||null});
+  else if(a==='addServee'){
+    const mine=!canManage(),sel=document.getElementById('ssv');
+    const chk=checkNewServee({name:v('sn'),class_id:mine?acid():v('sc'),servant_id:mine?S.p.id:(sel?v('ssv'):''),phone:v('sp'),father_phone:v('sfp'),mother_phone:v('smp'),birth_date:v('sb'),address:v('sa'),school:v('ssch'),confession_father:v('scf'),notes:v('sno')});
+    if(chk.errors.length)return toast(errToast(chk.errors));
+    const c=chk.clean;
+    {const dup=S.servees.find(x=>(c.phone&&normPhone(x.phone||'')===c.phone)||nz(x.full_name)===nz(c.full_name));if(dup&&!confirm('فيه مخدوم بنفس الاسم أو التليفون: '+dup.full_name+'. تضيفه برضه؟'))return}
+    if(mine){
+      r=await sb.rpc('kh_servant_add_servee',{p_name:c.full_name,p_phone:c.phone,p_birth:c.birth_date,p_class:c.class_id,p_address:c.address,p_school:c.school,p_confession:c.confession_father,p_father_phone:c.father_phone,p_mother_phone:c.mother_phone,p_notes:c.notes});
       if(r.error&&/FORBIDDEN/.test(r.error.message))return toast('مش مسموح لك تضيف في الفصل ده');
-      if(r.error&&/PGRST202|kh_servant_add_servee/.test(JSON.stringify(r.error)))return toast('محتاج تشغّل ملف 41_servant_add_servee.sql على Supabase');
-    }else
-    r=await sb.from('servees').insert({full_name:v('sn'),phone:v('sp')||null,birth_date:v('sb')||null,class_id:v('sc')||null,address:v('sa')||null,notes:v('sno')||null,...(document.getElementById('ssv')&&v('ssv')?{servant_id:v('ssv')}:{})})}
+      if(r.error&&/NAME_NOT_QUAD|PARENT_PHONE_REQUIRED|BAD_PHONE|BAD_BIRTH|_REQUIRED/.test(r.error.message))return toast('البيانات مش مكتملة أو غلط: راجع الاسم الرباعي والتليفونات وباقي الحقول');
+      if(r.error&&/PGRST202|kh_servant_add_servee/.test(JSON.stringify(r.error)))return toast('محتاج تشغّل ملف 42_servee_fields.sql على Supabase');
+    }else r=await sb.from('servees').insert(c)}
   else if(a==='delServee'){if(!canManage())return;const sv=S.servees.find(x=>x.id===id);if(!sv)return;const t=prompt('الحذف نهائي وبيمسح حضوره ونقاطه. لو عايز تحتفظ بيه استخدم «أرشفة».\nاكتب اسم المخدوم للتأكيد:\n'+sv.full_name);if(t===null)return;if(nz(t)!==nz(sv.full_name))return toast('الاسم مش مطابق، ما اتحذفش');r=await sb.from('servees').delete().eq('id',id)}
   else if(a==='archServee'){const why=prompt('سبب الأرشفة (اختياري: انتقل، سافر، انقطع...)');if(why===null)return;r=await sb.from('servees').update({active:false,archived_at:new Date().toISOString(),archive_reason:why.trim()||null}).eq('id',id)}
   else if(a==='restServee'){r=await sb.from('servees').update({active:true,archived_at:null,archive_reason:null}).eq('id',id)}
@@ -1240,6 +1289,7 @@ async function run(a,id){
   else if(a==='addUser'){
     const role=v('ur'),ph=normPhone(v('up'));
     if(!v('un'))return toast('اكتب الاسم');
+    if((role==='servant'||role==='secretary')&&!isQuadName(v('un')))return toast(QUAD_MSG);
     if(!ph)return toast('رقم التليفون مش صحيح (مثال: 01012345678)');
     if(role==='servant'&&!v('ucl'))return toast('اختار فصل الخادم');
     if(role==='parent'&&!v('use'))return toast('اختار المخدوم');
@@ -1344,7 +1394,7 @@ function myPage(which){
 }
 function addSvCard(){
   if(canManage()||!acid())return '';
-  return `<div class="card"><h2>إضافة مخدوم لفصلي</h2><input id="sn" placeholder="الاسم بالكامل"><div class="two"><input id="sp" type="tel" placeholder="التليفون" dir="ltr"><input id="sb" type="date" aria-label="تاريخ الميلاد"></div><input id="sa" placeholder="العنوان (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>`;
+  return `<div class="card"><h2>إضافة مخدوم لفصلي</h2><p class="empty" style="margin:0 0 8px">اللي عليه * إجباري. الاسم رباعي، وتليفون الأب أو الأم كفاية. هتتسجّل أنت الخادم المسئول عنه.</p><input id="sn" placeholder="الاسم بالكامل (رباعي) *"><div class="two"><input id="sfp" type="tel" placeholder="رقم هاتف الأب *" dir="ltr"><input id="smp" type="tel" placeholder="رقم هاتف الأم *" dir="ltr"></div><input id="sp" type="tel" placeholder="رقم هاتف المخدوم (اختياري)" dir="ltr"><label class="empty" style="display:block;margin:6px 0 2px">تاريخ الميلاد *</label><input id="sb" type="date" aria-label="تاريخ الميلاد"><input id="sa" placeholder="العنوان *"><input id="ssch" placeholder="اسم المدرسة التابع لها *"><input id="scf" placeholder="أب الاعتراف *"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>`;
 }
 function vMyClass(){return myPage('cl')}
 function vMyServees(){return myPage('sv')}
@@ -1355,6 +1405,14 @@ async function openProfile(id){
   const [r]=await Promise.all([sb.rpc('kh_servee_parents',{p_servee:id}),S.pr===null?loadComp():null,ensureHist(90),ensureMass()]);
   if(S.pf!==id)return;
   S.pfPar=r.error?[]:(r.data||[]);render();
+}
+const MISS=[['father_phone','mother_phone','تليفون الأب أو الأم'],['birth_date','','تاريخ الميلاد'],['address','','العنوان'],['school','','المدرسة'],['confession_father','','أب الاعتراف']];
+const missingOf=x=>MISS.filter(([a,b])=>!x[a]&&!(b&&x[b])).map(m=>m[2]);
+function profInfo(x){
+  const ln=(t,val,ph)=>val?`<div class="row"><div>${t}<small${ph?' dir="ltr" style="text-align:right"':''}>${esc(val)}</small></div>${ph?`<div class="acts">${qc(val,'')}</div>`:''}</div>`:'';
+  const miss=canManage()?missingOf(x):[];
+  return ln('هاتف الأب',x.father_phone,1)+ln('هاتف الأم',x.mother_phone,1)+ln('العنوان',x.address)+ln('المدرسة',x.school)+ln('أب الاعتراف',x.confession_father)
+    +(miss.length?`<p class="empty" style="color:var(--red)">بيانات ناقصة: ${miss.join('، ')}</p>`:'');
 }
 function vProfile(){
   const x=S.servees.find(y=>y.id===S.pf);
@@ -1370,6 +1428,7 @@ function vProfile(){
   <div class="card"><div class="who">${av(x,72)}<div><b style="font-size:19px">${esc(x.full_name)}</b>${badge(x.section)}${x.active?'':'<span class="bd" style="background:#f3d6d2">مؤرشف</span>'}<small>${esc(cname(x.class_id))}</small></div></div>
   ${x.phone?`<div class="acts" style="justify-content:flex-start;margin-top:10px"><span dir="ltr" style="align-self:center">${esc(x.phone)}</span>${qc(x.phone,'')}</div>
   <div class="acts" style="justify-content:flex-start;margin-top:8px">${tpl(x.phone,MSG,x)}</div>`:'<p class="empty">مفيش رقم تليفون للمخدوم.</p>'}
+  ${profInfo(x)}
   ${canManage()?`<button class="s" data-a="editServee" data-id="${x.id}" style="margin-top:10px">تعديل البيانات</button>`:''}</div>
   ${canManage()?(()=>{const sv=svServants(x),gd=S.pl.filter(l=>l.servee_id===x.id).map(l=>S.profiles.find(p=>p.id===l.parent_id)).filter(Boolean),ln=p=>{const ph=p.contact_phone||p.phone;return `<div class="row"><div>${esc(p.full_name||'بدون اسم')}${ph?`<small dir="ltr" style="text-align:right">${esc(ph)}</small>`:''}</div><div class="cnt" style="margin:0">${contactLinks(ph)}</div></div>`};return `<div class="card"><h2>${svAssigned(x)?'الخادم المسئول':'خدام الفصل ('+sv.length+')'}</h2>${sv.map(ln).join('')||'<div class="empty">'+(x.class_id?'مفيش خادم مربوط بفصله.':'المخدوم ملوش فصل.')+'</div>'}${x.class_id?assignSel(x):''}<h2 style="margin-top:14px">ولي الأمر</h2>${gd.map(ln).join('')||'<div class="empty">ولي الأمر مش مسجّل.</div>'}</div>`})():''}
   ${S.fuf===x.id?fuForm(x):''}
@@ -1453,7 +1512,9 @@ app.addEventListener('click',async e=>{
   if(a==='cancelEdit'){S.ed=null;S.edc=null;S.fuf=null;return render()}
   if(a==='saveServee'){
     const sv=S.servees.find(x=>x.id===S.ed);if(!sv)return;if(!v('en'))return toast('اكتب الاسم');
-    const r=await sb.from('servees').update({full_name:v('en'),phone:v('ep')||null,birth_date:v('eb')||null,class_id:v('ec')||null,address:v('ea')||null,notes:v('eno')||null,...(document.getElementById('esv')?{servant_id:v('esv')||null}:{})}).eq('id',sv.id);
+    const chg=(id,old)=>{const x=v(id);if(!x)return{val:null};if(x===String(old||''))return{val:x};const q=normPhone(x);return q?{val:q}:{bad:true}},P=[['ep','phone','تليفون المخدوم'],['efp','father_phone','تليفون الأب'],['emp','mother_phone','تليفون الأم']].map(([id,k,l])=>({k,l,...chg(id,sv[k])})),pb=P.find(x=>x.bad);
+    if(pb)return toast(pb.l+' غلط: '+PH_MSG);
+    const r=await sb.from('servees').update({full_name:v('en'),phone:P[0].val,father_phone:P[1].val,mother_phone:P[2].val,school:v('esch')||null,confession_father:v('ecf')||null,birth_date:v('eb')||null,class_id:v('ec')||null,address:v('ea')||null,notes:v('eno')||null,...(document.getElementById('esv')?{servant_id:v('esv')||null}:{})}).eq('id',sv.id);
     if(!ok(r))return;S.ed=null;await load();render();return toast('تم الحفظ');
   }
   if(a==='saveClass'){
