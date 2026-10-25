@@ -5,7 +5,7 @@
 const X={rep:{date:'',text:'',busy:false},hon:{month:'',data:null,busy:false},
   evt:{list:null,rs:[],open:null,form:false,busy:false},
   rev:{month:'',cls:'',rows:null,busy:false},
-  par:{ev:[],rs:[],sp:{}},myqr:undefined,uid:null};
+  par:{ev:[],rs:[],sp:{}},myqr:undefined,uid:null,q:''};
 const val=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
 const isStaff=()=>!!S.p&&(S.p.role==='admin'||S.p.role==='secretary');
 const isSrvr=()=>!!S.p&&S.p.role==='servant';
@@ -346,4 +346,54 @@ window.vParent=function(){
   const h=origParent(),add=parentCards();
   return add?h.replace(/<\/main>\s*$/,add+'</main>'):h;
 };
+
+/* ================= حضور سريع: بحث بالاسم + تحديد سريع (المخدومين والخدام) ================= */
+const nrm=t=>String(t||'').replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').toLowerCase().trim();
+const qRows=()=>[...document.querySelectorAll('main .row')].filter(r=>r.querySelector('[data-a="mark"],[data-a="smark"]'));
+const isSv=()=>!!document.querySelector('main [data-a="mark"]');
+const errMsg=e=>typeof rpcErr==='function'?rpcErr(e):(e&&e.message)||'حصل خطأ';
+function qApply(){
+  const q=nrm(X.q),rows=qRows();let n=0;
+  rows.forEach(r=>{const m=!q||nrm(r.textContent).includes(q);r.style.display=m?'':'none';if(m)n++});
+  document.querySelectorAll('main .card').forEach(c=>{const rs=[...c.querySelectorAll('.row')].filter(r=>r.querySelector('[data-a="mark"],[data-a="smark"]'));if(rs.length)c.style.display=rs.some(r=>r.style.display!=='none')?'':'none'});
+  const c=document.getElementById('x_qc');if(c)c.textContent=q?n+' نتيجة':'';
+  return rows.filter(r=>r.style.display!=='none');
+}
+function qIds(rows){
+  const sel=isSv()?'[data-a="mark"][data-id$="|present"]':'[data-a="smark"][data-id$="|present"]';
+  return rows.map(r=>r.querySelector(sel)).filter(b=>b&&!b.classList.contains('on')).map(b=>b.dataset.id.split('|')[0]);
+}
+async function qMark(ids){
+  if(!ids.length)return toast('الكل متسجّل حاضر');
+  let bad=0;
+  if(isSv()){
+    const rs=await Promise.all(ids.map(id=>sb.rpc('kh_mark',{p_servee:id,p_date:S.date,p_status:'present'})));
+    const e=rs.find(r=>r.error);bad=rs.filter(r=>r.error).length;if(e)toast(errMsg(e.error));
+    await loadAtt();
+  }else{
+    const r=await sb.from('servant_attendance').upsert(ids.map(id=>({servant_id:id,att_date:S.date,status:'present'})),{onConflict:'servant_id,att_date'});
+    if(r.error){toast('حصل خطأ: '+r.error.message);return}
+    await loadExtra();
+  }
+  X.q='';rp();if(!bad)toast('اتسجّل حضور '+ids.length);
+}
+function qDecorate(){
+  if(!S.p||S.cards||S.pf||document.getElementById('x_q'))return;
+  const anchor=S.tab==='att'?document.querySelector('main [data-a="scan"]'):S.tab==='sat'&&canManage()?document.querySelector('main input[data-a="satDate"]'):null;
+  if(!anchor)return;
+  const card=anchor.closest('.card');if(!card)return;
+  const d=document.createElement('div');d.className='card';
+  d.innerHTML=`<input id="x_q" type="search" placeholder="🔎 ابحث بالاسم (اكتب وادوس Enter لتحضير الظاهر لو واحد)" autocomplete="off" value="${esc(X.q||'')}"><div class="cnt"><span id="x_qc"></span></div><div class="acts" style="justify-content:flex-start"><button class="s on" data-x="qPresent">حاضر للظاهرين</button><button class="s" data-x="qAll">حضّر الكل</button></div>`;
+  card.after(d);qApply();
+}
+const _r2=window.render;
+window.render=function(){_r2();try{qDecorate()}catch(e){console.error(e)}};
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='x_q'){X.q=e.target.value;qApply()}});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter'||!e.target||e.target.id!=='x_q')return;
+  e.preventDefault();const v=qApply(),ids=qIds(v);
+  if(v.length===1&&ids.length===1)qMark(ids);else if(v.length!==1)toast('اكتب حروف أكتر لحد ما يفضل اسم واحد');else toast('متسجّل حاضر');
+});
+ACT.qPresent=async()=>{const v=qApply(),ids=qIds(v);if(!X.q)return toast('اكتب جزء من الاسم الأول، أو استخدم «حضّر الكل»');if(ids.length>1&&!confirm('تسجيل '+ids.length+' كحاضرين؟'))return;qMark(ids)};
+ACT.qAll=async()=>{X.q='';const ids=qIds(qRows());if(ids.length&&!confirm('تسجيل '+ids.length+' كحاضرين؟'))return;qMark(ids)};
 })();
