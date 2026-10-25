@@ -349,33 +349,38 @@ window.vParent=function(){
 
 /* ================= حضور سريع: بحث بالاسم + تحديد سريع (المخدومين والخدام) ================= */
 const nrm=t=>String(t||'').replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').toLowerCase().trim();
-const qRows=()=>[...document.querySelectorAll('main .row')].filter(r=>r.querySelector('[data-a="mark"],[data-a="smark"]'));
+const rowSel='[data-a="mark"],[data-a="smark"]';
+const qRows=()=>[...document.querySelectorAll('main .row')].filter(r=>r.querySelector(rowSel));
 const isSv=()=>!!document.querySelector('main [data-a="mark"]');
 const errMsg=e=>typeof rpcErr==='function'?rpcErr(e):(e&&e.message)||'حصل خطأ';
+const rowName=r=>{const d=r.querySelector('.who>div')||r.firstElementChild;const n=d&&d.childNodes[0];return (n?n.textContent:r.textContent).trim()};
 function qApply(){
   const q=nrm(X.q),rows=qRows();let n=0;
   rows.forEach(r=>{const m=!q||nrm(r.textContent).includes(q);r.style.display=m?'':'none';if(m)n++});
-  document.querySelectorAll('main .card').forEach(c=>{const rs=[...c.querySelectorAll('.row')].filter(r=>r.querySelector('[data-a="mark"],[data-a="smark"]'));if(rs.length)c.style.display=rs.some(r=>r.style.display!=='none')?'':'none'});
-  const c=document.getElementById('x_qc');if(c)c.textContent=q?n+' نتيجة':'';
-  return rows.filter(r=>r.style.display!=='none');
+  document.querySelectorAll('main .card').forEach(c=>{const rs=[...c.querySelectorAll('.row')].filter(r=>r.querySelector(rowSel));if(rs.length)c.style.display=rs.some(r=>r.style.display!=='none')?'':'none'});
+  const vis=rows.filter(r=>r.style.display!=='none'),c=document.getElementById('x_qc'),bp=document.getElementById('x_qp'),be=document.getElementById('x_qe');
+  if(c)c.textContent=q?(n?n+' نتيجة':'مفيش نتيجة'):'';
+  if(bp){bp.textContent=!q?'حاضر':n===1?'✓ حاضر: '+rowName(vis[0]):n?'حاضر للظاهرين ('+n+')':'حاضر';bp.disabled=!q||!n}
+  if(be){be.textContent=!q?'معتذر':n===1?'معتذر: '+rowName(vis[0]):n?'معتذر للظاهرين ('+n+')':'معتذر';be.disabled=!q||!n}
+  return vis;
 }
-function qIds(rows){
-  const sel=isSv()?'[data-a="mark"][data-id$="|present"]':'[data-a="smark"][data-id$="|present"]';
+function qIds(rows,st){
+  const sel=(isSv()?'[data-a="mark"]':'[data-a="smark"]')+'[data-id$="|'+st+'"]';
   return rows.map(r=>r.querySelector(sel)).filter(b=>b&&!b.classList.contains('on')).map(b=>b.dataset.id.split('|')[0]);
 }
-async function qMark(ids){
-  if(!ids.length)return toast('الكل متسجّل حاضر');
+async function qMark(ids,st,note){
+  if(!ids.length)return toast(st==='present'?'الكل متسجّل حاضر':'الكل متسجّل معتذر');
   let bad=0;
   if(isSv()){
-    const rs=await Promise.all(ids.map(id=>sb.rpc('kh_mark',{p_servee:id,p_date:S.date,p_status:'present'})));
+    const rs=await Promise.all(ids.map(id=>st==='excused'?sb.rpc('kh_mark_excuse',{p_servee:id,p_date:S.date,p_note:note||null}):sb.rpc('kh_mark',{p_servee:id,p_date:S.date,p_status:st})));
     const e=rs.find(r=>r.error);bad=rs.filter(r=>r.error).length;if(e)toast(errMsg(e.error));
     await loadAtt();
   }else{
-    const r=await sb.from('servant_attendance').upsert(ids.map(id=>({servant_id:id,att_date:S.date,status:'present'})),{onConflict:'servant_id,att_date'});
+    const r=await sb.from('servant_attendance').upsert(ids.map(id=>({servant_id:id,att_date:S.date,status:st})),{onConflict:'servant_id,att_date'});
     if(r.error){toast('حصل خطأ: '+r.error.message);return}
     await loadExtra();
   }
-  X.q='';rp();if(!bad)toast('اتسجّل حضور '+ids.length);
+  X.q='';rp();if(!bad)toast('اتسجّل '+(st==='present'?'حضور ':'اعتذار ')+ids.length);
 }
 function qDecorate(){
   if(!S.p||S.cards||S.pf||document.getElementById('x_q'))return;
@@ -383,7 +388,7 @@ function qDecorate(){
   if(!anchor)return;
   const card=anchor.closest('.card');if(!card)return;
   const d=document.createElement('div');d.className='card';
-  d.innerHTML=`<input id="x_q" type="search" placeholder="🔎 ابحث بالاسم (اكتب وادوس Enter لتحضير الظاهر لو واحد)" autocomplete="off" value="${esc(X.q||'')}"><div class="cnt"><span id="x_qc"></span></div><div class="acts" style="justify-content:flex-start"><button class="s on" data-x="qPresent">حاضر للظاهرين</button><button class="s" data-x="qAll">حضّر الكل</button></div>`;
+  d.innerHTML=`<input id="x_q" type="search" placeholder="🔎 ابحث بالاسم" autocomplete="off" value="${esc(X.q||'')}"><div class="cnt"><span id="x_qc"></span></div><div class="acts" style="justify-content:flex-start;flex-wrap:wrap"><button class="p" id="x_qp" data-x="qPresent" disabled>حاضر</button><button class="s" id="x_qe" data-x="qExcuse" disabled>معتذر</button><button class="s" data-x="qAll">حضّر الكل</button></div>`;
   card.after(d);qApply();
 }
 const _r2=window.render;
@@ -391,9 +396,28 @@ window.render=function(){_r2();try{qDecorate()}catch(e){console.error(e)}};
 document.addEventListener('input',e=>{if(e.target&&e.target.id==='x_q'){X.q=e.target.value;qApply()}});
 document.addEventListener('keydown',e=>{
   if(e.key!=='Enter'||!e.target||e.target.id!=='x_q')return;
-  e.preventDefault();const v=qApply(),ids=qIds(v);
-  if(v.length===1&&ids.length===1)qMark(ids);else if(v.length!==1)toast('اكتب حروف أكتر لحد ما يفضل اسم واحد');else toast('متسجّل حاضر');
+  e.preventDefault();const v=qApply();
+  if(v.length===1)ACT.qPresent();
 });
-ACT.qPresent=async()=>{const v=qApply(),ids=qIds(v);if(!X.q)return toast('اكتب جزء من الاسم الأول، أو استخدم «حضّر الكل»');if(ids.length>1&&!confirm('تسجيل '+ids.length+' كحاضرين؟'))return;qMark(ids)};
-ACT.qAll=async()=>{X.q='';const ids=qIds(qRows());if(ids.length&&!confirm('تسجيل '+ids.length+' كحاضرين؟'))return;qMark(ids)};
+ACT.qPresent=async()=>{
+  const v=qApply(),ids=qIds(v,'present');if(!X.q)return toast('اكتب جزء من الاسم الأول');
+  if(ids.length>1&&!confirm('تسجيل '+ids.length+' كحاضرين؟'))return;qMark(ids,'present')
+};
+ACT.qExcuse=async()=>{
+  const v=qApply(),ids=qIds(v,'excused');if(!X.q)return toast('اكتب جزء من الاسم الأول');
+  if(!ids.length)return toast('الكل متسجّل معتذر');
+  let note=null;
+  if(isSv()){note=prompt('سبب الاعتذار؟ (مثلاً: مسافر، مريض، امتحان). سيبه فاضي لو مفيش سبب.','مسافر');if(note===null)return;note=note.trim()||null}
+  if(ids.length>1&&!confirm('تسجيل '+ids.length+' كمعتذرين؟'))return;qMark(ids,'excused',note)
+};
+ACT.qAll=async()=>{X.q='';const ids=qIds(qRows(),'present');if(ids.length&&!confirm('تسجيل '+ids.length+' كحاضرين؟'))return;qMark(ids,'present')};
+
+/* المعتذر مش بيتحسب غياب في الافتقاد ونسبة حضور المخدوم */
+const _servStat=window.servStat;
+window.servStat=function(x,H){
+  const m=H.byS[x.id]||{};
+  if(!Object.values(m).includes('excused'))return _servStat(x,H);
+  const ds=new Set([...(H.datesByC[x.class_id]||[])].filter(d=>m[d]!=='excused'));
+  return _servStat(x,{byS:H.byS,datesByC:Object.assign({},H.datesByC,{[x.class_id]:ds})});
+};
 })();
