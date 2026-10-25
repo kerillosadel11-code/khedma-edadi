@@ -1219,6 +1219,11 @@ async function run(a,id){
   else if(a==='delClass'){if(S.servees.some(x=>x.class_id===id))return toast('انقل أو أرشف المخدومين اللي في الفصل ده الأول');if(!confirm('حذف الفصل؟'))return;r=await sb.from('classes').delete().eq('id',id)}
   else if(a==='addServee'){if(!v('sn'))return toast('اكتب اسم المخدوم');
     {const np=normPhone(v('sp')||''),dup=S.servees.find(x=>(np&&normPhone(x.phone||'')===np)||nz(x.full_name)===nz(v('sn')));if(dup&&!confirm('فيه مخدوم بنفس الاسم أو التليفون: '+dup.full_name+'. تضيفه برضه؟'))return}
+    if(!canManage()){const cid=acid();if(!cid)return toast('مفيش فصل مربوط بيك');
+      r=await sb.rpc('kh_servant_add_servee',{p_name:v('sn'),p_phone:v('sp')||null,p_birth:v('sb')||null,p_class:cid,p_address:v('sa')||null,p_notes:v('sno')||null});
+      if(r.error&&/FORBIDDEN/.test(r.error.message))return toast('مش مسموح لك تضيف في الفصل ده');
+      if(r.error&&/PGRST202|kh_servant_add_servee/.test(JSON.stringify(r.error)))return toast('محتاج تشغّل ملف 41_servant_add_servee.sql على Supabase');
+    }else
     r=await sb.from('servees').insert({full_name:v('sn'),phone:v('sp')||null,birth_date:v('sb')||null,class_id:v('sc')||null,address:v('sa')||null,notes:v('sno')||null,...(document.getElementById('ssv')&&v('ssv')?{servant_id:v('ssv')}:{})})}
   else if(a==='delServee'){if(!canManage())return;const sv=S.servees.find(x=>x.id===id);if(!sv)return;const t=prompt('الحذف نهائي وبيمسح حضوره ونقاطه. لو عايز تحتفظ بيه استخدم «أرشفة».\nاكتب اسم المخدوم للتأكيد:\n'+sv.full_name);if(t===null)return;if(nz(t)!==nz(sv.full_name))return toast('الاسم مش مطابق، ما اتحذفش');r=await sb.from('servees').delete().eq('id',id)}
   else if(a==='archServee'){const why=prompt('سبب الأرشفة (اختياري: انتقل، سافر، انقطع...)');if(why===null)return;r=await sb.from('servees').update({active:false,archived_at:new Date().toISOString(),archive_reason:why.trim()||null}).eq('id',id)}
@@ -1335,7 +1340,11 @@ function myPage(which){
   ${bd.length?`<div class="card"><h2>أعياد ميلاد قريبة (${bd.length})</h2>${bd.map(o=>`<div class="row"><div class="who">${av(o.x,36)}<div>${esc(o.x.full_name)}<small>${lbl(o)}</small></div></div><div class="acts">${qc(o.x.phone,MSG.bd(o.x))}</div></div>`).join('')}</div>`:''}
   <div class="card"><h2>زمايلي في الفصل (${mates.length})</h2>${mates.map(m=>`<div class="row"><div>${esc(m.name||'بدون اسم')}<small dir="ltr" style="text-align:right">${esc(m.contact_phone||m.phone||'')}</small></div><div class="acts">${qc(m.contact_phone||m.phone,'',{u:m.id},m.name)}</div></div>`).join('')||'<div class="empty">إنت الخادم الوحيد المربوط بالفصل ده.</div>'}</div>`;
   const hd=`<div class="card">${S.classes.length>1?`<select data-a="attClass">${opts(S.classes,cLabel,cid)}</select>`:`<b>${esc(cLabel(c))}</b>`}</div>`;
-  return which==='pr'?hd+parCard:which==='sv'?hd+sev:sum+rest;
+  return which==='pr'?hd+parCard:which==='sv'?hd+addSvCard()+sev:sum+rest;
+}
+function addSvCard(){
+  if(canManage()||!acid())return '';
+  return `<div class="card"><h2>إضافة مخدوم لفصلي</h2><input id="sn" placeholder="الاسم بالكامل"><div class="two"><input id="sp" type="tel" placeholder="التليفون" dir="ltr"><input id="sb" type="date" aria-label="تاريخ الميلاد"></div><input id="sa" placeholder="العنوان (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>`;
 }
 function vMyClass(){return myPage('cl')}
 function vMyServees(){return myPage('sv')}
