@@ -1,0 +1,14 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://radvrgthxxtesjitzkil.supabase.co; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://radvrgthxxtesjitzkil.supabase.co wss://radvrgthxxtesjitzkil.supabase.co; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: same-origin
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=()
+/sw.js
+  Cache-Control: no-cache
+/version.json
+  Cache-Control: no-store
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

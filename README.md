@@ -4,7 +4,7 @@ PWA عربي (RTL) على Supabase، مستضاف على Cloudflare Workers.
 
 ## الهيكل
 - `index.html` `sw.js` `manifest.json`: التطبيق نفسه (بيتنشر على Cloudflare).
-- `supabase/sql/`: ملفات SQL بالترتيب (06 ثم 07 ... ثم 17 ثم 18 ثم 19 ثم 20 ثم 21 ثم 22 ثم 23 ثم 24 ثم 25). كل ملف بيتنفّذ مرة واحدة في SQL Editor.
+- `supabase/sql/`: ملفات SQL بالترتيب (06 ثم 07 ... ثم 17 ثم 18 ثم 19 ثم 20 ثم 21 ثم 22 ثم 23 ثم 24 ثم 25 ثم 26). كل ملف بيتنفّذ مرة واحدة في SQL Editor.
 - `supabase/functions/`: دوال Edge (ببقى النشر من لوحة Supabase، Verify JWT = OFF للتنين):
   - `accept-invite`: قبول الدعوات (أمين / خادم / ولي أمر).
   - `set-active`: إيقاف وتفعيل الحسابات وقفل الدخول.
@@ -17,5 +17,16 @@ PWA عربي (RTL) على Supabase، مستضاف على Cloudflare Workers.
 ## الإشعارات
 التشغيل والفحص وحل المشاكل في [`NOTIFICATIONS.md`](NOTIFICATIONS.md). أي مستخدم يقدر يفحص جهازه من 🩺 في الهيدر.
 
-## بعد أي تعديل على التطبيق
-غيّر رقم النسخة في `sw.js` (`khedma-vN`) عشان الموبايلات تاخد الجديد.
+## الملفات الجديدة (نسخة التطوير)
+- `vendor/` و`fonts/`: المكتبات (supabase-js, qrcode, jsQR) وخط Noto Kufi محليًا، فالتطبيق بيفتح من غير نت وما فيش اعتماد على CDN.
+- `_headers`: سياسة الأمان (CSP وغيرها) على Cloudflare. أي سكربت أو اتصال جديد لازم يتضاف فيها.
+- `sw.js`: بيخزّن التطبيق كله وقت التثبيت، والنسخة الجديدة بتستنى لحد ما المستخدم يضغط «تحديث» (مفيش skipWaiting تلقائي).
+- `offline.js`: طابور أوفلاين في IndexedDB لتسجيل الحضور والاعتذار ومسح QR للمخدومين والخدام.
+- `supabase/sql/26_notif_links_audit_retention.sql`: رابط لكل إشعار (الضغط عليه يفتح الصفحة المناسبة)، سجل عمليات على الحضور والنقاط والمالية، وتنظيف يومي للجداول الكبيرة.
+- `supabase/functions/send-push`: بيبعت `url` و`tag` مع الإشعار. انشر الدالة تاني بعد التحديث.
+- `supabase/tests/security.test.sql`: اختبارات أمان بـ pgTAP (`supabase test db`).
+- `scripts/dump-schema.sh`: بيطلّع `00_baseline_schema.sql` من القاعدة الحالية عشان تقدر تبني المشروع من الصفر.
+- `tests/` و`npm test`: اختبارات دوال الأرقام والبحث والـ escape وفحوصات هيكل المشروع (بتشتغل تلقائي في GitHub Actions: `ci.yml`).
+
+## رقم النسخة (تلقائي)
+`.github/workflows/version.yml` بيرفع رقم النسخة في `sw.js` و`version.json` لوحده كل ما ملف من ملفات التطبيق يتغيّر على main. ممكن تعمله يدوي بـ `npm run bump`. وأي ملف جديد يتضاف للتطبيق ضيفه في قايمة `SHELL` في `sw.js`.

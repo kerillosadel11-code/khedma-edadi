@@ -194,7 +194,7 @@ async function printProfile(){
 table{border-collapse:collapse;width:100%}td{padding:4px 8px;border-bottom:1px solid #e3e9e4;vertical-align:top;font-size:13px}td.k{width:28%;color:#5d6f6a;font-weight:700}
 .ch{display:inline-block;border:1px solid #ccc;border-radius:12px;padding:1px 8px;margin:2px;font-size:12px}.ok{background:#cfeedd}.no{background:#f3d6d2}
 @media print{body{margin:10mm}button{display:none}}</style></head><body>
-<button onclick="window.print()" style="float:left;padding:6px 14px">طباعة / حفظ PDF</button>
+<button id="pbtn" style="float:left;padding:6px 14px">طباعة / حفظ PDF</button>
 <h1>${esc(x.full_name)}</h1><div style="color:#5d6f6a">${esc(cname(x.class_id))}${SEC[x.section]?' · خدمة '+SEC[x.section]:''} · اتطبع ${new Date().toLocaleDateString('ar-EG')}</div>
 <h2>البيانات</h2><table>
 ${R('التليفون',esc(x.phone||'—'))}${R('الميلاد',x.birth_date?esc(x.birth_date)+(age!==null&&age>=0?' ('+age+' سنة)':''):'—')}${R('العنوان',esc(x.address||'—'))}${R('ملاحظات',esc(x.notes||'—'))}
@@ -207,7 +207,7 @@ ${R('ولي الأمر',par.length?par.map(q=>esc(q.name||'')+' '+esc(q.contact_
 </body></html>`;
   const w=window.open('','_blank');
   if(!w)return toast('المتصفح منع النافذة. اسمح بالنوافذ المنبثقة وجرّب تاني.');
-  w.document.open();w.document.write(html);w.document.close();w.focus();setTimeout(()=>{try{w.print()}catch(_){}},500);
+  w.document.open();w.document.write(html);w.document.close();{const pb=w.document.getElementById('pbtn');if(pb)pb.addEventListener('click',()=>w.print())}w.focus();setTimeout(()=>{try{w.print()}catch(_){}},500);
 }
 
 /* ================= واجهة المخدوم / ولي الأمر: النقاط والفعاليات ================= */

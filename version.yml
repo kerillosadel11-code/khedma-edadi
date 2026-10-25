@@ -1,0 +1,36 @@
+name: Bump app version
+# كل ما ملف من ملفات التطبيق يتغيّر على main، بنرفع رقم النسخة في sw.js و version.json لوحدنا
+# (عشان الموبايلات تاخد التحديث من غير ما تفتكر تغيّره بإيدك).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app.js'
+      - 'finance.js'
+      - 'extras.js'
+      - 'offline.js'
+      - 'update.js'
+      - 'index.html'
+      - 'styles.css'
+      - 'manifest.json'
+      - 'vendor/**'
+      - 'fonts/**'
+permissions:
+  contents: write
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/bump-version.js "$(date -u -d '+3 hours' +%Y%m%d-%H%M)-${GITHUB_SHA::7}"
+      - name: Commit
+        run: |
+          git config user.name "khedma-bot"
+          git config user.email "khedma-bot@users.noreply.github.com"
+          git add sw.js version.json
+          git diff --cached --quiet || git commit -m "chore: bump app version [skip ci]"
+          git push

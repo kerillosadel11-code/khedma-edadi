@@ -1,6 +1,11 @@
 const sb=supabase.createClient('https://radvrgthxxtesjitzkil.supabase.co','sb_publishable_UFK-e5F6zuI2qZ2P5KVjiw_LrE33N_k');
 const S={nt:[],an:null,cmp:null,pr:null,pc:'',pbell:false,th:2,rd:56,rc:'',ah:null,fu:null,fuf:null,tab:'home',f:'',q:'',lim:50,st:'act',ed:null,edc:null,imp:null,aud:null,af:''},app=document.getElementById('app');
 const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* قوالب HTML آمنة: كل قيمة بتتعمل لها escape تلقائي إلا لو جاية من html`` تانية أو raw() */
+const RAW=Symbol('raw'),raw=x=>({[RAW]:1,s:String(x??'')});
+const fmtH=x=>x&&x[RAW]?x.s:Array.isArray(x)?x.map(fmtH).join(''):esc(x);
+const html=(st,...vs)=>raw(st.reduce((a,t,i)=>a+t+(i<vs.length?fmtH(vs[i]):''),''));
+const mount=(el,h)=>{el.innerHTML=h&&h[RAW]?h.s:esc(h)};
 const v=id=>document.getElementById(id).value.trim();
 const ROLES={admin:'أدمن',secretary:'أمين خدمة',servant:'خادم',parent:'ولي أمر'};
 const SEC={boys:'بنين',girls:'بنات'};
@@ -88,6 +93,7 @@ async function boot(){
   S.p=p;
   if(p.role==='admin'||p.role==='secretary'||p.role==='servant'){await load();render()}
   else{await loadParent();app.innerHTML=head()+vParent()}
+  applyNav();
   askPush();
 }
 async function loadParent(){
@@ -274,7 +280,7 @@ function srvEditCard(){
 }
 function srvList(){
   const L=srvFiltered().sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ar'));
-  return `<h2>الخدام (${L.length})</h2>`+(L.map(srvRow).join('')||'<div class="empty">مفيش خدام بالشكل ده.'+(isAdmin()?'<small style="display:block;direction:ltr;text-align:left">sec='+(S.sec||'all')+' · servants='+S.profiles.filter(p=>p.role==="servant").length+'/'+(S.all?S.all.profiles.filter(p=>p.role==="servant").length:'?')+' · fc='+(S.sfc||'-')+' · q='+(S.sq||'-')+'</small>':'')+'</div>');
+  return `<h2>الخدام (${L.length})</h2>`+(L.map(srvRow).join('')||'<div class="empty">مفيش خدام بالشكل ده.'+''+'</div>');
 }
 function vSrv(){
   const all=S.profiles.filter(p=>p.role==='servant'||p.role==='secretary'),free=all.filter(p=>p.active&&!srvClasses(p.id).length).length;
@@ -624,6 +630,14 @@ function dl(name,rows){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
 }
 const paint=()=>S.p.role==='parent'?(app.innerHTML=head()+vParent()):render();
+/* فتح صفحة معيّنة من إشعار: #tab=follow */
+const NAV_OK=/^(follow|rep|notif|home|att|duty|msg|comp|prep|ana|sat)$/;
+function goNav(u){
+  const m=String(u||'').match(/tab=([a-z]+)/);if(!m||!NAV_OK.test(m[1])||!S.p)return;
+  if(S.p.role==='parent'){S.pbell=true;paint();return}
+  S.tab=m[1];S.more=false;S.cards=false;S.pf=null;render();window.scrollTo(0,0);
+}
+function applyNav(){if(/^#tab=/.test(location.hash)){const h=location.hash;history.replaceState(null,'',location.pathname);goNav(h)}}
 
 const VAPID_PUBLIC='BKMZUY2HZeDBRRJwsFdL0E66B0tvFY2p-QQ_X-Uljl44k6q1tXBvxzfhIEI-WRDmPXl6izrEmdVj5d5jzEY5xnM';
 const pushOK=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
@@ -673,7 +687,7 @@ const dgHost=u=>{try{const h=new URL(u).host;return /fcm|googleapis/.test(h)?'Ch
 const sameKey=(a,b)=>{if(!a||!b||a.byteLength!==b.byteLength)return false;const x=new Uint8Array(a),y=new Uint8Array(b);for(let i=0;i<x.length;i++)if(x[i]!==y[i])return false;return true};
 const dgRpcErr=e=>{const m=e.message||'';return m==='TOO_SOON'?'استنى 15 ثانية بين كل تجربة والتانية':m==='TOO_MANY'?'بعت كتير في آخر دقيقة، استنى شوية':m==='FORBIDDEN'?'مش مسموح لك تبعت للشخص ده':m==='NOT_FOUND'?'الحساب مش موجود أو موقوف':m==='EMPTY'?'اكتب نص الإشعار':(e.code==='PGRST202'||e.code==='42883'||/Could not find the function|does not exist/i.test(m))?'الدالة مش موجودة على السيرفر: الأدمن يشغّل ملف 17_notifications_tracking.sql':m};
 S.dg=null;
-if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{const d=S.dg;if(e.data&&e.data.type==='push'&&d&&d.test){d.test.got=true;diagPaint()}});
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{const d=S.dg;if(e.data&&e.data.type==='nav')goNav(e.data.url);if(e.data&&e.data.type==='push'&&d&&d.test){d.test.got=true;diagPaint()}});
 async function dgChecks(){
   const out=[],add=(ok,t,d,fix)=>out.push({ok,t,d:d||'',fix:fix||''});
   let sub=null,reg=null;
@@ -1552,7 +1566,7 @@ async function catchUp(){
       toast(fresh.length===1?'🔔 '+f.title:'🔔 عندك '+fresh.length+' إشعارات جديدة');
       if(navigator.vibrate)navigator.vibrate(80);
       if(document.hidden&&'Notification' in window&&Notification.permission==='granted'&&await pushState()!=='on'){
-        try{const reg=await navigator.serviceWorker.ready;reg.showNotification(f.title||'خدمة إعدادي',{body:String(f.body||'').slice(0,200),icon:'icon-192.png',dir:'rtl',lang:'ar',tag:'nt-'+f.id})}catch(_){}
+        try{const reg=await navigator.serviceWorker.ready;reg.showNotification(f.title||'خدمة إعدادي',{body:String(f.body||'').slice(0,200),icon:'icon-192.png',dir:'rtl',lang:'ar',tag:'nt-'+f.id,data:{url:f.url||'./#tab=notif'}})}catch(_){}
       }
     }
     const hd=document.querySelector('header');
