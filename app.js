@@ -36,9 +36,13 @@ const rpcErr=e=>({NOT_FOUND:'الكود ده مش معروف',FORBIDDEN:'الم�
 async function loadAtt(){let r=await sb.from('attendance_days').select('servee_id,status,note').eq('att_date',S.date);if(r.error)r=await sb.from('attendance_days').select('servee_id,status').eq('att_date',S.date);if(ok(r))S.att=fSv(r.data||[]);await loadMassAtt()}
 async function loadMassAtt(){const r=await sb.from('mass_attendance').select('servee_id,status,note').eq('att_date',S.date);S.matt=r.error?[]:fSv(r.data||[]);S.mah=(S.mah||[]).filter(x=>x.att_date!==S.date).concat(S.matt.map(a=>({servee_id:a.servee_id,att_date:S.date,status:a.status})))}
 async function loadPhotos(){
-  const ps=S.servees.filter(x=>x.photo_path);S.photos={};if(!ps.length)return;
-  const {data}=await sb.storage.from('servee-photos').createSignedUrls(ps.map(x=>x.photo_path),3600);
-  (data||[]).forEach(d=>{const x=ps.find(y=>y.photo_path===d.path);if(x&&d.signedUrl)S.photos[x.id]=d.signedUrl});
+  const ps=S.servees.filter(x=>x.photo_path);S.photos={};
+  const seen=new Set(),pp=[S.p].concat(S.profiles||[]).filter(x=>x&&x.photo_path&&!seen.has(x.id)&&seen.add(x.id));
+  await Promise.all([[ps,'servee-photos'],[pp,'servant-photos']].map(async([L,bk])=>{
+    if(!L.length)return;
+    const {data}=await sb.storage.from(bk).createSignedUrls(L.map(x=>x.photo_path),3600);
+    (data||[]).forEach(d=>{const x=L.find(y=>y.photo_path===d.path);if(x&&d.signedUrl)S.photos[x.id]=d.signedUrl});
+  }));
 }
 const acid=()=>S.classes.some(c=>c.id===S.ac)?S.ac:(S.classes[0]||{}).id;
 const opts=(a,l,sel)=>a.map(x=>`<option value="${x.id}"${x.id===sel?' selected':''}>${esc(l(x))}</option>`).join('');
@@ -275,7 +279,7 @@ function srvRow(p){
   <h3>الحضور (آخر 90 يوم)</h3>
   <div class="cnt">${st.n?`<span>حاضر ${st.P}</span><span>غايب ${st.A}</span><span>معتذر ${st.E}</span><span>نسبة الحضور ${st.pct}%</span>`:'<span>لسه مفيش حضور متسجّل</span>'}</div>
   <div class="cnt"><span>تحضيرات الدروس: ${np}</span></div>
-  <div class="acts" style="justify-content:flex-start"><button class="s" data-a="srvEdit" data-id="${p.id}">تعديل البيانات</button><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button><button class="s${p.pending&&!p.active?' on':''}" data-a="togUser" data-id="${p.id}">${p.pending&&!p.active?'موافقة':(p.active?'إيقاف':'تفعيل')}</button>${(isAdmin()&&p.role!=='admin')||(isSec()&&p.role==='servant')?`<button class="s d" data-a="delUser" data-id="${p.id}">حذف</button>`:''}</div></div>`;
+  <div class="acts" style="justify-content:flex-start"><button class="s" data-a="sphoto" data-id="${p.id}">صورة</button><button class="s" data-a="srvEdit" data-id="${p.id}">تعديل البيانات</button><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button><button class="s${p.pending&&!p.active?' on':''}" data-a="togUser" data-id="${p.id}">${p.pending&&!p.active?'موافقة':(p.active?'إيقاف':'تفعيل')}</button>${(isAdmin()&&p.role!=='admin')||(isSec()&&p.role==='servant')?`<button class="s d" data-a="delUser" data-id="${p.id}">حذف</button>`:''}</div></div>`;
   return `<div class="srv open">${head}${det}</div>`;
 }
 function srvEditCard(){
@@ -469,7 +473,7 @@ const attList=()=>servList().concat(secList());
 function vSat(){
   if(!canManage()){
     const SA=isMass()?S.sma:S.sa,H=SA.filter(x=>x.servant_id===S.p.id).sort((a,b)=>b.att_date.localeCompare(a.att_date)),P=H.filter(x=>x.status==='present').length;
-    return `<div class="card">${MK_TABS()}<h2>${isMass()?'حضوري في القداس':'حضوري'}</h2><div class="cnt"><span>حاضر ${P}</span><span>غايب ${H.filter(x=>x.status==='absent').length}</span><span>معتذر ${H.filter(x=>x.status==='excused').length}</span>${P+H.filter(x=>x.status==='absent').length?`<span>نسبة الحضور ${Math.round(P*100/(P+H.filter(x=>x.status==='absent').length))}%</span>`:''}</div></div>
+    return `<div class="card"><div class="who">${av(S.p,56)}<div>${esc(S.p.full_name||'')}<small><button class="s" data-a="sphoto" data-id="${S.p.id}">${S.p.photo_path?'غيّر صورتي':'ضيف صورتك'}</button></small></div></div></div><div class="card">${MK_TABS()}<h2>${isMass()?'حضوري في القداس':'حضوري'}</h2><div class="cnt"><span>حاضر ${P}</span><span>غايب ${H.filter(x=>x.status==='absent').length}</span><span>معتذر ${H.filter(x=>x.status==='excused').length}</span>${P+H.filter(x=>x.status==='absent').length?`<span>نسبة الحضور ${Math.round(P*100/(P+H.filter(x=>x.status==='absent').length))}%</span>`:''}</div></div>
     <div class="card"><h2>آخر الأيام</h2>${H.slice(0,30).map(h=>`<div class="row"><div>${fdate(h.att_date)}</div><span style="font-weight:700;color:${h.status==='present'?'#1b7a43':h.status==='excused'?'var(--mut)':'var(--red)'}">${SST[h.status]}</span></div>`).join('')||'<div class="empty">لسه مفيش حضور متسجّل.</div>'}</div>`;
   }
   const M=isMass(),SA=M?S.sma:S.sa,L=attList(),A=Object.fromEntries(SA.filter(x=>x.att_date===S.date).map(x=>[x.servant_id,x.status]));
@@ -1311,7 +1315,8 @@ app.addEventListener('click',async e=>{
   if(a==='card'){S.cards=[id];return render()}
   if(a==='back'){S.cards=null;return render()}
   if(a==='print')return window.print();
-  if(a==='photo'){S.pu=id;return document.getElementById('pf').click()}
+  if(a==='photo'){S.pu=id;S.pk='';return document.getElementById('pf').click()}
+  if(a==='sphoto'){S.pu=id;S.pk='p';return document.getElementById('pf').click()}
   if(a==='dismiss'){S.created=null;return render()}
   if(a==='out'){await sb.auth.signOut();return login()}
   if(a==='diag')return diagOpen();
@@ -1618,9 +1623,16 @@ document.getElementById('pf').addEventListener('change',async e=>{
   toast('بنرفع الصورة...');
   try{
     const im=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(f)});
-    const z=400,cv=document.createElement('canvas');cv.width=cv.height=z;const m=Math.min(im.width,im.height);
+    const z=320,cv=document.createElement('canvas');cv.width=cv.height=z;const m=Math.min(im.width,im.height);
     cv.getContext('2d').drawImage(im,(im.width-m)/2,(im.height-m)/2,m,m,0,0,z,z);
-    const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.85)),path=S.pu+'.jpg';
+    const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.8)),path=S.pu+'.jpg';
+    if(S.pk==='p'){
+      let r=await sb.storage.from('servant-photos').upload(path,blob,{upsert:true,contentType:'image/jpeg'});
+      if(!ok(r))return;
+      r=await sb.rpc('kh_set_servant_photo',{p_id:S.pu,p_path:path});if(!ok(r))return;
+      const t=(S.profiles||[]).find(x=>x.id===S.pu);if(t)t.photo_path=path;if(S.p&&S.p.id===S.pu)S.p.photo_path=path;
+      await loadPhotos();render();return toast('تم رفع الصورة');
+    }
     let r=await sb.storage.from('servee-photos').upload(path,blob,{upsert:true,contentType:'image/jpeg'});
     if(!ok(r))return;
     r=await sb.from('servees').update({photo_path:path}).eq('id',S.pu);if(!ok(r))return;
