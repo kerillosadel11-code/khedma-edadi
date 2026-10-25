@@ -167,12 +167,12 @@ async function onXScan(code){
   sBusy=true;const res=document.getElementById('xsr');if(!res){sBusy=false;return}
   const btn='<button class="p" data-x="xscanClose">إغلاق</button>';
   if(!code.startsWith('KS:')){res.innerHTML=`<p class="err" style="font-weight:700">ده مش كود خادم. كروت المخدومين بتتمسح من «حضور المخدومين».</p>${btn}`;sBusy=false;return}
-  const {data,error}=await sb.rpc('kh_servant_checkin',{p_code:code.slice(3),p_date:S.date});
+  const {data,error}=await sb.rpc(isMs()?'kh_servant_mass_checkin':'kh_servant_checkin',{p_code:code.slice(3),p_date:S.date});
   if(error){
     const m={NOT_FOUND:'الكود ده مش معروف أو الحساب موقوف',FORBIDDEN:'الخادم ده مش من قسمك',BAD_DATE:'التاريخ ده في المستقبل'}[(error.message||'').trim()]||error.message;
     res.innerHTML=`<p class="err" style="font-weight:700">${esc(m)}</p>${btn}`;navigator.vibrate&&navigator.vibrate([80,60,80]);
   }else{
-    res.innerHTML=`<p style="font-weight:700;font-size:18px;margin:0 0 6px">${esc(data.name)}</p><p style="color:#1b7a43;font-weight:700;margin:0 0 10px">${data.already?'متسجّل حاضر قبل كده':'✓ اتسجّل حضوره'} · ${esc(fdate(S.date))}</p>${btn}`;
+    res.innerHTML=`<p style="font-weight:700;font-size:18px;margin:0 0 6px">${esc(data.name)}</p><p style="color:#1b7a43;font-weight:700;margin:0 0 10px">${data.already?'متسجّل حاضر قبل كده':'✓ اتسجّل حضوره'}${isMs()?' (القداس)':''} · ${esc(fdate(S.date))}</p>${btn}`;
     navigator.vibrate&&navigator.vibrate(60);
   }
   sBusy=false;
@@ -349,9 +349,10 @@ window.vParent=function(){
 
 /* ================= حضور سريع: بحث بالاسم + تحديد سريع (المخدومين والخدام) ================= */
 const nrm=t=>String(t||'').replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').toLowerCase().trim();
-const rowSel='[data-a="mark"],[data-a="smark"]';
+const rowSel='[data-a="mark"],[data-a="smark"],[data-a="mmark"],[data-a="smmark"]';
+const isMs=()=>typeof S!=='undefined'&&S.mk==='mass';
 const qRows=()=>[...document.querySelectorAll('main .row')].filter(r=>r.querySelector(rowSel));
-const isSv=()=>!!document.querySelector('main [data-a="mark"]');
+const isSv=()=>!!document.querySelector('main [data-a="mark"],main [data-a="mmark"]');
 const errMsg=e=>typeof rpcErr==='function'?rpcErr(e):(e&&e.message)||'حصل خطأ';
 const rowName=r=>{const d=r.querySelector('.who>div')||r.firstElementChild;const n=d&&d.childNodes[0];return (n?n.textContent:r.textContent).trim()};
 function qApply(){
@@ -365,18 +366,22 @@ function qApply(){
   return vis;
 }
 function qIds(rows,st){
-  const sel=(isSv()?'[data-a="mark"]':'[data-a="smark"]')+'[data-id$="|'+st+'"]';
+  const sel=(isSv()?(isMs()?'[data-a="mmark"]':'[data-a="mark"]'):(isMs()?'[data-a="smmark"]':'[data-a="smark"]'))+'[data-id$="|'+st+'"]';
   return rows.map(r=>r.querySelector(sel)).filter(b=>b&&!b.classList.contains('on')).map(b=>b.dataset.id.split('|')[0]);
 }
 async function qMark(ids,st,note){
   if(!ids.length)return toast(st==='present'?'الكل متسجّل حاضر':'الكل متسجّل معتذر');
   let bad=0;
-  if(isSv()){
+  if(isSv()&&isMs()){
+    const rs=await Promise.all(ids.map(id=>sb.rpc('kh_mass_mark',{p_servee:id,p_date:S.date,p_status:st,p_note:st==='excused'?(note||null):null})));
+    const e=rs.find(r=>r.error);bad=rs.filter(r=>r.error).length;if(e)toast(typeof mErr==='function'?mErr(e.error):errMsg(e.error));
+    await loadAtt();
+  }else if(isSv()){
     const rs=await Promise.all(ids.map(id=>st==='excused'?sb.rpc('kh_mark_excuse',{p_servee:id,p_date:S.date,p_note:note||null}):sb.rpc('kh_mark',{p_servee:id,p_date:S.date,p_status:st})));
     const e=rs.find(r=>r.error);bad=rs.filter(r=>r.error).length;if(e)toast(errMsg(e.error));
     await loadAtt();
   }else{
-    const r=await sb.from('servant_attendance').upsert(ids.map(id=>({servant_id:id,att_date:S.date,status:st})),{onConflict:'servant_id,att_date'});
+    const r=await sb.from(isMs()?'servant_mass_attendance':'servant_attendance').upsert(ids.map(id=>({servant_id:id,att_date:S.date,status:st})),{onConflict:'servant_id,att_date'});
     if(r.error){toast('حصل خطأ: '+r.error.message);return}
     await loadExtra();
   }

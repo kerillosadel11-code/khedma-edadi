@@ -1,4 +1,4 @@
-const V='khedma-202610251143'; // بيتغيّر لوحده من scripts/bump-version.js (GitHub Action)
+const V='khedma-202610251207'; // بيتغيّر لوحده من scripts/bump-version.js (GitHub Action)
 const SHELL=['./','index.html','styles.css','app.js','finance.js','extras.js','xlsx.js','offline.js','mail.js','update.js','manifest.json','logo.png','icon-192.png','icon-512.png','apple-touch-icon.png',
   'vendor/supabase.js','vendor/591.supabase.js','vendor/qrcode.js','vendor/jsQR.js',
   'fonts/noto-kufi-arabic-arabic-400-normal.woff2','fonts/noto-kufi-arabic-arabic-600-normal.woff2','fonts/noto-kufi-arabic-arabic-700-normal.woff2',
