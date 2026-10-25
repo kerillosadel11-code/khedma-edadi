@@ -9,6 +9,7 @@ on:
       - 'finance.js'
       - 'extras.js'
       - 'offline.js'
+      - 'mail.js'
       - 'update.js'
       - 'index.html'
       - 'styles.css'
