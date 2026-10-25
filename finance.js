@@ -50,7 +50,7 @@ function vFin(){
   return `<div class="two"><button class="${F.v==='box'?'p':'s'}" data-fa="v" data-id="box">الخزنة</button><button class="${F.v==='ev'?'p':'s'}" data-fa="v" data-id="ev">رحلات ومؤتمرات</button></div>`+(F.v==='ev'?vEv():vBox());
 }
 const accSel=()=>isAdmin()&&F.accs.length>1?`<select data-fa="acc">${F.accs.map(a=>`<option value="${a.id}"${a.id===F.acc?' selected':''}>${esc(a.name)}</option>`).join('')}</select>`:'';
-function catOpts(kind){return `<option value="">البند</option>`+F.cats.filter(c=>c.kind===kind).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+function catOpts(kind){return `<option value="">البند</option>`+F.cats.filter(c=>c.kind===kind).sort((a,b)=>(b.name==='رصيد أول المدة')-(a.name==='رصيد أول المدة')).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
 function txRow(t){
   const inn=t.kind==='income'||t.kind==='transfer_in';
   const ev=t.event_id?evOf(t.event_id):null;
