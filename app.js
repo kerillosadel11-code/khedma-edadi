@@ -1419,12 +1419,24 @@ function myPage(which){
   const sum=`<div class="card"><h2>فصلي</h2>${S.classes.length>1?`<select data-a="attClass">${opts(S.classes,cLabel,cid)}</select>`:`<b>${esc(cLabel(c))}</b>`}
   <div class="cnt"><span>مخدومين ${L.length}</span>${avg!==null?`<span>متوسط الحضور ${avg}%</span>`:''}<span>${fdate(S.date)}: حاضر ${P} · غايب ${B}</span></div>
   <button class="p" data-a="tab" data-id="att">تسجيل الحضور</button></div>`,sev=`
-  <div class="card"><h2>مخدومين الفصل (${L.length})</h2>${R.map(({x,st})=>`<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small${st.streak>=ABS_TH?' style="color:var(--red)"':''}>${st.pct===null?'لسه مفيش حضور':'حضور '+st.pct+'%'}${st.streak>=1?' · غايب '+st.streak+' ورا بعض':''}</small></div></div><div class="acts">${qc(x.phone,st.streak>=1?MSG.abs(x):'',{s:x.id,m:st.streak>=1?MSGP.abs(x):''},'أولياء أمور '+x.full_name)}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`,rest=`
+  <div class="card"><h2>مخدومين الفصل (${L.length})</h2>${R.map(({x,st})=>`<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small${st.streak>=ABS_TH?' style="color:var(--red)"':''}>${st.pct===null?'لسه مفيش حضور':'حضور '+st.pct+'%'}${st.streak>=1?' · غايب '+st.streak+' ورا بعض':''}</small>${respLine(x,mates)}</div></div><div class="acts">${respBtn(x)}${qc(x.phone,st.streak>=1?MSG.abs(x):'',{s:x.id,m:st.streak>=1?MSGP.abs(x):''},'أولياء أمور '+x.full_name)}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`,rest=`
   ${absCard(absList(cid),10,false)}
   ${bd.length?`<div class="card"><h2>أعياد ميلاد قريبة (${bd.length})</h2>${bd.map(o=>`<div class="row"><div class="who">${av(o.x,36)}<div>${esc(o.x.full_name)}<small>${lbl(o)}</small></div></div><div class="acts">${qc(o.x.phone,MSG.bd(o.x))}</div></div>`).join('')}</div>`:''}
   <div class="card"><h2>زمايلي في الفصل (${mates.length})</h2>${mates.map(m=>`<div class="row"><div>${esc(m.name||'بدون اسم')}<small dir="ltr" style="text-align:right">${esc(m.contact_phone||m.phone||'')}</small></div><div class="acts">${qc(m.contact_phone||m.phone,'',{u:m.id},m.name)}</div></div>`).join('')||'<div class="empty">إنت الخادم الوحيد المربوط بالفصل ده.</div>'}</div>`;
   const hd=`<div class="card">${S.classes.length>1?`<select data-a="attClass">${opts(S.classes,cLabel,cid)}</select>`:`<b>${esc(cLabel(c))}</b>`}</div>`;
   return which==='pr'?hd+parCard:which==='sv'?hd+addSvCard()+sev:sum+rest;
+}
+/* الخادم يربط نفسه بمخدوم في فصله (الخادم المسئول) */
+function respLine(x,mates){
+  if(x.servant_id===S.p.id)return '<small style="color:#2f8a55">أنت الخادم المسئول</small>';
+  if(x.servant_id)return `<small>المسئول: ${esc(((mates||[]).find(m=>m.id===x.servant_id)||{}).name||'خادم تاني')}</small>`;
+  return '<small>مفيش خادم مسئول</small>';
+}
+function respBtn(x){
+  if(canManage())return '';
+  if(x.servant_id===S.p.id)return `<button class="s" data-a="unclaim" data-id="${x.id}">شيل نفسي</button>`;
+  if(!x.servant_id)return `<button class="s on" data-a="claim" data-id="${x.id}">أنا المسئول</button>`;
+  return '';
 }
 function addSvCard(){
   if(canManage()||!acid())return '';
@@ -1530,6 +1542,12 @@ app.addEventListener('click',async e=>{
   if(a==='sphoto'){S.pu=id;S.pk='p';return document.getElementById('pf').click()}
   if(a==='dismiss'){S.created=null;return render()}
   if(a==='out'){await KV.clear();await sb.auth.signOut();return login()}
+  if(a==='claim'||a==='unclaim'){
+    const r=await sb.rpc('kh_servant_claim_servee',{p_servee:id,p_claim:a==='claim'});
+    if(r.error){const m=JSON.stringify(r.error);return toast(/TAKEN/.test(m)?'فيه خادم تاني مسئول عن المخدوم ده، اطلب من الأدمن يغيّره':/PGRST202|kh_servant_claim/.test(m)?'محتاج تشغّل ملف 43_servant_claim_servee.sql على Supabase':'مش مسموح لك')}
+    const sv=S.servees.find(x=>x.id===id);if(sv)sv.servant_id=a==='claim'?S.p.id:null;S._cms=null;
+    render();return toast(a==='claim'?'بقيت الخادم المسئول عنه':'اتشلت من المسئولية');
+  }
   if(a==='parDone'){S.pcreds=null;return render()}
   if(a==='parCsv')return parCsv();
   if(a==='mkParents'){await autoParents([id]);await load();return render()}
