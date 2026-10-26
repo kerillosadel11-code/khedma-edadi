@@ -247,7 +247,7 @@ function render(){
   const hid=T.map(x=>x[0]).filter(k=>!PRI.includes(k)),moreDot=hid.some(k=>/[(⚠]/.test(nm[k]));
   const nb=k=>`<button data-a="tab" data-id="${k}" class="${S.tab===k?'on':''}"><i aria-hidden="true">${NAVIC[k]||'•'}</i><span>${nm[k]}</span></button>`;
   const sheet=S.more?`<div class="sheet-bg" data-a="moreX"></div><div class="sheet" role="dialog" aria-label="كل الصفحات"><div class="sheet-h"><b>كل الصفحات</b><button data-a="moreX" aria-label="إغلاق">✕</button></div>${GR.map(([t,ks])=>`<h4>${t}</h4><div class="sg">${ks.map(nb).join('')}</div>`).join('')}</div>`:'';
-  app.innerHTML=head()+`<main>${{mycls:vMyClass,mysv:vMyServees,mypr:vMyParents,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,duty:vDuty,prep:vPrep,home:vHome,ana:vAna,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn,msg:vMsg,pst:vPst,set:vSet}[S.tab]()}</main><nav class="bn">${PRI.map(nb).join('')}<button data-a="more" class="${S.more||hid.includes(S.tab)?'on':''}"><i aria-hidden="true">☰</i><span>المزيد${moreDot?' <b class="dotb"></b>':''}</span></button></nav>${sheet}`;
+  app.innerHTML=head()+`<main>${parCredCard()}${{mycls:vMyClass,mysv:vMyServees,mypr:vMyParents,classes:vClasses,servees:vServees,srv:vSrv,people:vPeople,add:vAdd,inv:vInv,att:vAtt,sat:vSat,duty:vDuty,prep:vPrep,home:vHome,ana:vAna,audit:vAudit,follow:vFollow,rep:vRep,notif:vNotif,comp:vComp,ann:vAnn,msg:vMsg,pst:vPst,set:vSet}[S.tab]()}</main><nav class="bn">${PRI.map(nb).join('')}<button data-a="more" class="${S.more||hid.includes(S.tab)?'on':''}"><i aria-hidden="true">☰</i><span>المزيد${moreDot?' <b class="dotb"></b>':''}</span></button></nav>${sheet}`;
 }
 const clsRow=c=>`<div class="row"><div>${esc(c.name)}${badge(c.section)}<small>${esc(c.stage||'')} ${S.servees.filter(s=>s.class_id===c.id&&s.active).length} مخدوم · ${S.cs.filter(x=>x.class_id===c.id).length} خادم${clsStat(c)}</small></div><div class="acts"><button class="s${S.cso===c.id?' on':''}" data-a="classOpen" data-id="${c.id}">${S.cso===c.id?'إخفاء':'الخدام والمخدومين'}</button><button class="s" data-a="editClass" data-id="${c.id}">تعديل</button><button class="s" data-a="promoteClass" data-id="${c.id}">ترقية</button><button class="s d" data-a="delClass" data-id="${c.id}">حذف</button></div></div>${S.cso===c.id?classDetail(c):''}`;
 const clsStat=c=>{const n=S.cs.filter(x=>x.class_id===c.id).length,ms=S.ah===null?null:(S._cms||(S._cms=meetStats(56))),p=ms?clsLast(ms,c.id):null;
@@ -1189,6 +1189,39 @@ async function onScan(code){
   }
   document.getElementById('sx').onclick=closeScan;busy=false;
 }
+/* حسابات أولياء الأمور أوتوماتيك: بتتعمل من تليفون الأب/الأم وبتتربط بالمخدوم (دالة create-user، action=auto_parent) */
+async function autoParents(ids){
+  ids=[...new Set(ids)].filter(Boolean);if(!ids.length)return;
+  const all=[];
+  for(let i=0;i<ids.length;i+=15){
+    if(ids.length>15)toast('بعمل حسابات أولياء الأمور '+Math.min(i+15,ids.length)+' من '+ids.length);
+    const x=await fn({action:'auto_parent',servee_ids:ids.slice(i,i+15)});
+    if(x.error){toast('حسابات أولياء الأمور ما اتعملتش: '+x.error+'. تقدر تعملها من صفحة المخدوم.');break}
+    all.push(...(x.results||[]));
+  }
+  if(all.some(r=>r.error||(r.parents||[]).length))S.pcreds=(S.pcreds||[]).concat(all);
+}
+const PAR_ST={linked:'اتربط بحساب موجود',already:'مربوط من قبل'};
+function parCredCard(){
+  const L=S.pcreds;if(!L||!L.length)return'';
+  const url=location.origin+location.pathname,made=L.reduce((n,r)=>n+(r.parents||[]).filter(p=>p.status==='created').length,0);
+  const row=(r,p)=>{
+    if(p.status==='created'){
+      const msg=`أهلاً 👋\nحساب متابعة ${r.name} في تطبيق خدمة إعدادي جاهز.\nرقم الدخول: ${p.login}\nالباسورد المؤقت: ${p.password}\nالرابط: ${url}\nهتغيّر الباسورد أول مرة تدخل.`;
+      return `<div class="row"><div>${esc(p.who)} · <span dir="ltr">${esc(p.login)}</span><small>الباسورد المؤقت: <b dir="ltr" style="font-size:17px;letter-spacing:1px">${esc(p.password)}</b></small></div><div class="acts"><a target="_blank" rel="noopener" class="s on" style="text-decoration:none" href="https://wa.me/20${p.login.slice(1)}?text=${encodeURIComponent(msg)}">واتساب</a></div></div>`;
+    }
+    return `<div class="row"><div>${esc(p.who)} · <span dir="ltr">${esc(p.phone)}</span><small>${p.status==='skipped'?esc(p.reason||'اتخطّى'):PAR_ST[p.status]||''}</small></div></div>`;
+  };
+  return `<div class="card" style="border-color:var(--gold)"><h2>حسابات أولياء الأمور${made?` · اتعمل ${made}`:''}</h2>${L.map(r=>`<div class="sh2"><b>${esc(r.name||'')}</b></div>${r.error?`<p class="err">${esc(r.error)}</p>`:''}${(r.parents||[]).map(p=>row(r,p)).join('')}`).join('')}
+  <p class="empty">الباسورد المؤقت مش هيظهر تاني بعد ما تقفل الكارت، ابعته دلوقتي.</p>${made>1?'<button class="s" data-a="parCsv" style="margin-bottom:8px">⬇️ تحميل الباسوردات (Excel/CSV)</button>':''}<button class="s" data-a="parDone">تم</button></div>`;
+}
+function parCsv(){
+  const rows=[['المخدوم','ولي الأمر','رقم الدخول','الباسورد المؤقت']];
+  (S.pcreds||[]).forEach(r=>(r.parents||[]).filter(p=>p.status==='created').forEach(p=>rows.push([r.name,p.who,p.login,p.password])));
+  const csv='\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='باسوردات-اولياء-الامور.csv';
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
 function credCard(){
   const c=S.created;if(!c)return'';
   const url=location.origin+location.pathname;
@@ -1272,8 +1305,9 @@ async function run(a,id){
       r=await sb.rpc('kh_servant_add_servee',{p_name:c.full_name,p_phone:c.phone,p_birth:c.birth_date,p_class:c.class_id,p_address:c.address,p_school:c.school,p_confession:c.confession_father,p_father_phone:c.father_phone,p_mother_phone:c.mother_phone,p_notes:c.notes});
       if(r.error&&/FORBIDDEN/.test(r.error.message))return toast('مش مسموح لك تضيف في الفصل ده');
       if(r.error&&/NAME_NOT_QUAD|PARENT_PHONE_REQUIRED|BAD_PHONE|BAD_BIRTH|_REQUIRED/.test(r.error.message))return toast('البيانات مش مكتملة أو غلط: راجع الاسم الرباعي والتليفونات وباقي الحقول');
+      if(!r.error&&r.data)await autoParents([r.data]);
       if(r.error&&/PGRST202|kh_servant_add_servee/.test(JSON.stringify(r.error)))return toast('محتاج تشغّل ملف 42_servee_fields.sql على Supabase');
-    }else r=await sb.from('servees').insert(c)}
+    }else{r=await sb.from('servees').insert(c).select('id').single();if(!r.error&&r.data)await autoParents([r.data.id])}}
   else if(a==='delServee'){if(!canManage())return;const sv=S.servees.find(x=>x.id===id);if(!sv)return;const t=prompt('الحذف نهائي وبيمسح حضوره ونقاطه. لو عايز تحتفظ بيه استخدم «أرشفة».\nاكتب اسم المخدوم للتأكيد:\n'+sv.full_name);if(t===null)return;if(nz(t)!==nz(sv.full_name))return toast('الاسم مش مطابق، ما اتحذفش');r=await sb.from('servees').delete().eq('id',id)}
   else if(a==='archServee'){const why=prompt('سبب الأرشفة (اختياري: انتقل، سافر، انقطع...)');if(why===null)return;r=await sb.from('servees').update({active:false,archived_at:new Date().toISOString(),archive_reason:why.trim()||null}).eq('id',id)}
   else if(a==='restServee'){r=await sb.from('servees').update({active:true,archived_at:null,archive_reason:null}).eq('id',id)}
@@ -1411,7 +1445,8 @@ const missingOf=x=>MISS.filter(([a,b])=>!x[a]&&!(b&&x[b])).map(m=>m[2]);
 function profInfo(x){
   const ln=(t,val,ph)=>val?`<div class="row"><div>${t}<small${ph?' dir="ltr" style="text-align:right"':''}>${esc(val)}</small></div>${ph?`<div class="acts">${qc(val,'')}</div>`:''}</div>`:'';
   const miss=canManage()?missingOf(x):[];
-  return ln('هاتف الأب',x.father_phone,1)+ln('هاتف الأم',x.mother_phone,1)+ln('العنوان',x.address)+ln('المدرسة',x.school)+ln('أب الاعتراف',x.confession_father)
+  const mk=canManage()&&(x.father_phone||x.mother_phone)?`<button class="s" data-a="mkParents" data-id="${x.id}" style="margin-top:8px">إنشاء/ربط حساب ولي الأمر</button>`:'';
+  return mk+ln('هاتف الأب',x.father_phone,1)+ln('هاتف الأم',x.mother_phone,1)+ln('العنوان',x.address)+ln('المدرسة',x.school)+ln('أب الاعتراف',x.confession_father)
     +(miss.length?`<p class="empty" style="color:var(--red)">بيانات ناقصة: ${miss.join('، ')}</p>`:'');
 }
 function vProfile(){
@@ -1424,7 +1459,7 @@ function vProfile(){
     age=x.birth_date?Math.floor((Date.now()-new Date(x.birth_date+'T00:00:00'))/31557600000):null,
     sd=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{day:'numeric',month:'numeric'}),
     cmpName=id=>(S.cmp||[]).find(c=>c.id===id);
-  return `<main><div class="np" style="margin-bottom:12px"><button class="s" data-a="pfBack">← رجوع</button></div>
+  return `<main>${parCredCard()}<div class="np" style="margin-bottom:12px"><button class="s" data-a="pfBack">← رجوع</button></div>
   <div class="card"><div class="who">${av(x,72)}<div><b style="font-size:19px">${esc(x.full_name)}</b>${badge(x.section)}${x.active?'':'<span class="bd" style="background:#f3d6d2">مؤرشف</span>'}<small>${esc(cname(x.class_id))}</small></div></div>
   ${x.phone?`<div class="acts" style="justify-content:flex-start;margin-top:10px"><span dir="ltr" style="align-self:center">${esc(x.phone)}</span>${qc(x.phone,'')}</div>
   <div class="acts" style="justify-content:flex-start;margin-top:8px">${tpl(x.phone,MSG,x)}</div>`:'<p class="empty">مفيش رقم تليفون للمخدوم.</p>'}
@@ -1495,6 +1530,9 @@ app.addEventListener('click',async e=>{
   if(a==='sphoto'){S.pu=id;S.pk='p';return document.getElementById('pf').click()}
   if(a==='dismiss'){S.created=null;return render()}
   if(a==='out'){await KV.clear();await sb.auth.signOut();return login()}
+  if(a==='parDone'){S.pcreds=null;return render()}
+  if(a==='parCsv')return parCsv();
+  if(a==='mkParents'){await autoParents([id]);await load();return render()}
   if(a==='health')return loadHealth();
   if(a==='clrCache'){await KV.clear();S.ahDays=0;S.mahDays=0;render();return toast('اتمسح الكاش وهيتحمّل من جديد')}
   if(a==='diag')return diagOpen();
@@ -1515,7 +1553,9 @@ app.addEventListener('click',async e=>{
     const chg=(id,old)=>{const x=v(id);if(!x)return{val:null};if(x===String(old||''))return{val:x};const q=normPhone(x);return q?{val:q}:{bad:true}},P=[['ep','phone','تليفون المخدوم'],['efp','father_phone','تليفون الأب'],['emp','mother_phone','تليفون الأم']].map(([id,k,l])=>({k,l,...chg(id,sv[k])})),pb=P.find(x=>x.bad);
     if(pb)return toast(pb.l+' غلط: '+PH_MSG);
     const r=await sb.from('servees').update({full_name:v('en'),phone:P[0].val,father_phone:P[1].val,mother_phone:P[2].val,school:v('esch')||null,confession_father:v('ecf')||null,birth_date:v('eb')||null,class_id:v('ec')||null,address:v('ea')||null,notes:v('eno')||null,...(document.getElementById('esv')?{servant_id:v('esv')||null}:{})}).eq('id',sv.id);
-    if(!ok(r))return;S.ed=null;await load();render();return toast('تم الحفظ');
+    if(!ok(r))return;
+    if((P[1].val&&P[1].val!==sv.father_phone)||(P[2].val&&P[2].val!==sv.mother_phone))await autoParents([sv.id]);
+    S.ed=null;await load();render();return toast('تم الحفظ');
   }
   if(a==='saveClass'){
     const c=S.classes.find(x=>x.id===S.edc);if(!c)return;if(!v('ecn'))return toast('اكتب اسم الفصل');
@@ -1535,8 +1575,9 @@ app.addEventListener('click',async e=>{
   if(a==='csvGo'){
     const m=S.imp;if(!m||!m.ok.length)return;
     const b=document.querySelector('[data-a=csvGo]');if(b)b.disabled=true;
-    for(let i=0;i<m.ok.length;i+=200){const r=await sb.from('servees').insert(m.ok.slice(i,i+200));if(!ok(r)){await load();render();return}}
-    const n=m.ok.length;S.imp=null;await load();render();return toast('اتضاف '+n+' مخدوم');
+    const ids=[];
+    for(let i=0;i<m.ok.length;i+=200){const r=await sb.from('servees').insert(m.ok.slice(i,i+200)).select('id');if(!ok(r)){await load();render();return}(r.data||[]).forEach(x=>ids.push(x.id))}
+    const n=m.ok.length;S.imp=null;await autoParents(ids);await load();render();return toast('اتضاف '+n+' مخدوم');
   }
   if(a==='fuPick'){const sid=v('fupick');if(!sid)return toast('اختار المخدوم');S.fuf=sid;render();return window.scrollTo(0,0)}
   if(a==='fuOpen'){S.fuf=id;render();return window.scrollTo(0,0)}
