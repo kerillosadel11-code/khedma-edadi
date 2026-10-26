@@ -100,7 +100,7 @@
     e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, cs, true); e.setUint32(16, off, true);
     return new Blob([...parts, ...cen, new Uint8Array(e.buffer)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   }
-  const HEAD = ['الاسم بالكامل (رباعي)', 'الخادم المسئول', 'رقم هاتف المخدوم (اختياري)', 'رقم هاتف الأب', 'رقم هاتف الأم', 'تاريخ الميلاد (مثال 2012-05-31)', 'العنوان', 'اسم المدرسة التابع لها', 'أب الاعتراف', 'ملاحظات (اختياري)'];
+  const HEAD = ['الاسم (ثنائي)', 'الخادم المسئول', 'رقم هاتف المخدوم (اختياري)', 'رقم هاتف الأب', 'رقم هاتف الأم', 'تاريخ الميلاد (مثال 2012-05-31)', 'العنوان', 'اسم المدرسة التابع لها', 'أب الاعتراف', 'ملاحظات (اختياري)'];
   function xlsxTemplate() {
     const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n', NS = 'http://schemas.openxmlformats.org/';
     const cells = HEAD.map((h, i) => `<c r="${'ABCDEFGHIJ'[i]}1" s="2" t="inlineStr"><is><t>${h}</t></is></c>`).join('');
