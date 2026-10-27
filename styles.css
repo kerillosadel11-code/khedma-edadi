@@ -154,3 +154,10 @@ body:has(nav.bn){padding-right:0;padding-bottom:calc(76px + env(safe-area-inset-
 .seg{display:flex;gap:6px;margin-bottom:10px}
 .seg button{flex:1;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 6px;font:inherit;font-size:14px;font-weight:700;color:var(--ink)}
 .seg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* قايمة «المزيد» في صف المخدوم */
+.mre{flex-basis:100%;width:100%}
+.mre>summary{list-style:none;cursor:pointer;display:inline-block;user-select:none}
+.mre>summary::-webkit-details-marker{display:none}
+.mre[open]>summary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.mre>.acts{margin-top:6px;justify-content:flex-start}
