@@ -287,7 +287,7 @@ function svRow(s){
 }
 function svList(){
   const L=svFiltered();
-  return `<h2>المخدومين (${L.length})</h2>`+L.slice(0,S.lim).map(svRow).join('')+(L.length>S.lim?`<button class="s" data-a="more" style="width:100%;margin-top:8px">عرض المزيد (${L.length-S.lim})</button>`:'')+(L.length?'':'<div class="empty">مفيش مخدومين بالشكل ده.</div>');
+  return `<h2>المخدومين (${L.length})</h2>`+L.map(svRow).join('')+(L.length?'':'<div class="empty">مفيش مخدومين بالشكل ده.</div>');
 }
 const esvOpts=(cid,sel)=>{const L=classServants(cid);return `<option value="">${!cid?'الخادم المسئول: اختار الفصل الأول':L.length?'الخادم المسئول: كل خدام الفصل':'الخادم المسئول: مفيش خدام في الفصل'}</option>`+L.map(p=>`<option value="${p.id}"${p.id===sel?' selected':''}>${esc(p.full_name||'؟')}</option>`).join('')};
 function svEditCard(){
