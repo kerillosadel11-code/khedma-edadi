@@ -285,9 +285,17 @@ const assignSel=s=>{const cl=classServants(s.class_id),a=svAssigned(s);const L=a
 function svRow(s){
   return `<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}${badge(s.section)}${s.active?'':'<span class="bd" style="background:#f3d6d2">مؤرشف</span>'}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}${!s.active&&s.archive_reason?' · '+esc(s.archive_reason):''}</small>${canManage()&&s.class_id?`<small>${svAssigned(s)?'الخادم المسئول':'خدام الفصل'}: ${svServants(s).map(p=>esc(p.full_name||'؟')).join(' · ')||'<span style="color:var(--red)">مفيش خادم مربوط بالفصل</span>'}</small>`:''}</div></div><div class="acts"><button class="s on" data-a="pf" data-id="${s.id}">الملف</button><button class="s" data-a="editServee" data-id="${s.id}">تعديل</button><details class="mre"><summary class="s">المزيد ⋯</summary><div class="acts">${canManage()&&s.active?`<button class="s" data-a="parInv" data-id="${s.id}">دعوة ولي أمر</button>`:''}${isAdmin()&&s.active?`<button class="s" data-a="mkServeeAcc" data-id="${s.id}">${S.profiles.some(p=>p.self_servee_id===s.id)?'باسورد جديد للمخدوم':'حساب دخول للمخدوم'}</button>`:''}<button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button>${s.active?`<button class="s" data-a="archServee" data-id="${s.id}">أرشفة</button>`:`<button class="s on" data-a="restServee" data-id="${s.id}">استرجاع</button>`}${canManage()?`<button class="s d" data-a="delServee" data-id="${s.id}">حذف</button>`:''}</div></details></div></div>`;
 }
+function svDupCard(){
+  if(!canManage())return'';
+  const m=new Map();S.servees.forEach(s=>{const k=nz(s.full_name).replace(/\s+/g,' ');if(k){if(!m.has(k))m.set(k,[]);m.get(k).push(s)}});
+  const G=[...m.values()].filter(g=>g.length>1);if(!G.length)return'';
+  return `<div class="card" style="border-color:var(--gold)"><h2>⚠ أسماء مكررة (${G.length})</h2><p class="empty">الدمج بينقل الحضور والبيانات للملف الباقي ويمسح المكرر.</p>`+G.map(g=>{
+    const o=g.slice().sort((a,b)=>(b.active?1:0)-(a.active?1:0)||String(a.created_at||'').localeCompare(String(b.created_at||''))),k=o[0];
+    return `<div class="row"><div>${esc(k.full_name)}<small>${o.map(x=>esc(cname(x.class_id))+(x.active?'':' (مؤرشف)')).join(' | ')}</small></div><div class="acts">${o.slice(1).map(d=>`<button class="s" data-a="mergeSv" data-id="${k.id}|${d.id}">دمج${o.length>2?' '+esc(cname(d.class_id)):''}</button>`).join('')}</div></div>`}).join('')+`</div>`;
+}
 function svList(){
   const L=svFiltered();
-  return `<h2>المخدومين (${L.length})</h2>`+L.map(svRow).join('')+(L.length?'':'<div class="empty">مفيش مخدومين بالشكل ده.</div>');
+  return svDupCard()+`<h2>المخدومين (${L.length})</h2>`+L.map(svRow).join('')+(L.length?'':'<div class="empty">مفيش مخدومين بالشكل ده.</div>');
 }
 const esvOpts=(cid,sel)=>{const L=classServants(cid);return `<option value="">${!cid?'الخادم المسئول: اختار الفصل الأول':L.length?'الخادم المسئول: كل خدام الفصل':'الخادم المسئول: مفيش خدام في الفصل'}</option>`+L.map(p=>`<option value="${p.id}"${p.id===sel?' selected':''}>${esc(p.full_name||'؟')}</option>`).join('')};
 function svEditCard(){
@@ -1309,6 +1317,7 @@ async function run(a,id){
       if(r.error&&/PGRST202|kh_servant_add_servee/.test(JSON.stringify(r.error)))return toast('محتاج تشغّل ملف 42_servee_fields.sql على Supabase');
     }else{r=await sb.from('servees').insert(c).select('id').single();if(!r.error&&r.data)await autoParents([r.data.id])}}
   else if(a==='delServee'){if(!canManage())return;const sv=S.servees.find(x=>x.id===id);if(!sv)return;const t=prompt('الحذف نهائي وبيمسح حضوره ونقاطه. لو عايز تحتفظ بيه استخدم «أرشفة».\nاكتب اسم المخدوم للتأكيد:\n'+sv.full_name);if(t===null)return;if(nz(t)!==nz(sv.full_name))return toast('الاسم مش مطابق، ما اتحذفش');r=await sb.from('servees').delete().eq('id',id)}
+  else if(a==='mergeSv'){if(!canManage())return;const[kid,did]=id.split('|'),k=S.servees.find(x=>x.id===kid),d=S.servees.find(x=>x.id===did);if(!k||!d)return;if(!confirm('دمج الملفين في ملف واحد؟\nهيفضل: '+k.full_name+' ('+cname(k.class_id)+')\nوالملف المكرر ('+cname(d.class_id)+') هيتمسح بعد نقل حضوره وبياناته للباقي. مينفعش يتراجع عنه.'))return;r=await sb.rpc('kh_merge_servees',{p_keep:kid,p_dup:did});if(r.error&&/PGRST202|kh_merge_servees/.test(JSON.stringify(r.error))&&!/FORBIDDEN/.test(r.error.message||''))return toast('محتاج تشغّل ملف 43_servee_dedupe.sql على Supabase');if(r.error&&/FORBIDDEN/.test(r.error.message||''))return toast('مش مسموح لك تدمج الملفين دول')}
   else if(a==='archServee'){const why=prompt('سبب الأرشفة (اختياري: انتقل، سافر، انقطع...)');if(why===null)return;r=await sb.from('servees').update({active:false,archived_at:new Date().toISOString(),archive_reason:why.trim()||null}).eq('id',id)}
   else if(a==='restServee'){r=await sb.from('servees').update({active:true,archived_at:null,archive_reason:null}).eq('id',id)}
   else if(a==='togServee'){const s=S.servees.find(x=>x.id===id);r=await sb.from('servees').update({active:!s.active}).eq('id',id)}
