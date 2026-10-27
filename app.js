@@ -1299,7 +1299,13 @@ function vPeople(){
   <div class="card"><h2>ربط ولي أمر بمخدوم</h2><select id="lp">${opts(pr,p=>p.full_name||'بدون اسم')}</select><select id="le">${opts(S.servees,s=>s.full_name)}</select><button class="p" data-a="addPL">ربط</button>
   ${S.pl.map(x=>`<div class="row"><div>${esc(pname(x.parent_id))}<small>${esc(sname(x.servee_id))}</small></div><button class="s d" data-a="delPL" data-id="${x.parent_id}|${x.servee_id}">فك</button></div>`).join('')}</div>`;
 }
+/* قفل ضد الضغط المزدوج على «إضافة مخدوم» (كان بيعمل ملفين متطابقين) */
 async function run(a,id){
+  if(a!=='addServee')return run0(a,id);
+  if(run.lk)return;run.lk=true;
+  try{await run0(a,id)}finally{run.lk=false}
+}
+async function run0(a,id){
   let r;
   if(a==='addClass'){if(!v('cn'))return toast('اكتب اسم الفصل');if(isAdmin()&&!v('csec'))return toast('اختار قسم الفصل');r=await sb.from('classes').insert({name:v('cn'),stage:v('cs')||null,section:isSec()?S.p.section:v('csec')})}
   else if(a==='delClass'){if(S.servees.some(x=>x.class_id===id))return toast('انقل أو أرشف المخدومين اللي في الفصل ده الأول');if(!confirm('حذف الفصل؟'))return;r=await sb.from('classes').delete().eq('id',id)}
