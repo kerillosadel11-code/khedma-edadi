@@ -1,0 +1,70 @@
+--- ../app.js.orig	2026-10-29 17:47:52.446953199 +0300
++++ app.js	2026-10-29 17:47:52.498561609 +0300
+@@ -84,6 +84,12 @@
+   document.querySelectorAll('span.av[data-av]').forEach(e=>{const x=sv.get(e.dataset.av);if(x&&S.photos[x.id])e.outerHTML=av(x,+e.dataset.z||44)});
+ }
+ const acid=()=>S.classes.some(c=>c.id===S.ac)?S.ac:(S.classes[0]||{}).id;
++/* حضور المخدومين: اختيار «كل الفصول» */
++const attAll=()=>S.ac==='all'&&S.classes.length>1;
++const attCid=()=>attAll()?'all':acid();
++const attServees=cid=>cid==='all'?S.servees.filter(x=>x.active&&x.class_id).sort((a,b)=>String(cname(a.class_id)).localeCompare(String(cname(b.class_id)),'ar')||String(a.full_name||'').localeCompare(String(b.full_name||''),'ar')):S.servees.filter(x=>x.class_id===cid&&x.active);
++const attSel=cid=>`<select data-a="attClass">${S.classes.length>1?`<option value="all"${cid==='all'?' selected':''}>كل الفصول</option>`:''}${opts(S.classes,cLabel,cid==='all'?null:cid)}</select>`;
++const clsTag=(x,cid)=>cid==='all'?`<small>${esc(cname(x.class_id))}</small>`:'';
+ const opts=(a,l,sel)=>a.map(x=>`<option value="${x.id}"${x.id===sel?' selected':''}>${esc(l(x))}</option>`).join('');
+ 
+ function login(){
+@@ -205,7 +211,7 @@
+ function clearStale(){
+   const has=id=>S.classes.some(c=>c.id===id);
+   if(S.sfc&&S.sfc!=='_none'&&!has(S.sfc))S.sfc='';
+-  if(S.f&&!has(S.f))S.f='';if(S.rc&&!has(S.rc))S.rc='';if(S.ac&&!has(S.ac))S.ac=null;
++  if(S.f&&!has(S.f))S.f='';if(S.rc&&!has(S.rc))S.rc='';if(S.ac&&S.ac!=='all'&&!has(S.ac))S.ac=null;
+   S.ssec='';S.sf='';
+ }
+ function applySec(){
+@@ -530,14 +536,14 @@
+ function vAtt(){
+   if(isMass())return vAttMass();
+   if(!S.classes.length)return '<div class="card"><div class="empty">مفيش فصل مربوط بيك لسه. اطلب من أبونا يربطك بفصل.</div></div>';
+-  const cid=acid(),L=S.servees.filter(x=>x.class_id===cid&&x.active),A=Object.fromEntries(S.att.map(a=>[a.servee_id,a.status]));
++  const cid=attCid(),L=attServees(cid),A=Object.fromEntries(S.att.map(a=>[a.servee_id,a.status]));
+   const P=L.filter(x=>A[x.id]==='present').length,B=L.filter(x=>A[x.id]==='absent').length,E=L.filter(x=>A[x.id]==='excused').length,N=Object.fromEntries(S.att.map(a=>[a.servee_id,a.note||'']));
+   return `<div class="card">${MK_TABS()}<h2>حضور المخدومين</h2>
+-  <select data-a="attClass">${opts(S.classes,cLabel,cid)}</select><input type="date" data-a="attDate" value="${S.date}" max="${today()}">
++  ${attSel(cid)}<input type="date" data-a="attDate" value="${S.date}" max="${today()}">
+   <button class="p" data-a="scan">مسح كارت QR</button>
+   <div class="cnt"><span>حاضر ${P}</span><span>غايب ${B}</span><span>معتذر ${E}</span><span>لسه ${L.length-P-B-E}</span></div>
+   <button class="s" data-a="restAbs">سجّل الباقي غياب</button></div>
+-  <div class="card"><h2>المخدومين (${L.length})</h2>${L.map(x=>`<div class="row"><div class="who">${av(x)}<div>${esc(x.full_name)}<small><button class="s" data-a="photo" data-id="${x.id}">📷 ${x.photo_path?'غيّر الصورة':'ضيف صورة'}</button></small>${A[x.id]==='excused'?`<small>معتذر${N[x.id]?' · '+esc(N[x.id]):''}</small>`:''}</div></div><div class="acts"><button class="s ${A[x.id]==='present'?'on':''}" data-a="mark" data-id="${x.id}|present">حاضر</button><button class="s ${A[x.id]==='excused'?'on':''}" data-a="mark" data-id="${x.id}|excused">معتذر</button><button class="s ${A[x.id]==='absent'?'on bad':''}" data-a="mark" data-id="${x.id}|absent">غايب</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`;
++  <div class="card"><h2>المخدومين (${L.length})</h2>${L.map(x=>`<div class="row"><div class="who">${av(x)}<div>${esc(x.full_name)}${clsTag(x,cid)}<small><button class="s" data-a="photo" data-id="${x.id}">📷 ${x.photo_path?'غيّر الصورة':'ضيف صورة'}</button></small>${A[x.id]==='excused'?`<small>معتذر${N[x.id]?' · '+esc(N[x.id]):''}</small>`:''}</div></div><div class="acts"><button class="s ${A[x.id]==='present'?'on':''}" data-a="mark" data-id="${x.id}|present">حاضر</button><button class="s ${A[x.id]==='excused'?'on':''}" data-a="mark" data-id="${x.id}|excused">معتذر</button><button class="s ${A[x.id]==='absent'?'on bad':''}" data-a="mark" data-id="${x.id}|absent">غايب</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`;
+ }
+ const SAT_GR=[['1','خدام أولى'],['2','خدام تانية'],['3','خدام تالتة'],['0','خدام غير محدد الفصل']];
+ const grNorm=t=>String(t||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه');
+@@ -584,14 +590,14 @@
+ }
+ function vAttMass(){
+   if(!S.classes.length)return '<div class="card"><div class="empty">مفيش فصل مربوط بيك لسه. اطلب من أبونا يربطك بفصل.</div></div>';
+-  const cid=acid(),L=S.servees.filter(x=>x.class_id===cid&&x.active),A=Object.fromEntries(S.matt.map(a=>[a.servee_id,a.status])),N=Object.fromEntries(S.matt.map(a=>[a.servee_id,a.note||'']));
++  const cid=attCid(),L=attServees(cid),A=Object.fromEntries(S.matt.map(a=>[a.servee_id,a.status])),N=Object.fromEntries(S.matt.map(a=>[a.servee_id,a.note||'']));
+   const P=L.filter(x=>A[x.id]==='present').length,B=L.filter(x=>A[x.id]==='absent').length,E=L.filter(x=>A[x.id]==='excused').length;
+   return `<div class="card">${MK_TABS()}<h2>حضور القداس · المخدومين</h2>
+-  <select data-a="attClass">${opts(S.classes,cLabel,cid)}</select><input type="date" data-a="attDate" value="${S.date}" max="${today()}">
++  ${attSel(cid)}<input type="date" data-a="attDate" value="${S.date}" max="${today()}">
+   <button class="p" data-a="scan">مسح كارت QR</button>
+   <div class="cnt"><span>حاضر ${P}</span><span>غايب ${B}</span><span>معتذر ${E}</span><span>لسه ${L.length-P-B-E}</span></div>
+   <button class="s" data-a="restAbs">سجّل الباقي غياب</button></div>
+-  <div class="card"><h2>المخدومين (${L.length})</h2>${L.map(x=>`<div class="row"><div class="who">${av(x)}<div>${esc(x.full_name)}<small><button class="s" data-a="photo" data-id="${x.id}">📷 ${x.photo_path?'غيّر الصورة':'ضيف صورة'}</button></small>${A[x.id]==='excused'?`<small>معتذر${N[x.id]?' · '+esc(N[x.id]):''}</small>`:''}</div></div><div class="acts"><button class="s ${A[x.id]==='present'?'on':''}" data-a="mmark" data-id="${x.id}|present">حاضر</button><button class="s ${A[x.id]==='excused'?'on':''}" data-a="mmark" data-id="${x.id}|excused">معتذر</button><button class="s ${A[x.id]==='absent'?'on bad':''}" data-a="mmark" data-id="${x.id}|absent">غايب</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`;
++  <div class="card"><h2>المخدومين (${L.length})</h2>${L.map(x=>`<div class="row"><div class="who">${av(x)}<div>${esc(x.full_name)}${clsTag(x,cid)}<small><button class="s" data-a="photo" data-id="${x.id}">📷 ${x.photo_path?'غيّر الصورة':'ضيف صورة'}</button></small>${A[x.id]==='excused'?`<small>معتذر${N[x.id]?' · '+esc(N[x.id]):''}</small>`:''}</div></div><div class="acts"><button class="s ${A[x.id]==='present'?'on':''}" data-a="mmark" data-id="${x.id}|present">حاضر</button><button class="s ${A[x.id]==='excused'?'on':''}" data-a="mmark" data-id="${x.id}|excused">معتذر</button><button class="s ${A[x.id]==='absent'?'on bad':''}" data-a="mmark" data-id="${x.id}|absent">غايب</button></div></div>`).join('')||'<div class="empty">مفيش مخدومين في الفصل ده.</div>'}</div>`;
+ }
+ function massProfileCard(x){
+   const st=massStat(x,S.mah,S.servees,90),sd=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{day:'numeric',month:'numeric'});
+@@ -1545,7 +1551,8 @@
+   }
+   if(a==='restAbs'){
+     if(!confirm('تسجيل كل اللي لسه ما اتحضروش كغايبين؟'))return;
+-    const mm=isMass(),{data,error}=await sb.rpc(mm?'kh_mass_mark_rest':'kh_mark_rest',{p_class:acid(),p_date:S.date});
++    const mm=isMass();let data=0,error=null;
++    for(const c of (attAll()?S.classes:[{id:acid()}])){const r=await sb.rpc(mm?'kh_mass_mark_rest':'kh_mark_rest',{p_class:c.id,p_date:S.date});if(r.error){error=r.error;break}data+=(+r.data||0)}
+     if(error)return toast(mm?mErr(error):rpcErr(error));
+     await loadAtt();render();return toast('اتسجّل غياب '+data+' مخدوم');
+   }
