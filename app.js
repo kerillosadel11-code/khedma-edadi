@@ -824,7 +824,9 @@ function servStat(x,H){
   for(const d of ds){if(m[d]==='present'){pr++;if(!last)last=d;stop=true}else if(!stop)streak++}
   return{sessions:ds.length,present:pr,absent:ds.length-pr,pct:ds.length?Math.round(pr*100/ds.length):null,streak,last};
 }
-const FK={call:'اتصال',visit:'زيارة',message:'رسالة'},FS={open:'متابعة',done:'تم'};
+const FK={call:'هاتفي',visit:'منزلي',whatsapp:'واتس اب',message:'رسالة'},FKF=['call','visit','whatsapp'],FS={open:'متابعة',done:'تم'};
+const fwho=f=>{const n=pname(f.servant_id);return n&&n!=='؟'?' · '+esc(n):''};
+const fuStaff=()=>{const L=attList();return(S.p&&!L.some(p=>p.id===S.p.id)?[S.p].concat(L):L).slice().sort((a,b)=>String(a.full_name||'').localeCompare(String(b.full_name||''),'ar'))};
 const bar=p=>`<div style="height:8px;background:var(--line);border-radius:4px;min-width:60px"><div style="width:${p||0}%;height:8px;background:var(--gold);border-radius:4px"></div></div>`;
 function vFollow(){
   if(S.ah===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
@@ -835,12 +837,12 @@ function vFollow(){
   const rows=L.map(({x,st})=>{const ph=normPhone(x.phone||''),lf=lastFu(x.id);
     const wa=ph?`<a class="s" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="https://wa.me/20${ph.slice(1)}?text=${encodeURIComponent('أهلاً يا '+x.full_name.split(' ')[0]+'، افتقدناك في الاجتماع. ربنا يباركك ويحفظك. خدمة إعدادي')}">واتساب</a>`:''+nb({s:x.id,m:MSGP.abs(x)},'أولياء أمور '+x.full_name);
     const tel=ph?`<a class="s" style="text-decoration:none;display:inline-block" href="tel:${ph}">اتصال</a>`:'';
-    return `<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))} · ${absLine(st)}</small><small>الخادم المسؤول: ${respName(x)}</small>${lf?`<small>آخر افتقاد: ${FK[lf.kind]||''} ${fdate(lf.followup_date)} (${FS[lf.status]||''})</small>`:'<small>لسه ما اتفتقدش</small>'}</div></div><div class="acts">${tel}${wa}<button class="s on" data-a="fuOpen" data-id="${x.id}">تسجيل</button></div></div>`}).join('');
+    return `<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))} · ${absLine(st)}</small><small>الخادم المسؤول: ${respName(x)}</small>${lf?`<small>آخر افتقاد: ${FK[lf.kind]||''} ${fdate(lf.followup_date)}${fwho(lf)} (${FS[lf.status]||''})</small>`:'<small>لسه ما اتفتقدش</small>'}</div></div><div class="acts">${tel}${wa}<button class="s on" data-a="fuOpen" data-id="${x.id}">تسجيل</button></div></div>`}).join('');
   const recent=fu.filter(f=>S.servees.some(x=>x.id===f.servee_id)).slice(0,30);
   const pk=S.servees.filter(x=>x.active&&(!S.f||x.class_id===S.f)).sort((p,q)=>(p.full_name||'').localeCompare(q.full_name||'','ar'));
-  const pickCard=`<div class="card"><h2>افتقاد أي مخدوم</h2><small style="display:block;margin-bottom:6px">لو عايز تفتقد حد من غير ما يكون غايب.</small><select id="fupick"><option value="">اختار المخدوم</option>${pk.map(x=>`<option value="${x.id}">${esc(x.full_name)}${x.class_id?' · '+esc(cname(x.class_id)):''}</option>`).join('')}</select><button class="s on" data-a="fuPick">تسجيل افتقاد</button></div>`;
+  const pickCard=`<div class="card"><h2>افتقاد أي مخدوم</h2><small style="display:block;margin-bottom:6px">لو عايز تفتقد حد من غير ما يكون غايب.</small><select id="fupick"><option value="">اختار المخدوم</option>${pk.map(x=>`<option value="${x.id}">${esc(x.full_name)}${x.class_id?' · '+esc(cname(x.class_id)):''}</option>`).join('')}</select><small>نوع الافتقاد</small><select id="fupk">${FKF.map(k=>`<option value="${k}">${FK[k]}</option>`).join('')}</select>${canManage()?`<small>مين اللي قام بالافتقاد</small><select id="fupw">${fuStaff().map(p=>`<option value="${p.id}"${p.id===S.p.id?' selected':''}>${esc(p.full_name||'بدون اسم')}</option>`).join('')}</select>`:`<small>القائم بالافتقاد: ${esc(S.p.full_name||'أنا')}</small>`}<textarea id="fupn" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="fuQuick">حفظ الافتقاد</button><button class="s" data-a="fuPick" style="margin-top:8px">فتح نموذج كامل (تاريخ / متابعة)</button></div>`;
   return form+pickCard+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
-  <div class="card"><h2>آخر الافتقادات (${recent.length})</h2>${recent.map(f=>`<div class="row"><div>${esc(sname(f.servee_id))}<small>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}${canManage()&&pname(f.servant_id)!=='؟'?' · '+esc(pname(f.servant_id)):''}</small>${f.note?`<small>${esc(f.note)}</small>`:''}</div><div class="acts"><span class="bd">${FS[f.status]||esc(f.status)}</span>${f.status==='open'?`<button class="s" data-a="fuDone" data-id="${f.id}">تم</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش افتقادات متسجلة.</div>'}</div>`;
+  <div class="card"><h2>آخر الافتقادات (${recent.length})</h2>${recent.map(f=>`<div class="row"><div>${esc(sname(f.servee_id))}<small>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}${fwho(f)}</small>${f.note?`<small>${esc(f.note)}</small>`:''}</div><div class="acts"><span class="bd">${FS[f.status]||esc(f.status)}</span>${f.status==='open'?`<button class="s" data-a="fuDone" data-id="${f.id}">تم</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش افتقادات متسجلة.</div>'}</div>`;
 }
 function vRep(){
   if(S.ah===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
@@ -1374,7 +1376,7 @@ async function run0(a,id){
 }
 function fuForm(x){
   const fu=S.fu||[];
-  return `<div class="card" style="border-color:var(--gold)"><h2>افتقاد: ${esc(x.full_name)}</h2><div class="two"><select id="fk">${Object.entries(FK).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select><select id="fs">${Object.entries(FS).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select></div><input id="fd" type="date" value="${today()}" max="${today()}"><textarea id="fn" rows="3" placeholder="ملاحظات الافتقاد (اتكلمنا مع مين، السبب، المطلوب...)"></textarea><button class="p" data-a="saveFu">حفظ الافتقاد</button><button class="s" data-a="cancelEdit" style="margin-top:8px">إلغاء</button>${fu.filter(f=>f.servee_id===x.id).slice(0,4).map(f=>`<div class="row"><div>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}<small>${esc(f.note||'')}</small></div><span class="bd">${FS[f.status]||esc(f.status)}</span></div>`).join('')}</div>`;
+  return `<div class="card" style="border-color:var(--gold)"><h2>افتقاد: ${esc(x.full_name)}</h2><small>نوع الافتقاد</small><div class="two"><select id="fk">${FKF.map(k=>`<option value="${k}">${FK[k]}</option>`).join('')}</select><select id="fs">${Object.entries(FS).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select></div>${canManage()?`<small>مين اللي قام بالافتقاد</small><select id="fw">${fuStaff().map(p=>`<option value="${p.id}"${p.id===S.p.id?' selected':''}>${esc(p.full_name||'بدون اسم')}</option>`).join('')}</select>`:`<small>القائم بالافتقاد: ${esc(S.p.full_name||'أنا')}</small>`}<input id="fd" type="date" value="${today()}" max="${today()}"><textarea id="fn" rows="3" placeholder="ملاحظات الافتقاد (اتكلمنا مع مين، السبب، المطلوب...)"></textarea><button class="p" data-a="saveFu">حفظ الافتقاد</button><button class="s" data-a="cancelEdit" style="margin-top:8px">إلغاء</button>${fu.filter(f=>f.servee_id===x.id).slice(0,4).map(f=>`<div class="row"><div>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}${fwho(f)}<small>${esc(f.note||'')}</small></div><span class="bd">${FS[f.status]||esc(f.status)}</span></div>`).join('')}</div>`;
 }
 /* ===== تنبيه الغياب المتتالي · فصلي · ملف المخدوم · اتصال وواتساب سريع ===== */
 const daysSince=d=>Math.max(0,Math.round((new Date(today()+'T00:00:00')-new Date(d+'T00:00:00'))/864e5));
@@ -1509,7 +1511,7 @@ function vProfile(){
     <div class="pfl">${ds.map(d=>`<span class="chip ${m[d]==='present'?'ok':'no'}">${m[d]==='present'?'✓':'✗'} ${sd(d)}</span>`).join('')}</div>`:''}</div>
   ${massProfileCard(x)}
   <div class="card"><h2>النقاط</h2>${pr===null?'<div class="empty">جاري التحميل...</div>':`<div class="cnt"><span>إجمالي النقاط ${tot}</span></div>${pr.slice(0,6).map(p=>{const c=cmpName(p.competition_id);return `<div class="row"><div>${esc(p.reason||'نقاط')}<small>${c?esc(c.title)+' · ':''}${new Date(p.created_at).toLocaleDateString('ar-EG')}</small></div><b style="color:${p.points>0?'#1b7a43':'var(--red)'}">${p.points>0?'+':''}${p.points}</b></div>`}).join('')||'<div class="empty">لسه مفيش نقاط.</div>'}`}</div>
-  <div class="card"><h2>الافتقاد (${fu.length})</h2><button class="s on" data-a="fuOpen" data-id="${x.id}" style="margin-bottom:8px">تسجيل افتقاد</button>${fu.slice(0,8).map(f=>`<div class="row"><div>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}<small>${esc(f.note||'')}</small></div><div class="acts"><span class="bd">${FS[f.status]||esc(f.status)}</span>${f.status==='open'?`<button class="s" data-a="fuDone" data-id="${f.id}">تم</button>`:''}</div></div>`).join('')||'<div class="empty">لسه ما اتفتقدش.</div>'}</div></main>`;
+  <div class="card"><h2>الافتقاد (${fu.length})</h2><button class="s on" data-a="fuOpen" data-id="${x.id}" style="margin-bottom:8px">تسجيل افتقاد</button>${fu.slice(0,8).map(f=>`<div class="row"><div>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}${fwho(f)}<small>${esc(f.note||'')}</small></div><div class="acts"><span class="bd">${FS[f.status]||esc(f.status)}</span>${f.status==='open'?`<button class="s" data-a="fuDone" data-id="${f.id}">تم</button>`:''}</div></div>`).join('')||'<div class="empty">لسه ما اتفتقدش.</div>'}</div></main>`;
 }
 
 app.addEventListener('click',async e=>{
@@ -1621,9 +1623,15 @@ app.addEventListener('click',async e=>{
     const n=m.ok.length;S.imp=null;await autoParents(ids);await load();render();return toast('اتضاف '+n+' مخدوم');
   }
   if(a==='fuPick'){const sid=v('fupick');if(!sid)return toast('اختار المخدوم');S.fuf=sid;render();return window.scrollTo(0,0)}
+  if(a==='fuQuick'){
+    const sid=v('fupick');if(!sid)return toast('اختار المخدوم');
+    const r=await sb.from('followups').insert({servee_id:sid,servant_id:(canManage()&&v('fupw'))||S.p.id,kind:v('fupk'),status:'done',note:(document.getElementById('fupn').value||'').trim()||null,followup_date:today()});
+    if(!ok(r))return;await sb.from('followups').update({status:'done'}).eq('servee_id',sid).eq('status','open').like('note','[تلقائي]%');
+    await loadFu();render();return toast('اتسجّل');
+  }
   if(a==='fuOpen'){S.fuf=id;render();return window.scrollTo(0,0)}
   if(a==='saveFu'){
-    const r=await sb.from('followups').insert({servee_id:S.fuf,servant_id:S.p.id,kind:v('fk'),status:v('fs'),note:document.getElementById('fn').value.trim()||null,followup_date:v('fd')||today()});
+    const r=await sb.from('followups').insert({servee_id:S.fuf,servant_id:(canManage()&&v('fw'))||S.p.id,kind:v('fk'),status:v('fs'),note:document.getElementById('fn').value.trim()||null,followup_date:v('fd')||today()});
     if(!ok(r))return;if(v('fs')==='done')await sb.from('followups').update({status:'done'}).eq('servee_id',S.fuf).eq('status','open').like('note','[تلقائي]%');S.fuf=null;await loadFu();render();return toast('اتسجّل');
   }
   if(a==='fuDone'){const r=await sb.from('followups').update({status:'done'}).eq('id',id);if(!ok(r))return;await loadFu();return render()}
