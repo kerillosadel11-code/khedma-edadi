@@ -291,13 +291,63 @@ const assignSel=s=>{const cl=classServants(s.class_id),a=svAssigned(s);const L=a
 function svRow(s){
   return `<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}${badge(s.section)}${s.active?'':'<span class="bd" style="background:#f3d6d2">مؤرشف</span>'}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}${!s.active&&s.archive_reason?' · '+esc(s.archive_reason):''}</small>${canManage()&&s.class_id?`<small>${svAssigned(s)?'الخادم المسئول':'خدام الفصل'}: ${svServants(s).map(p=>esc(p.full_name||'؟')).join(' · ')||'<span style="color:var(--red)">مفيش خادم مربوط بالفصل</span>'}</small>`:''}</div></div><div class="acts"><button class="s on" data-a="pf" data-id="${s.id}">الملف</button><button class="s" data-a="editServee" data-id="${s.id}">تعديل</button><details class="mre"><summary class="s">المزيد ⋯</summary><div class="acts">${canManage()&&s.active?`<button class="s" data-a="parInv" data-id="${s.id}">دعوة ولي أمر</button>`:''}${isAdmin()&&s.active?`<button class="s" data-a="mkServeeAcc" data-id="${s.id}">${S.profiles.some(p=>p.self_servee_id===s.id)?'باسورد جديد للمخدوم':'حساب دخول للمخدوم'}</button>`:''}<button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button>${s.active?`<button class="s" data-a="archServee" data-id="${s.id}">أرشفة</button>`:`<button class="s on" data-a="restServee" data-id="${s.id}">استرجاع</button>`}${canManage()?`<button class="s d" data-a="delServee" data-id="${s.id}">حذف</button>`:''}</div></details></div></div>`;
 }
+/* ===== كشف الأسماء المتشابهة: إملاء مختلف (ى/ي، ذ/ز، ص/س...) أو حرف زيادة/ناقص أو اسم رابع ناقص/زيادة ===== */
+const dupFold=t=>nz(t).replace(/ـ/g,'').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/ء/g,'').replace(/ذ/g,'ز').replace(/ظ/g,'ض').replace(/ص/g,'س').replace(/ط/g,'ت').replace(/عبد\s+/g,'عبد').replace(/\s+/g,' ').trim();
+function dupLev1(a,b){
+  if(a===b)return true;const la=a.length,lb=b.length;if(Math.abs(la-lb)>1)return false;
+  let i=0;while(i<la&&i<lb&&a[i]===b[i])i++;
+  if(la===lb)return a.slice(i+1)===b.slice(i+1);
+  return la<lb?a.slice(i)===b.slice(i+1):a.slice(i+1)===b.slice(i);
+}
+const dupTokEq=(a,b)=>a===b||(a.length>=4&&b.length>=4&&dupLev1(a,b));
+/* 0 = مش شبه بعض · 2 = نفس الاسم بعد توحيد الإملاء · 1 = متشابهين (حرف مختلف أو اسم أطول/أقصر) */
+function dupSim(a,b){
+  const x=dupFold(a).split(' ').filter(Boolean),y=dupFold(b).split(' ').filter(Boolean);
+  if(x.length<2||y.length<2)return 0;
+  const s=x.length<=y.length?x:y,l=x.length<=y.length?y:x;
+  if(!dupTokEq(s[0],l[0]))return 0;
+  if(s.length===l.length){
+    let f=0;for(let i=0;i<s.length;i++){if(s[i]===l[i])continue;if(!dupTokEq(s[i],l[i]))return 0;f++}
+    return f===0?2:f<=(s.length>=4?2:1)?1:0;
+  }
+  if(s.length<3||l.length-s.length>2)return 0;
+  let j=0,f=0;
+  for(let i=0;i<s.length;i++){
+    let hit=false;
+    while(j<l.length){const t=l[j++];if(s[i]===t){hit=true;break}if(dupTokEq(s[i],t)){hit=true;f++;break}}
+    if(!hit)return 0;
+  }
+  return f<=1?1:0;
+}
+const dupIgn=()=>{try{return new Set(JSON.parse(localStorage.getItem('khedma_dup_ok')||'[]'))}catch(_){return new Set()}};
+const dupPair=(a,b)=>a<b?a+'|'+b:b+'|'+a;
+/* بيرجّع مجموعات: [{id, list:[servees], sure:true لو نفس الاسم بعد توحيد الإملاء}] */
+function dupGroups(list,ign){
+  list=list||S.servees;ign=ign||new Set();
+  const n=list.length,P=list.map((_,i)=>i),find=i=>{while(P[i]!==i){P[i]=P[P[i]];i=P[i]}return i},sure=new Set();
+  const key=list.map(x=>dupFold(x.full_name).split(' ')[0]||'');
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){
+    if(key[i]&&key[j]&&key[i][0]!==key[j][0]&&!dupTokEq(key[i],key[j]))continue;
+    if(ign.has(dupPair(list[i].id,list[j].id)))continue;
+    const s=dupSim(list[i].full_name,list[j].full_name);
+    if(!s)continue;
+    const a=find(i),b=find(j);if(a!==b)P[a]=b;
+    if(s===2){sure.add(i);sure.add(j)}
+  }
+  const m=new Map();for(let i=0;i<n;i++){const r=find(i);if(!m.has(r))m.set(r,[]);m.get(r).push(i)}
+  return [...m.values()].filter(g=>g.length>1).map(g=>{const L=g.map(i=>list[i]).sort((a,b)=>String(a.id).localeCompare(String(b.id)));return{id:L[0].id,list:L,sure:g.every(i=>sure.has(i))}})
+    .sort((a,b)=>(b.sure?1:0)-(a.sure?1:0)||String(a.list[0].full_name).localeCompare(String(b.list[0].full_name),'ar'));
+}
+const dupFilled=x=>['phone','father_phone','mother_phone','birth_date','address','school','confession_father','photo_path','servant_id','notes'].filter(k=>x[k]).length;
+const dupRank=(a,b)=>(b.active?1:0)-(a.active?1:0)||dupFilled(b)-dupFilled(a)||String(a.created_at||'').localeCompare(String(b.created_at||''));
+const mergeErr=e=>/FORBIDDEN/.test(e.message||'')?'مش مسموح لك تدمج الملفين دول':/PGRST202|could not find/i.test(JSON.stringify(e))?'محتاج تشغّل ملف 43_servee_dedupe.sql على Supabase':'حصل خطأ: '+(e.message||'');
+const dupKeepOf=g=>(S.dk&&g.list.find(x=>x.id===S.dk[g.id]))||g.list.slice().sort(dupRank)[0];
 function svDupCard(){
   if(!canManage())return'';
-  const m=new Map();S.servees.forEach(s=>{const k=nz(s.full_name).replace(/\s+/g,' ');if(k){if(!m.has(k))m.set(k,[]);m.get(k).push(s)}});
-  const G=[...m.values()].filter(g=>g.length>1);if(!G.length)return'';
-  return `<div class="card" style="border-color:var(--gold)"><h2>⚠ أسماء مكررة (${G.length})</h2><p class="empty">الدمج بينقل الحضور والبيانات للملف الباقي ويمسح المكرر.</p>`+G.map(g=>{
-    const o=g.slice().sort((a,b)=>(b.active?1:0)-(a.active?1:0)||String(a.created_at||'').localeCompare(String(b.created_at||''))),k=o[0];
-    return `<div class="row"><div>${esc(k.full_name)}<small>${o.map(x=>esc(cname(x.class_id))+(x.active?'':' (مؤرشف)')).join(' | ')}</small></div><div class="acts">${o.slice(1).map(d=>`<button class="s" data-a="mergeSv" data-id="${k.id}|${d.id}">دمج${o.length>2?' '+esc(cname(d.class_id)):''}</button>`).join('')}</div></div>`}).join('')+`</div>`;
+  const G=dupGroups(S.servees,dupIgn());if(!G.length)return'';
+  return `<div class="card" style="border-color:var(--gold)"><h2>⚠ أسماء مكررة أو متشابهة (${G.length})</h2><p class="empty">الدمج بينقل الحضور والبيانات للملف «الباقي» ويمسح المكرر. لو تلاقي اتنين مش نفس الشخص اضغط «مش مكرر».</p>`+G.map(g=>{
+    const k=dupKeepOf(g),ph=g.list.map(x=>x.phone).filter(Boolean),warn=new Set(ph).size>1?' ⚠ تليفونات مختلفة':'';
+    return `<div class="card" style="margin:8px 0"><small>${g.sure?'نفس الاسم (فرق إملاء بس)':'أسماء متشابهة'}${warn}</small>`+g.list.map(x=>`<div class="row"><div>${esc(x.full_name)}${x.id===k.id?'<span class="bd">الباقي ✓</span>':''}<small>${esc(cname(x.class_id))}${x.active?'':' · مؤرشف'}${x.phone?' · '+esc(x.phone):''}</small></div><div class="acts">${x.id===k.id?'':`<button class="s on" data-a="mergeSv" data-id="${k.id}|${x.id}">دمج في الباقي</button><button class="s" data-a="dupKeep" data-id="${g.id}|${x.id}">خليه الباقي</button>`}</div></div>`).join('')+`<div class="acts" style="justify-content:flex-start;margin-top:6px">${g.list.length>2?`<button class="s on" data-a="mergeAll" data-id="${g.id}">دمج الكل في الباقي</button>`:''}<button class="s" data-a="dupNo" data-id="${g.id}">مش مكرر</button></div></div>`}).join('')+`</div>`;
 }
 function svList(){
   const L=svFiltered();
@@ -844,6 +894,70 @@ function vFollow(){
   return form+pickCard+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
   <div class="card"><h2>آخر الافتقادات (${recent.length})</h2>${recent.map(f=>`<div class="row"><div>${esc(sname(f.servee_id))}<small>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}${fwho(f)}</small>${f.note?`<small>${esc(f.note)}</small>`:''}</div><div class="acts"><span class="bd">${FS[f.status]||esc(f.status)}</span>${f.status==='open'?`<button class="s" data-a="fuDone" data-id="${f.id}">تم</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش افتقادات متسجلة.</div>'}</div>`;
 }
+/* ===== التقرير الأسبوعي: الأسبوع بيبدأ سبت · اجتماع البنين الخميس · اجتماع البنات الأربع ===== */
+const wkStart=d=>{const t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()-(t.getUTCDay()+1)%7);return t.toISOString().slice(0,10)};
+const WR={present:3,excused:2,absent:1},wkPct=o=>o&&o.n?Math.round(o.p*100/o.n):null;
+const WSEC={boys:{n:'بنين',off:5,day:'الخميس'},girls:{n:'بنات',off:4,day:'الأربع'}};
+const fdm=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{day:'numeric',month:'long'});
+const wkDay=(k,sec)=>{const t=new Date(k+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+WSEC[sec].off);return t.toISOString().slice(0,10)};
+const wkSum=a=>a.reduce((t,o)=>({p:t.p+o.p,e:t.e+o.e,n:t.n+o.n}),{p:0,e:0,n:0});
+function weekStats(sRows,aRows,days){
+  const d0=ago(days),W={},act={},cid=new Map();
+  S.servees.forEach(x=>{if(x.active&&x.class_id){cid.set(x.id,x.class_id);(act[x.class_id]=act[x.class_id]||[]).push(x.id)}});
+  const wk=k=>W[k]||(W[k]={k,cl:{},sa:null,dt:{boys:new Set(),girls:new Set()}});
+  const put=(m,id,st)=>{if(WR[st]&&(!m[id]||WR[st]>WR[m[id]]))m[id]=st};
+  const secOfC=c=>(S.classes.find(x=>x.id===c)||{}).section;
+  for(const r of sRows||[]){
+    if(r.att_date<d0)continue;const c=cid.get(r.servee_id);if(!c||(S.rc&&c!==S.rc))continue;
+    const w=wk(wkStart(r.att_date));put(w.cl[c]=w.cl[c]||{},r.servee_id,r.status);const s=secOfC(c);if(w.dt[s])w.dt[s].add(r.att_date);
+  }
+  const L=attList().filter(p=>!S.rc||srvClasses(p.id).some(c=>c.id===S.rc)),ids=new Set(L.map(p=>p.id));
+  for(const r of aRows||[]){
+    if(r.att_date<d0||!ids.has(r.servant_id))continue;
+    const w=wk(wkStart(r.att_date));put(w.sa=w.sa||{},r.servant_id,r.status);
+    const p=L.find(q=>q.id===r.servant_id),s=p&&srvSection(p);if(s&&w.dt[s])w.dt[s].add(r.att_date);
+  }
+  return Object.values(W).sort((a,b)=>b.k.localeCompare(a.k)).map(w=>{
+    const cl=Object.keys(w.cl).map(c=>{const i2=act[c]||[],m=w.cl[c];return{c:S.classes.find(x=>x.id===c),p:i2.filter(i=>m[i]==='present').length,e:i2.filter(i=>m[i]==='excused').length,n:i2.length}}).filter(o=>o.c&&o.n).sort((a,b)=>clsSort(a.c,b.c));
+    const cnt=P=>w.sa?{p:P.filter(p=>w.sa[p.id]==='present').length,e:P.filter(p=>w.sa[p.id]==='excused').length,n:P.length}:null;
+    const by={};
+    for(const s of Object.keys(WSEC)){
+      const cs=cl.filter(o=>o.c.section===s),P=L.filter(p=>srvSection(p)===s);
+      if(!cs.length&&!(w.sa&&P.some(p=>w.sa[p.id])))continue;
+      const exp=wkDay(w.k,s),got=[...w.dt[s]].sort();
+      by[s]={date:exp,exp:got.length&&!got.includes(exp)?got:null,sv:wkSum(cs),sa:P.length?cnt(P):null,cl:cs};
+    }
+    const dates=Object.values(by).map(b=>b.date).sort();
+    return{k:w.k,last:dates.length?dates[dates.length-1]:w.k,sv:wkSum(cl),sa:cnt(L),cl,by};
+  });
+}
+function weekRepCard(days){
+  const W=weekStats(S.ah,S.sa,days);
+  const hd=`<div class="card"><h2>التقرير الأسبوعي <small>حضور الاجتماع · بنين الخميس · بنات الأربع</small></h2>`;
+  if(!W.length)return hd+'<div class="empty">مفيش حضور متسجّل في الفترة دي.</div></div>';
+  const avg=f=>{const a=W.map(f).filter(x=>x!==null&&x!==undefined);return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null};
+  const aS=avg(w=>wkPct(w.sv)),aA=avg(w=>wkPct(w.sa));
+  const pr=(t,o)=>`<div class="row"><div>${t}<small>${o?`حاضر ${o.p} من ${o.n}${o.e?' · معتذر '+o.e:''}`:'لسه ما اتسجّلش'}</small></div><div style="width:40%;text-align:left">${o&&o.n?wkPct(o)+'%'+bar(wkPct(o)):'—'}</div></div>`;
+  return hd+`<div class="cnt"><span>${W.length} أسبوع</span><span>متوسط المخدومين ${aS===null?'—':aS+'%'}</span><span>متوسط الخدام ${aA===null?'—':aA+'%'}</span></div><button class="s on" data-a="exp" data-id="weekly" style="margin:8px 0">تصدير التقرير الأسبوعي (Excel/CSV)</button></div>`
+    +W.map(w=>{
+      const ks=Object.keys(w.by),one=ks.length===1;
+      const body=ks.map(s=>{const b=w.by[s],h=`${WSEC[s].n} · ${WSEC[s].day} ${fdm(b.date)}`;
+        return `<div style="margin-top:8px"><b>${h}</b>${b.exp?`<small style="display:block;color:var(--red)">⚠ اتسجّل في ${b.exp.map(d=>fdate(d)).join(' و ')}</small>`:''}${pr('المخدومين',b.sv)}${pr('الخدام',b.sa)}<details class="mre"><summary class="s">تفاصيل الفصول (${b.cl.length})</summary>${b.cl.map(o=>pr(esc(cLabel(o.c)),o)).join('')}</details></div>`}).join('');
+      return `<div class="card"><h2>أسبوع ${fdm(w.k)}</h2>${one?'':pr('الإجمالي · المخدومين',w.sv)+pr('الإجمالي · الخدام',w.sa)}${body}</div>`}).join('');
+}
+function weeklyRows(days){
+  const rows=[['بداية الأسبوع (سبت)','القسم','يوم الاجتماع','النوع','البند','حاضر','معتذر','العدد','النسبة %']],
+    M=weekStats(S.mah,S.sma,days),mm=Object.fromEntries(M.map(w=>[w.k,w]));
+  const add=(k,sec,date,t,n,o)=>rows.push([k,sec,date,t,n,o?o.p:'',o?o.e:'',o?o.n:'',o&&o.n?wkPct(o):'']);
+  for(const w of weekStats(S.ah,S.sa,days)){
+    add(w.k,'الكل','','اجتماع','كل المخدومين',w.sv);add(w.k,'الكل','','اجتماع','الخدام',w.sa);
+    for(const s of Object.keys(w.by)){const b=w.by[s];
+      add(w.k,WSEC[s].n,b.date,'اجتماع','كل المخدومين',b.sv);add(w.k,WSEC[s].n,b.date,'اجتماع','الخدام',b.sa);
+      b.cl.forEach(o=>add(w.k,WSEC[s].n,b.date,'اجتماع',cname(o.c.id),o));}
+    const q=mm[w.k];if(q){add(w.k,'الكل','','قداس','كل المخدومين',q.sv);add(w.k,'الكل','','قداس','الخدام',q.sa)}
+  }
+  return rows;
+}
 function vRep(){
   if(S.ah===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
   const days=S.rd||56,H=histInfo(days),cls=S.classes.filter(c=>!S.rc||c.id===S.rc);
@@ -859,7 +973,7 @@ function vRep(){
     const L=attList().map(p=>{const r=S.sa.filter(x=>x.servant_id===p.id&&x.att_date>=d0),pr=r.filter(x=>x.status==='present').length;return{p,pr,ab:r.filter(x=>x.status==='absent').length,ex:r.filter(x=>x.status==='excused').length,n:r.length,pct:pr+r.filter(x=>x.status==='absent').length?Math.round(pr*100/(pr+r.filter(x=>x.status==='absent').length)):null}}).sort((a,b)=>(a.pct??101)-(b.pct??101));
     sv=`<div class="card"><h2>حضور الخدام (${L.length})</h2><button class="s" data-a="exp" data-id="servants" style="margin-bottom:8px">تصدير Excel (CSV)</button>${L.map(o=>`<div class="row"><div>${esc(o.p.full_name||'بدون اسم')}${o.p.role==='secretary'?'<span class="bd">أمين</span>':''}${isAdmin()?badge(o.p.section):''}<small>حاضر ${o.pr} · غايب ${o.ab} · معتذر ${o.ex}</small></div><div style="width:40%;text-align:left">${o.pct===null?'—':o.pct+'%'}${bar(o.pct)}</div></div>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div>`}
   return `<div class="card"><h2>تقارير الحضور</h2><div class="two"><select data-a="rc"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.rc)}</select><select data-a="rd">${[[28,'آخر 4 أسابيع'],[56,'آخر 8 أسابيع'],[90,'آخر 90 يوم']].map(([n,l])=>`<option value="${n}"${days===n?' selected':''}>${l}</option>`).join('')}</select></div></div>
-  <div class="card"><h2>الفصول</h2><button class="s" data-a="exp" data-id="servees" style="margin-bottom:8px">تصدير Excel (CSV)</button>${crow.map(o=>`<div class="row"><div>${esc(cLabel(o.c))}<small>${o.act.length} مخدوم · ${o.ds.length} اجتماع</small></div><div style="width:40%;text-align:left">${o.avg===null?'—':o.avg+'%'}${bar(o.avg)}</div></div>`).join('')||'<div class="empty">مفيش فصول.</div>'}</div>${det}${sv}${massRepCards(days,cls)}`;
+  ${weekRepCard(days)}<div class="card"><h2>الفصول</h2><button class="s" data-a="exp" data-id="servees" style="margin-bottom:8px">تصدير Excel (CSV)</button>${crow.map(o=>`<div class="row"><div>${esc(cLabel(o.c))}<small>${o.act.length} مخدوم · ${o.ds.length} اجتماع</small></div><div style="width:40%;text-align:left">${o.avg===null?'—':o.avg+'%'}${bar(o.avg)}</div></div>`).join('')||'<div class="empty">مفيش فصول.</div>'}</div>${det}${sv}${massRepCards(days,cls)}`;
 }
 function dl(name,rows){
   const q=x=>{let t=String(x??'');if(/^[=+\-@]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"'};
@@ -1637,6 +1751,7 @@ app.addEventListener('click',async e=>{
   if(a==='fuDone'){const r=await sb.from('followups').update({status:'done'}).eq('id',id);if(!ok(r))return;await loadFu();return render()}
   if(a==='exp'){
     const H=histInfo(S.rd||56),d=today();
+    if(id==='weekly'){dl('weekly-report-'+d+'.csv',weeklyRows(S.rd||56));return}
     if(id==='servees'){
       const rows=[['الاسم','الفصل','التليفون','اجتماعات','حاضر','غايب','نسبة الحضور %','غياب متتالي','آخر حضور']];
       S.servees.filter(x=>x.active&&x.class_id&&(!S.rc||x.class_id===S.rc)).forEach(x=>{const t=servStat(x,H);rows.push([x.full_name,cname(x.class_id),x.phone||'',t.sessions,t.present,t.absent,t.pct===null?'':t.pct,t.streak,t.last||''])});
@@ -1818,6 +1933,21 @@ app.addEventListener('click',async e=>{
     S.f='';S.rc='';S.ac=null;S.sfc='';S.ssec='';S.sf='';S.ed=null;S.edc=null;S.sed=null;S.sso=null;S.pf=null;S.pfPar=null;S.fuf=null;S.cards=null;S.lim=50;
     await load();if(S.cmp!==null)await loadComp();if(S.an!==null)await loadAnn();
     render();return toast(id==='boys'?'خدمة بنين':id==='girls'?'خدمة بنات':'الكل: بنين وبنات');
+  }
+  if(a==='dupKeep'){const[g,k]=id.split('|');(S.dk=S.dk||{})[g]=k;return render()}
+  if(a==='dupNo'){
+    const g=dupGroups(S.servees,dupIgn()).find(x=>x.id===id);if(!g)return;
+    const s=dupIgn();for(let i=0;i<g.list.length;i++)for(let j=i+1;j<g.list.length;j++)s.add(dupPair(g.list[i].id,g.list[j].id));
+    try{localStorage.setItem('khedma_dup_ok',JSON.stringify([...s]))}catch(_){}
+    return render();
+  }
+  if(a==='mergeAll'){
+    if(!canManage())return;const g=dupGroups(S.servees,dupIgn()).find(x=>x.id===id);if(!g)return;
+    const k=dupKeepOf(g),ds=g.list.filter(x=>x.id!==k.id);
+    if(!confirm('دمج '+ds.length+' ملف في ملف واحد؟\nهيفضل: '+k.full_name+' ('+cname(k.class_id)+')\nوالباقي هيتمسح بعد نقل حضورهم وبياناتهم. مينفعش يتراجع عنه.'))return;
+    let n=0;
+    for(const d of ds){const r=await sb.rpc('kh_merge_servees',{p_keep:k.id,p_dup:d.id});if(r.error){if(n){await load();render()}return toast(mergeErr(r.error))}n++}
+    await load();render();return toast('تم دمج '+n+' ✓');
   }
   if(a==='pf')return openProfile(id);
   if(a==='pfBack'){S.pf=null;S.pfPar=null;S.fuf=null;return render()}
