@@ -956,14 +956,16 @@ function weekRepCard(days){
   if(!W.length)return hd+'<div class="empty">مفيش حضور متسجّل في الفترة دي.</div></div>';
   const avg=f=>{const a=W.map(f).filter(x=>x!==null&&x!==undefined);return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null};
   const aS=avg(w=>wkPct(w.sv)),aA=avg(w=>wkPct(w.sa));
-  const nl=(t,ids,f)=>ids&&ids.length?`<small style="display:block;white-space:normal"><b>${t} (${ids.length}):</b> ${ids.map(i=>esc(f(i))).join(' · ')}</small>`:'';
-  const names=(o,f)=>o?nl('حاضر',o.P,f)+nl('معتذر',o.E,f)+nl('غايب',o.A,f):'';
+  const ST3=[['P','حاضر'],['E','معتذر'],['A','غايب']],ar=(x,y)=>String(x[1]||'').localeCompare(String(y[1]||''),'ar')||String(x[0]).localeCompare(String(y[0]),'ar');
+  const vl=(t,arr)=>arr.length?`<div style="margin:8px 0 2px"><b>${t} (${arr.length})</b></div>${arr.map(x=>`<div style="padding:4px 0;border-bottom:1px solid var(--line)">${esc(x[0])}${x[1]?` <small>${esc(x[1])}</small>`:''}</div>`).join('')}`:'';
+  const svNames=b=>`<h3 style="margin:10px 0 0">المخدومين</h3>`+ST3.map(([k,t])=>vl(t,b.cl.flatMap(o=>o[k].map(i=>[sname(i),cLabel(o.c)])).sort(ar))).join('');
+  const saNames=b=>b.sa?`<h3 style="margin:14px 0 0">الخدام</h3>`+ST3.map(([k,t])=>vl(t,b.sa[k].map(i=>[pname(i),'']).sort(ar))).join(''):'';
   const pr=(t,o)=>`<div class="row"><div>${t}<small>${o?`حاضر ${o.p} من ${o.n}${o.e?' · معتذر '+o.e:''}`:'لسه ما اتسجّلش'}</small></div><div style="width:40%;text-align:left">${o&&o.n?wkPct(o)+'%'+bar(wkPct(o)):'—'}</div></div>`;
   return hd+`<div class="cnt"><span>${W.length} أسبوع</span><span>متوسط المخدومين ${aS===null?'—':aS+'%'}</span><span>متوسط الخدام ${aA===null?'—':aA+'%'}</span></div><button class="s on" data-a="exp" data-id="weekly" style="margin:8px 0">تصدير التقرير الأسبوعي (Excel/CSV)</button> <button class="s" data-a="exp" data-id="weeklyNames" style="margin:8px 0">تصدير الأسماء (CSV)</button></div>`
     +W.map(w=>{
       const ks=Object.keys(w.by),one=ks.length===1;
       const body=ks.map(s=>{const b=w.by[s],h=`${WSEC[s].n} · ${WSEC[s].day} ${fdm(b.date)}`;
-        return `<div style="margin-top:8px"><b>${h}</b>${b.exp?`<small style="display:block;color:var(--red)">⚠ اتسجّل في ${b.exp.map(d=>fdate(d)).join(' و ')}</small>`:''}${pr('المخدومين',b.sv)}${pr('الخدام',b.sa)}<details class="mre"><summary class="s">فتح الأسبوع: الأسماء (${b.sv.p} مخدوم · ${b.sa?b.sa.p:0} خادم)</summary>${b.sa?`<div class="row"><div><b>الخدام</b>${names(b.sa,pname)}</div></div>`:''}${b.cl.map(o=>`<div class="row"><div><b>${esc(cLabel(o.c))}</b> <small>حاضر ${o.p} من ${o.n}</small>${names(o,sname)}</div></div>`).join('')}</details></div>`}).join('');
+        return `<div style="margin-top:8px"><b>${h}</b>${b.exp?`<small style="display:block;color:var(--red)">⚠ اتسجّل في ${b.exp.map(d=>fdate(d)).join(' و ')}</small>`:''}${pr('المخدومين',b.sv)}${pr('الخدام',b.sa)}<details class="mre"><summary class="s">فتح الأسبوع: الأسماء (${b.sv.p} مخدوم · ${b.sa?b.sa.p:0} خادم)</summary>${svNames(b)}${saNames(b)}</details></div>`}).join('');
       return `<div class="card"><h2>أسبوع ${fdm(w.k)}</h2>${one?'':pr('الإجمالي · المخدومين',w.sv)+pr('الإجمالي · الخدام',w.sa)}${body}</div>`}).join('');
 }
 function weeklyNameRows(days){
