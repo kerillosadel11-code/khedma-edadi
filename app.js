@@ -309,7 +309,8 @@ function dupSim(a,b){
     let f=0;for(let i=0;i<s.length;i++){if(s[i]===l[i])continue;if(!dupTokEq(s[i],l[i]))return 0;f++}
     return f===0?2:f<=(s.length>=4?2:1)?1:0;
   }
-  if(s.length<3||l.length-s.length>2)return 0;
+  if(l.length-s.length>3)return 0;
+  if(s.length===2&&!dupTokEq(s[1],l[1]))return 0;   // ثنائي: لازم الكلمتين الأولانيين يطابقوا بداية الاسم الأطول
   let j=0,f=0;
   for(let i=0;i<s.length;i++){
     let hit=false;
@@ -318,6 +319,8 @@ function dupSim(a,b){
   }
   return f<=1?1:0;
 }
+/* اسم ثنائي مطابق لبداية اسم أطول: احتمال أضعف (ممكن أخوات أو تشابه أسماء) فبنطلب نفس الفصل */
+const dupWeak=(a,b)=>{const x=dupFold(a).split(' ').filter(Boolean).length,y=dupFold(b).split(' ').filter(Boolean).length;return x!==y&&Math.min(x,y)===2};
 const dupIgn=()=>{try{return new Set(JSON.parse(localStorage.getItem('khedma_dup_ok')||'[]'))}catch(_){return new Set()}};
 const dupPair=(a,b)=>a<b?a+'|'+b:b+'|'+a;
 /* بيرجّع مجموعات: [{id, list:[servees], sure:true لو نفس الاسم بعد توحيد الإملاء}] */
@@ -330,6 +333,7 @@ function dupGroups(list,ign){
     if(ign.has(dupPair(list[i].id,list[j].id)))continue;
     const s=dupSim(list[i].full_name,list[j].full_name);
     if(!s)continue;
+    if(s===1&&dupWeak(list[i].full_name,list[j].full_name)&&list[i].class_id!==list[j].class_id)continue;
     const a=find(i),b=find(j);if(a!==b)P[a]=b;
     if(s===2){sure.add(i);sure.add(j)}
   }
