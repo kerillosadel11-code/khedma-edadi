@@ -29,14 +29,13 @@ function checkNewServee(o){
   if(!nm)e.push('اكتب اسم المخدوم');else if(!isDuoName(nm))e.push(DUO_MSG);
   c.full_name=nm;
   if(!o.class_id)e.push('اختار الفصل');c.class_id=o.class_id||null;
-  if(!o.servant_id)e.push('اختار الخادم المسئول');c.servant_id=o.servant_id||null;
+  c.servant_id=o.servant_id||null;
   const ph=(raw,label)=>{const x=t(raw);if(!x)return null;const q=normPhone(x);if(!q)e.push(label+' غلط: '+PH_MSG);return q};
   c.phone=ph(o.phone,'رقم هاتف المخدوم');c.father_phone=ph(o.father_phone,'رقم هاتف الأب');c.mother_phone=ph(o.mother_phone,'رقم هاتف الأم');
-  if(!t(o.father_phone)&&!t(o.mother_phone))e.push('اكتب رقم هاتف الأب أو الأم (واحد منهم كفاية)');
   const bd=t(o.birth_date);
-  if(!bd)e.push('اكتب تاريخ الميلاد');else if(!/^\d{4}-\d{2}-\d{2}$/.test(bd)||isNaN(Date.parse(bd))||bd>new Date().toISOString().slice(0,10)||bd<'1980-01-01')e.push('تاريخ الميلاد مش منطقي');
+  if(bd&&(!/^\d{4}-\d{2}-\d{2}$/.test(bd)||isNaN(Date.parse(bd))||bd>new Date().toISOString().slice(0,10)||bd<'1980-01-01'))e.push('تاريخ الميلاد مش منطقي');
   c.birth_date=bd||null;
-  [['address','العنوان'],['school','اسم المدرسة'],['confession_father','أب الاعتراف']].forEach(([k,l])=>{c[k]=t(o[k]);if(!c[k])e.push('اكتب '+l)});
+  ['address','school','confession_father'].forEach(k=>{c[k]=t(o[k])||null});
   c.notes=t(o.notes)||null;
   return{errors:e,clean:c};
 }
@@ -115,7 +114,7 @@ async function joinScreen(t){
   S.joinRole=x.role;
   const who=x.role==='secretary'?'أمين خدمة '+(SEC[x.section]||''):x.role==='parent'?'ولي أمر '+esc(x.servee_name||''):'خادم في فصل '+esc(x.class_name||'');
   app.innerHTML=joinWrap(`<h1>أهلاً بيك في خدمة إعدادي</h1><p>دعوة للانضمام كـ <b>${who}</b></p>
-  <input id="jn" placeholder="الاسم بالكامل (رباعي)"><input id="jp" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
+  <input id="jn" placeholder="الاسم (ثنائي على الأقل)"><input id="jp" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
   <input id="j1" type="password" placeholder="اختار باسورد (8 حروف على الأقل)" autocomplete="new-password" dir="ltr"><input id="j2" type="password" placeholder="أكّد الباسورد" autocomplete="new-password" dir="ltr">
   <button class="p" data-a="joinGo">انضمام</button><p class="err" id="err"></p>${x.role==='servant'?'<p class="empty">بعد التسجيل، حسابك هيستنى موافقة أمين الخدمة.</p>':x.role==='parent'?'<p class="empty">بعد التسجيل هتدخل على طول وتتابع حضور ابنك.</p>':''}`);
 }
@@ -123,7 +122,7 @@ async function joinGo(){
   const t=joinTok(),er=document.getElementById('err'),n=v('jn'),ph=normPhone(v('jp')),p1=document.getElementById('j1').value,p2=document.getElementById('j2').value;
   if(!t)return;
   if(!n)return er.textContent='اكتب اسمك.';
-  if(S.joinRole!=='parent'&&!isQuadName(n))return er.textContent=QUAD_MSG+'.';
+  if(S.joinRole!=='parent'&&!isDuoName(n))return er.textContent=DUO_MSG+'.';
   if(!ph)return er.textContent='رقم التليفون مش صحيح (مثال: 01012345678).';
   if(p1.length<8)return er.textContent='الباسورد لازم يكون 8 حروف على الأقل.';
   if(p1!==p2)return er.textContent='الباسورد مش متطابق.';
@@ -363,11 +362,11 @@ function impCard(){
   return `<div class="card" style="border-color:var(--gold)"><h2>معاينة الاستيراد · ${esc(cname(m.cid))}</h2><div class="cnt"><span>جديد ${m.ok.length}</span><span>مكرر (هيتخطّى) ${m.dup}</span><span>مرفوض ${(m.rej||[]).length}</span></div>${(m.rej||[]).length?`<div class="card" style="border-color:var(--red)"><h2>مرفوض (${m.rej.length}) · صلّحهم في الملف وارفعه تاني</h2>${m.rej.slice(0,15).map(x=>`<div class="row"><div>صف ${x.row} · ${esc(x.name)}<small>${x.why.map(esc).join('، ')}</small></div></div>`).join('')}${m.rej.length>15?`<div class="empty">و ${m.rej.length-15} كمان...</div>`:''}</div>`:''}${m.ok.slice(0,8).map(r=>`<div class="row"><div>${esc(r.full_name)}<small>${esc(r.phone||'')} ${esc(r.birth_date||'')}</small></div></div>`).join('')}${m.ok.length>8?`<div class="empty">و ${m.ok.length-8} كمان...</div>`:''}<button class="p" data-a="csvGo"${m.ok.length?'':' disabled'}>استيراد ${m.ok.length} مخدوم</button><button class="s" data-a="csvCancel" style="margin-top:8px">إلغاء</button></div>`;
 }
 function vServees(){
-  return credCard()+svEditCard()+impCard()+`<div class="card"><h2>إضافة مخدوم</h2><p class="empty" style="margin:0 0 8px">اللي عليه * إجباري. الاسم ثنائي، وتليفون الأب أو الأم كفاية.</p><input id="sn" placeholder="الاسم (ثنائي) *">
-  <select id="sc" data-a="scChange"><option value="">الفصل *</option>${opts(S.classes,cLabel)}</select>${canManage()?`<select id="ssv" aria-label="الخادم المسئول">${esvOpts(null,null).replace('الخادم المسئول:','الخادم المسئول *:')}</select>`:''}
-  <div class="two"><input id="sfp" type="tel" placeholder="رقم هاتف الأب *" dir="ltr"><input id="smp" type="tel" placeholder="رقم هاتف الأم *" dir="ltr"></div>
-  <input id="sp" type="tel" placeholder="رقم هاتف المخدوم (اختياري)" dir="ltr"><label class="empty" style="display:block;margin:6px 0 2px">تاريخ الميلاد *</label><input id="sb" type="date" aria-label="تاريخ الميلاد">
-  <input id="sa" placeholder="العنوان *"><input id="ssch" placeholder="اسم المدرسة التابع لها *"><input id="scf" placeholder="أب الاعتراف *"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
+  return credCard()+svEditCard()+impCard()+`<div class="card"><h2>إضافة مخدوم</h2><p class="empty" style="margin:0 0 8px">اللي عليه * بس إجباري: الاسم (ثنائي) والفصل. الباقي اختياري وتقدر تكمّله بعدين من «تعديل».</p><input id="sn" placeholder="الاسم (ثنائي) *">
+  <select id="sc" data-a="scChange"><option value="">الفصل *</option>${opts(S.classes,cLabel)}</select>${canManage()?`<select id="ssv" aria-label="الخادم المسئول">${esvOpts(null,null)}</select>`:''}
+  <div class="two"><input id="sfp" type="tel" placeholder="رقم هاتف الأب (اختياري)" dir="ltr"><input id="smp" type="tel" placeholder="رقم هاتف الأم (اختياري)" dir="ltr"></div>
+  <input id="sp" type="tel" placeholder="رقم هاتف المخدوم (اختياري)" dir="ltr"><label class="empty" style="display:block;margin:6px 0 2px">تاريخ الميلاد (اختياري)</label><input id="sb" type="date" aria-label="تاريخ الميلاد">
+  <input id="sa" placeholder="العنوان (اختياري)"><input id="ssch" placeholder="اسم المدرسة (اختياري)"><input id="scf" placeholder="أب الاعتراف (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
   <div class="card"><h2>استيراد من ملف Excel</h2><button class="s" data-x="tpl" style="margin-bottom:8px">⬇️ تحميل نموذج Excel فاضي</button><select id="icl2"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><input type="file" accept=".xlsx,.csv,.txt" data-a="csvPick"><p class="empty">حمّل النموذج، املاه في Excel (الاسم، التليفون، تاريخ الميلاد، العنوان، ملاحظات)، واحفظه، وارفعه هنا. بيقبل كمان ملفات CSV.</p></div>
   <div class="card"><input id="sq" type="search" data-a="search" placeholder="ابحث بالاسم أو التليفون أو الكود" value="${esc(S.q)}"><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="stfilter"><option value="act"${S.st==='act'?' selected':''}>الشغّالين</option><option value="arch"${S.st==='arch'?' selected':''}>المؤرشفين</option><option value="all"${S.st==='all'?' selected':''}>الكل</option></select></div><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button>
   <div id="sl">${svList()}</div></div>`;
@@ -576,8 +575,7 @@ function buildImport(text,cid){
     if((np&&exP.has(np))||exN.has(nz(name))||seen.has(key)){dup++;return}
     const sn=g(col.srv),sv=findSrv(sn);
     const chk=checkNewServee({name,class_id:cid,servant_id:sv?sv.id:'',phone:ph,father_phone:g(col.fph),mother_phone:g(col.mph),birth_date:nd(g(col.birth)),address:g(col.addr),school:g(col.school),confession_father:g(col.conf),notes:g(col.notes)});
-    if(!sv&&!chk.errors.includes('اختار الخادم المسئول'))chk.errors.push('اختار الخادم المسئول');
-    if(!sv)chk.errors[chk.errors.indexOf('اختار الخادم المسئول')]=sn?'الخادم المسئول «'+sn+'» مش موجود في خدام الفصل':'اكتب الخادم المسئول';
+    if(!sv&&sn)chk.errors.push('الخادم المسئول «'+sn+'» مش موجود في خدام الفصل');
     if(chk.errors.length){rej.push({row:rowNo,name,why:chk.errors});return}
     seen.add(key);ok.push(chk.clean);
   });
@@ -1362,7 +1360,7 @@ function credCard(){
   ${c.warning?`<p class="err">${esc(c.warning)}</p>`:''}<p class="empty">الباسورد مش هيظهر تاني بعد ما تقفل الكارت، ابعته دلوقتي.</p>${wa}<button class="s" data-a="dismiss">تم</button></div>`;
 }
 function vAdd(){
-  return credCard()+`<div class="card"><h2>إضافة مستخدم</h2><input id="un" placeholder="الاسم بالكامل (رباعي للخدام والأمناء)"><input id="up" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
+  return credCard()+`<div class="card"><h2>إضافة مستخدم</h2><input id="un" placeholder="الاسم (ثنائي على الأقل للخدام والأمناء)"><input id="up" type="tel" inputmode="tel" placeholder="رقم التليفون (هو اسم الدخول)" dir="ltr">
   <select id="ur" data-a="newrole">${Object.entries(ROLES).filter(([k])=>isAdmin()||k==='servant'||k==='parent').map(([k,n])=>`<option value="${k}"${k==='servant'?' selected':''}>${n}</option>`).join('')}</select>
   <div id="usc" style="display:none"><select id="usec"><option value="">اختار قسم أمين الخدمة</option><option value="boys"${S.sec==='boys'?' selected':''}>بنين</option><option value="girls"${S.sec==='girls'?' selected':''}>بنات</option></select></div>
   <div id="uc"><select id="ucl"><option value="">اختار فصل الخادم</option>${opts(S.classes,cLabel)}</select></div>
@@ -1440,7 +1438,7 @@ async function run0(a,id){
     if(mine){
       r=await sb.rpc('kh_servant_add_servee',{p_name:c.full_name,p_phone:c.phone,p_birth:c.birth_date,p_class:c.class_id,p_address:c.address,p_school:c.school,p_confession:c.confession_father,p_father_phone:c.father_phone,p_mother_phone:c.mother_phone,p_notes:c.notes});
       if(r.error&&/FORBIDDEN/.test(r.error.message))return toast('مش مسموح لك تضيف في الفصل ده');
-      if(r.error&&/NAME_NOT_QUAD|PARENT_PHONE_REQUIRED|BAD_PHONE|BAD_BIRTH|_REQUIRED/.test(r.error.message))return toast('البيانات مش مكتملة أو غلط: راجع الاسم والتليفونات وباقي الحقول');
+      if(r.error&&/NAME_NOT_QUAD|NAME_TOO_SHORT|PARENT_PHONE_REQUIRED|BAD_PHONE|BAD_BIRTH|_REQUIRED/.test(r.error.message))return toast('البيانات مش مكتملة أو غلط: راجع الاسم والتليفونات وباقي الحقول');
       if(!r.error&&r.data)await autoParents([r.data]);
       if(r.error&&/PGRST202|kh_servant_add_servee/.test(JSON.stringify(r.error)))return toast('محتاج تشغّل ملف 42_servee_fields.sql على Supabase');
     }else{r=await sb.from('servees').insert(c).select('id').single();if(!r.error&&r.data)await autoParents([r.data.id])}}
@@ -1460,7 +1458,7 @@ async function run0(a,id){
   else if(a==='addUser'){
     const role=v('ur'),ph=normPhone(v('up'));
     if(!v('un'))return toast('اكتب الاسم');
-    if((role==='servant'||role==='secretary')&&!isQuadName(v('un')))return toast(QUAD_MSG);
+    if((role==='servant'||role==='secretary')&&!isDuoName(v('un')))return toast(DUO_MSG);
     if(!ph)return toast('رقم التليفون مش صحيح (مثال: 01012345678)');
     if(role==='servant'&&!v('ucl'))return toast('اختار فصل الخادم');
     if(role==='parent'&&!v('use'))return toast('اختار المخدوم');
@@ -1577,7 +1575,7 @@ function respBtn(x){
 }
 function addSvCard(){
   if(canManage()||!acid())return '';
-  return `<div class="card"><h2>إضافة مخدوم لفصلي</h2><p class="empty" style="margin:0 0 8px">اللي عليه * إجباري. الاسم ثنائي، وتليفون الأب أو الأم كفاية. هتتسجّل أنت الخادم المسئول عنه.</p><input id="sn" placeholder="الاسم (ثنائي) *"><div class="two"><input id="sfp" type="tel" placeholder="رقم هاتف الأب *" dir="ltr"><input id="smp" type="tel" placeholder="رقم هاتف الأم *" dir="ltr"></div><input id="sp" type="tel" placeholder="رقم هاتف المخدوم (اختياري)" dir="ltr"><label class="empty" style="display:block;margin:6px 0 2px">تاريخ الميلاد *</label><input id="sb" type="date" aria-label="تاريخ الميلاد"><input id="sa" placeholder="العنوان *"><input id="ssch" placeholder="اسم المدرسة التابع لها *"><input id="scf" placeholder="أب الاعتراف *"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>`;
+  return `<div class="card"><h2>إضافة مخدوم لفصلي</h2><p class="empty" style="margin:0 0 8px">اللي عليه * بس إجباري: الاسم (ثنائي) والفصل. الباقي اختياري وتقدر تكمّله بعدين من «تعديل». هتتسجّل أنت الخادم المسئول عنه.</p><input id="sn" placeholder="الاسم (ثنائي) *"><div class="two"><input id="sfp" type="tel" placeholder="رقم هاتف الأب (اختياري)" dir="ltr"><input id="smp" type="tel" placeholder="رقم هاتف الأم (اختياري)" dir="ltr"></div><input id="sp" type="tel" placeholder="رقم هاتف المخدوم (اختياري)" dir="ltr"><label class="empty" style="display:block;margin:6px 0 2px">تاريخ الميلاد (اختياري)</label><input id="sb" type="date" aria-label="تاريخ الميلاد"><input id="sa" placeholder="العنوان (اختياري)"><input id="ssch" placeholder="اسم المدرسة (اختياري)"><input id="scf" placeholder="أب الاعتراف (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>`;
 }
 function vMyClass(){return myPage('cl')}
 function vMyServees(){return myPage('sv')}
