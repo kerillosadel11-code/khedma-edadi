@@ -348,7 +348,7 @@ const dupKeepOf=g=>(S.dk&&g.list.find(x=>x.id===S.dk[g.id]))||g.list.slice().sor
 function svDupCard(){
   if(!canManage())return'';
   const G=dupGroups(S.servees,dupIgn());if(!G.length)return'';
-  return `<div class="card" style="border-color:var(--gold)"><h2>⚠ أسماء مكررة أو متشابهة (${G.length})</h2><p class="empty">الدمج بينقل الحضور والبيانات للملف «الباقي» ويمسح المكرر. لو تلاقي اتنين مش نفس الشخص اضغط «مش مكرر».</p>`+G.map(g=>{
+  return `<div class="card" style="border-color:var(--gold)"><h2>⚠ أسماء مكررة أو متشابهة (${G.length})</h2><p class="empty">الدمج بينقل الحضور والبيانات للملف «الباقي» ويمسح المكرر. لو تلاقي اتنين مش نفس الشخص اضغط «مش مكرر».</p><button class="s on" data-a="exp" data-id="dups" style="margin-bottom:8px">تصدير كل المكرر (Excel/CSV)</button>`+G.map(g=>{
     const k=dupKeepOf(g),ph=g.list.map(x=>x.phone).filter(Boolean),warn=new Set(ph).size>1?' ⚠ تليفونات مختلفة':'';
     return `<div class="card" style="margin:8px 0"><small>${g.sure?'نفس الاسم (فرق إملاء بس)':'أسماء متشابهة'}${warn}</small>`+g.list.map(x=>`<div class="row"><div>${esc(x.full_name)}${x.id===k.id?'<span class="bd">الباقي ✓</span>':''}<small>${esc(cname(x.class_id))}${x.active?'':' · مؤرشف'}${x.phone?' · '+esc(x.phone):''}</small></div><div class="acts">${x.id===k.id?'':`<button class="s on" data-a="mergeSv" data-id="${k.id}|${x.id}">دمج في الباقي</button><button class="s" data-a="dupKeep" data-id="${g.id}|${x.id}">خليه الباقي</button>`}</div></div>`).join('')+`<div class="acts" style="justify-content:flex-start;margin-top:6px">${g.list.length>2?`<button class="s on" data-a="mergeAll" data-id="${g.id}">دمج الكل في الباقي</button>`:''}<button class="s" data-a="dupNo" data-id="${g.id}">مش مكرر</button></div></div>`}).join('')+`</div>`;
 }
@@ -1803,6 +1803,11 @@ app.addEventListener('click',async e=>{
   if(a==='fuDone'){const r=await sb.from('followups').update({status:'done'}).eq('id',id);if(!ok(r))return;await loadFu();return render()}
   if(a==='exp'){
     const H=histInfo(S.rd||56),d=today();
+    if(id==='dups'){
+      const rows=[['رقم المجموعة','النوع','الاسم','الفصل','التليفون','الحالة','الدور المقترح']];
+      dupGroups(S.servees,dupIgn()).forEach((g,i)=>{const k=dupKeepOf(g);g.list.forEach(x=>rows.push([i+1,g.sure?'نفس الاسم (فرق إملاء)':'أسماء متشابهة',x.full_name,cname(x.class_id),x.phone||x.father_phone||x.mother_phone||'',x.active?'شغّال':'مؤرشف',x.id===k.id?'الباقي':'يتدمج فيه']))});
+      if(rows.length===1)return toast('مفيش أسماء مكررة');dl('duplicates-'+d+'.csv',rows);return;
+    }
     if(id==='weekly'){dl('weekly-report-'+d+'.csv',weeklyRows(S.rd||56));return}
     if(id==='weeklyNames'){dl('weekly-names-'+d+'.csv',weeklyNameRows(S.rd||56));return}
     if(id==='servees'){
