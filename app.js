@@ -887,15 +887,18 @@ async function loadSc(){
   if(r.error){S.sc=[];S.scErr=/PGRST205|special_cases|42P01/.test(JSON.stringify(r.error))?'محتاج تشغّل ملف 45_special_cases.sql على Supabase':'تعذّر تحميل الحالات: '+r.error.message}
   else{S.scErr='';const ids=new Set(S.servees.map(x=>x.id));S.sc=(r.data||[]).filter(c=>ids.has(c.servee_id))}
 }
+function spOpts(q){
+  const k=nz(q||'').trim(),L=S.servees.filter(x=>x.active&&(!k||nz(x.full_name).includes(k)||(x.phone||'').includes(String(q).trim()))).sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ar'));
+  return `<option value="">${k?(L.length?'اختار المخدوم ('+L.length+' نتيجة)':'مفيش نتيجة'):'اختار المخدوم'}</option>`+L.map(x=>`<option value="${x.id}"${k&&L.length===1?' selected':''}>${esc(x.full_name)}${x.class_id?' · '+esc(cname(x.class_id)):''}</option>`).join('');
+}
 const spOpenSet=()=>new Set((S.sc||[]).filter(c=>c.status==='open').map(c=>c.servee_id));
 function vSpec(){
   if(S.sc===undefined||S.sc===null){if(!S._scL){S._scL=1;loadSc().then(()=>{S._scL=0;render()})}return '<div class="card"><div class="empty">جاري التحميل...</div></div>'}
   if(S.scErr)return `<div class="card"><h2>الحالات الخاصة</h2><div class="empty">${esc(S.scErr)}</div></div>`;
   const st=S.sps||'open',kd=S.spk||'';
   const L=S.sc.filter(c=>(st==='all'||c.status===st)&&(!kd||c.kind===kd)),sv=new Map(S.servees.map(x=>[x.id,x]));
-  const pk=S.servees.filter(x=>x.active).sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ar'));
   const form=`<div class="card"><h2>إضافة حالة خاصة</h2><small style="display:block;margin-bottom:6px">الحالات دي سرّية: بتظهر للخدام والأمناء وأبونا بس، مش لأولياء الأمور.</small>
-  <select id="spsv"><option value="">اختار المخدوم</option>${pk.map(x=>`<option value="${x.id}">${esc(x.full_name)}${x.class_id?' · '+esc(cname(x.class_id)):''}</option>`).join('')}</select>
+  <input id="spq" type="search" data-a="spfind" placeholder="ابحث بالاسم أو التليفون..." autocomplete="off"><select id="spsv">${spOpts('')}</select>
   <select id="spkd">${Object.entries(SPK).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select>
   <textarea id="spn" rows="3" placeholder="التفاصيل واللي المطلوب (اختياري)"></textarea><button class="p" data-a="spAdd">إضافة</button></div>`;
   const rows=L.map(c=>{const x=sv.get(c.servee_id);return `<div class="row"><div class="who">${x?av(x,40):''}<div>${esc(x?x.full_name:'؟')}<span class="bd">${SPK[c.kind]||esc(c.kind)}</span>${c.status==='closed'?'<span class="bd" style="background:#dbeadf">اتقفلت</span>':''}<small>${x?esc(cname(x.class_id)):''} · ${fdm(String(c.created_at).slice(0,10))}${c.created_by?' · '+esc(pname(c.created_by)):''}</small>${c.note?`<small style="white-space:pre-wrap">${esc(c.note)}</small>`:''}</div></div><div class="acts">${x?`<button class="s" data-a="pf" data-id="${x.id}">الملف</button>`:''}<button class="s${c.status==='open'?' on':''}" data-a="${c.status==='open'?'spDone':'spReopen'}" data-id="${c.id}">${c.status==='open'?'تم / اتقفلت':'إعادة فتح'}</button><button class="s d" data-a="spDel" data-id="${c.id}">حذف</button></div></div>`}).join('');
@@ -2122,6 +2125,7 @@ document.getElementById('pf').addEventListener('change',async e=>{
   }catch(_){toast('الصورة دي مش مقبولة، جرّب صورة تانية')}
 });
 app.addEventListener('input',e=>{
+  {const t=e.target;if(t&&t.dataset&&t.dataset.a==='spfind'){const sel=document.getElementById('spsv');if(sel)sel.innerHTML=spOpts(t.value);return}}
   const b=e.target;if(b&&b.dataset&&b.dataset.a==='rpdraft'){S.rpd=b.value;return}
   if(b&&b.dataset&&b.dataset.a==='msgfind'){const q=nz(b.value);document.querySelectorAll('.smlbl').forEach(l=>l.style.display=(!q||l.dataset.n.includes(q))?'flex':'none');return}
   if(b&&b.dataset&&b.dataset.a==='srvsearch'){clearTimeout(S.qt);S.qt=setTimeout(()=>{S.sq=b.value;const l=document.getElementById('srl');if(l)l.innerHTML=srvList()},150);return}
