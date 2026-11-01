@@ -24,13 +24,30 @@ const busyBtn=(b,on)=>{if(b)b.disabled=!!on};
 
 /* ================= تقرير الاجتماع ================= */
 const latestAtt=()=>(S.ah||[]).reduce((m,r)=>r.att_date>m?r.att_date:m,'')||today();
+
+const pctOf=(p,n)=>n?Math.round(100*p/n):0,pcls=v=>v>=60?'g':v>=35?'m':'b';
+function repCards(D){
+  const pc=pctOf(D.p,D.n),late=D.late||[],need=late.filter(x=>!x.done),done=late.filter(x=>x.done);
+  const sh=n=>String(n||'').split(' ').slice(0,3).join(' '),sr=n=>n?String(n).split(' ').slice(0,2).join(' '):'—';
+  const tile=(v,l,c)=>`<div class="rk ${c||''}"><b>${v}</b><span>${l}</span></div>`;
+  const cl=(D.classes||[]).map(c=>{const v=pctOf(c.p,c.n);return `<tr><td>${esc(c.name)}</td><td>${c.p} / ${c.n}</td><td><div class="rbar"><i class="${pcls(v)}" style="width:${v}%"></i></div></td><td><b>${v}%</b></td></tr>`}).join('');
+  const row=x=>`<tr><td>${esc(sh(x.name))}</td><td>${esc(x.cls)}</td><td><span class="rg ${x.streak>=5?'b':x.streak>=4?'m':''}">${x.streak}</span></td><td>${esc(sr(x.resp))}</td></tr>`;
+  const th='<thead><tr><th>الاسم</th><th>الفصل</th><th>غياب</th><th>المسؤول</th></tr></thead>';
+  return `<div class="card"><h2>📊 اجتماع ${esc(D.date)}</h2>
+  <div class="rks">${tile(pc+'%','الحضور',pcls(pc))}${tile(D.p+' / '+D.n,'حضروا')}${tile(late.length,'غياب 3+','b')}${tile(need.length,'لسه ما اتفتقدوش',need.length?'m':'g')}</div></div>
+  <div class="card"><h2>حسب الفصل</h2><table class="rt"><thead><tr><th>الفصل</th><th>الحضور</th><th></th><th>%</th></tr></thead><tbody>${cl||'<tr><td colspan="4">—</td></tr>'}</tbody></table></div>
+  <div class="card"><h2>⚠️ محتاجين افتقاد (${need.length})</h2>${need.length?`<div class="rscr"><table class="rt">${th}<tbody>${need.map(row).join('')}</tbody></table></div>`:'<p class="empty">الكل اتفتقد ✓</p>'}
+  <p class="empty" style="padding:8px 0 0">غابوا 3 اجتماعات ورا بعض أو أكتر ولسه ما اتسجلش لهم افتقاد. افتقادات آخر 7 أيام: ${D.week||0}</p></div>
+  ${done.length?`<details class="card"><summary><b>✅ اتفتقدوا (${done.length})</b></summary><div class="rscr"><table class="rt">${th}<tbody>${done.map(row).join('')}</tbody></table></div></details>`:''}`;
+}
 function vRep(){
   const R=X.rep;if(!R.date)R.date=latestAtt();
   return `<div class="card"><h2>تقرير الاجتماع</h2>
   <p class="empty" style="padding:0 0 8px">نسبة حضور كل فصل، مين غاب 3 اجتماعات أو أكتر، ومين اتفتقد ومين لسه. التقرير ده بيوصلك كإشعار تلقائي بعد كل اجتماع كمان.</p>
   <input type="date" id="x_rd" value="${esc(R.date)}" max="${today()}">
   <button class="p" data-x="repGo"${R.busy?' disabled':''}>${R.busy?'جاري التجهيز...':'اعمل التقرير'}</button></div>
-  ${R.text?`<div class="card"><pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;margin:0 0 10px;line-height:1.8">${esc(R.text)}</pre>
+  ${R.data&&!R.data.empty?repCards(R.data):''}
+  ${R.text?`<div class="card"><h2>نسخة للإرسال</h2><pre class="rpre">${esc(R.text)}</pre>
   <div class="acts" style="justify-content:flex-start"><a class="s on" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="https://wa.me/?text=${encodeURIComponent(R.text)}">إرسال واتساب</a><button class="s" data-x="repCopy">نسخ</button></div></div>`:''}`;
 }
 
@@ -238,7 +255,8 @@ function parentCards(){
 /* ================= الأحداث ================= */
 const ACT={
   async repGo(b){
-    const R=X.rep;R.date=val('x_rd')||latestAtt();R.busy=true;R.text='';rp();
+    const R=X.rep;R.date=val('x_rd')||latestAtt();R.busy=true;R.text='';R.data=null;rp();
+    const d=await sb.rpc('kh_report_data',{p_section:isAdmin()?(S.sec||''):'',p_date:R.date});R.data=d.error?null:d.data;
     const r=await sb.rpc('kh_report_text',{p_section:isAdmin()?(S.sec||''):'',p_date:R.date});
     R.busy=false;if(r.error){rp();return fail(r.error,'تعذّر عمل التقرير (شغّل ملف 24؟)')}
     R.text=r.data||'';rp();
