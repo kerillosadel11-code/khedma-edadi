@@ -281,7 +281,7 @@ function classDetail(c){
 const nz=t=>String(t||'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').trim();
 function svFiltered(){
   const q=nz(S.q);
-  return S.servees.filter(s=>(!S.f||s.class_id===S.f)&&(!S.sf||s.section===S.sf)&&(S.st==='all'||(S.st==='arch'?!s.active:s.active))&&(!q||nz(s.full_name).includes(q)||(s.phone||'').includes(S.q.trim())||nz(s.code).includes(q)));
+  return S.servees.filter(s=>(!S.f||s.class_id===S.f)&&(!S.sf||s.section===S.sf)&&(S.st==='all'||(S.st==='arch'?!s.active:S.st==='inc'?(s.active&&(!s.servant_id||!s.phone&&!s.father_phone&&!s.mother_phone||!s.birth_date)):s.active))&&(!q||nz(s.full_name).includes(q)||(s.phone||'').includes(S.q.trim())||nz(s.code).includes(q)));
 }
 const classServants=cid=>S.cs.filter(x=>x.class_id===cid).map(x=>S.profiles.find(p=>p.id===x.servant_id)).filter(Boolean);
 const svAssigned=s=>s.servant_id?S.profiles.find(p=>p.id===s.servant_id):null;
@@ -372,7 +372,7 @@ function vServees(){
   <input id="sp" type="tel" placeholder="رقم هاتف المخدوم (اختياري)" dir="ltr"><label class="empty" style="display:block;margin:6px 0 2px">تاريخ الميلاد (اختياري)</label><input id="sb" type="date" aria-label="تاريخ الميلاد">
   <input id="sa" placeholder="العنوان (اختياري)"><input id="ssch" placeholder="اسم المدرسة (اختياري)"><input id="scf" placeholder="أب الاعتراف (اختياري)"><textarea id="sno" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="addServee">إضافة المخدوم</button></div>
   <div class="card"><h2>استيراد من ملف Excel</h2><button class="s" data-x="tpl" style="margin-bottom:8px">⬇️ تحميل نموذج Excel فاضي</button><select id="icl2"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><input type="file" accept=".xlsx,.csv,.txt" data-a="csvPick"><p class="empty">حمّل النموذج، املاه في Excel (الاسم، التليفون، تاريخ الميلاد، العنوان، ملاحظات)، واحفظه، وارفعه هنا. بيقبل كمان ملفات CSV.</p></div>
-  <div class="card"><input id="sq" type="search" data-a="search" placeholder="ابحث بالاسم أو التليفون أو الكود" value="${esc(S.q)}"><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="stfilter"><option value="act"${S.st==='act'?' selected':''}>الشغّالين</option><option value="arch"${S.st==='arch'?' selected':''}>المؤرشفين</option><option value="all"${S.st==='all'?' selected':''}>الكل</option></select></div><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button>
+  <div class="card"><input id="sq" type="search" data-a="search" placeholder="ابحث بالاسم أو التليفون أو الكود" value="${esc(S.q)}"><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="stfilter"><option value="act"${S.st==='act'?' selected':''}>الشغّالين</option><option value="inc"${S.st==='inc'?' selected':''}>ناقص بيانات (خادم/تليفون/ميلاد)</option><option value="arch"${S.st==='arch'?' selected':''}>المؤرشفين</option><option value="all"${S.st==='all'?' selected':''}>الكل</option></select></div><button class="s" data-a="cards" style="margin-bottom:8px">طباعة كروت الظاهرين</button>
   <div id="sl">${svList()}</div></div>`;
 }
 function srvStats(id){const H=S.sa.filter(x=>x.servant_id===id),P=H.filter(x=>x.status==='present').length;return{n:H.length,P,A:H.filter(x=>x.status==='absent').length,E:H.filter(x=>x.status==='excused').length,pct:P+H.filter(x=>x.status==='absent').length?Math.round(P*100/(P+H.filter(x=>x.status==='absent').length)):null}}
@@ -579,7 +579,7 @@ function buildImport(text,cid){
     if((np&&exP.has(np))||exN.has(nz(name))||seen.has(key)){dup++;return}
     const sn=g(col.srv),sv=findSrv(sn);
     const chk=checkNewServee({name,class_id:cid,servant_id:sv?sv.id:'',phone:ph,father_phone:g(col.fph),mother_phone:g(col.mph),birth_date:nd(g(col.birth)),address:g(col.addr),school:g(col.school),confession_father:g(col.conf),notes:g(col.notes)});
-    if(!sv&&sn)chk.errors.push('الخادم المسئول «'+sn+'» مش موجود في خدام الفصل');
+    if(!sv&&sn)chk.clean.notes=((chk.clean.notes?chk.clean.notes+' · ':'')+'الخادم في الملف: '+sn).trim();
     if(chk.errors.length){rej.push({row:rowNo,name,why:chk.errors});return}
     seen.add(key);ok.push(chk.clean);
   });
@@ -774,7 +774,7 @@ function vPrep(){
   <div class="card"><h2>تحضيرات الفصل (${L.length})</h2>${L.map(p=>`<div class="row"><div>${fdate(p.prep_date)}<span class="bd">${PST[p.status]||''}</span>${p.approved?'<span class="bd" style="background:#cfeedd">معتمد</span>':''}<small>${esc(p.topic||'من غير موضوع')}</small></div><div class="acts"><button class="s" data-a="prepOpen" data-id="${p.prep_date}">فتح</button>${mg&&p.status==='ready'?`<button class="s${p.approved?' on':''}" data-a="prepApp" data-id="${p.id}">${p.approved?'إلغاء الاعتماد':'اعتماد'}</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش تحضير للفصل ده.</div>'}</div>`;
 }
 /* سجل الحضور بيتحمّل عند الحاجة بس (مش مع كل فتحة) عشان نقل البيانات على Supabase */
-const HIST_TABS={home:90,classes:90,mycls:90,mysv:90,follow:90,rep:90,ana:90},MASS_TABS=new Set(['rep']);
+const HIST_TABS={home:90,classes:90,mycls:90,mysv:90,follow:90,rep:90,ana:90},MASS_TABS=new Set(['rep','ana']);
 async function loadFu(){const f=await fetchAll(()=>sb.from('followups').select('*').order('followup_date',{ascending:false}).order('created_at',{ascending:false}));S.fu=fSv(f.error?[]:(f.data||[]))}
 /* كاش على الجهاز (IndexedDB): السجل القديم بيتحفظ، وكل فتحة بعد كده بنجيب آخر 3 أسابيع بس */
 const KV={db:null,
@@ -934,7 +934,7 @@ function vFollow(){
     return `<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))} · ${absLine(st)}</small><small>الخادم المسؤول: ${respName(x)}</small>${lf?`<small>آخر افتقاد: ${FK[lf.kind]||''} ${fdate(lf.followup_date)}${fwho(lf)} (${FS[lf.status]||''})</small>`:'<small>لسه ما اتفتقدش</small>'}</div></div><div class="acts">${tel}${wa}<button class="s on" data-a="fuOpen" data-id="${x.id}">تسجيل</button></div></div>`}).join('');
   const recent=fu.filter(f=>S.servees.some(x=>x.id===f.servee_id)).slice(0,30);
   const pk=S.servees.filter(x=>x.active&&(!S.f||x.class_id===S.f)).sort((p,q)=>(p.full_name||'').localeCompare(q.full_name||'','ar'));
-  const pickCard=`<div class="card"><h2>افتقاد أي مخدوم</h2><small style="display:block;margin-bottom:6px">لو عايز تفتقد حد من غير ما يكون غايب.</small><select id="fupick"><option value="">اختار المخدوم</option>${pk.map(x=>`<option value="${x.id}">${esc(x.full_name)}${x.class_id?' · '+esc(cname(x.class_id)):''}</option>`).join('')}</select><small>نوع الافتقاد</small><select id="fupk">${FKF.map(k=>`<option value="${k}">${FK[k]}</option>`).join('')}</select>${canManage()?`<small>مين اللي قام بالافتقاد</small><select id="fupw">${fuStaff().map(p=>`<option value="${p.id}"${p.id===S.p.id?' selected':''}>${esc(p.full_name||'بدون اسم')}</option>`).join('')}</select>`:`<small>القائم بالافتقاد: ${esc(S.p.full_name||'أنا')}</small>`}<textarea id="fupn" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="fuQuick">حفظ الافتقاد</button><button class="s" data-a="fuPick" style="margin-top:8px">فتح نموذج كامل (تاريخ / متابعة)</button></div>`;
+  const pickCard=`<div class="card"><h2>افتقاد أي مخدوم</h2><small style="display:block;margin-bottom:6px">لو عايز تفتقد حد من غير ما يكون غايب.</small><input type="search" data-sf="fupick" placeholder="ابحث بالاسم..." autocomplete="off" aria-label="بحث"><select id="fupick"><option value="">اختار المخدوم</option>${pk.map(x=>`<option value="${x.id}">${esc(x.full_name)}${x.class_id?' · '+esc(cname(x.class_id)):''}</option>`).join('')}</select><small>نوع الافتقاد</small><select id="fupk">${FKF.map(k=>`<option value="${k}">${FK[k]}</option>`).join('')}</select>${canManage()?`<small>مين اللي قام بالافتقاد</small><select id="fupw">${fuStaff().map(p=>`<option value="${p.id}"${p.id===S.p.id?' selected':''}>${esc(p.full_name||'بدون اسم')}</option>`).join('')}</select>`:`<small>القائم بالافتقاد: ${esc(S.p.full_name||'أنا')}</small>`}<textarea id="fupn" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="fuQuick">حفظ الافتقاد</button><button class="s" data-a="fuPick" style="margin-top:8px">فتح نموذج كامل (تاريخ / متابعة)</button></div>`;
   return form+pickCard+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
   <div class="card"><h2>آخر الافتقادات (${recent.length})</h2>${recent.map(f=>`<div class="row"><div>${esc(sname(f.servee_id))}<small>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}${fwho(f)}</small>${f.note?`<small>${esc(f.note)}</small>`:''}</div><div class="acts"><span class="bd">${FS[f.status]||esc(f.status)}</span>${f.status==='open'?`<button class="s" data-a="fuDone" data-id="${f.id}">تم</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش افتقادات متسجلة.</div>'}</div>`;
 }
@@ -945,7 +945,7 @@ const WSEC={boys:{n:'بنين',off:5,day:'الخميس'},girls:{n:'بنات',off
 const fdm=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{day:'numeric',month:'long'});
 const wkDay=(k,sec)=>{const t=new Date(k+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+WSEC[sec].off);return t.toISOString().slice(0,10)};
 const wkSum=a=>a.reduce((t,o)=>({p:t.p+o.p,e:t.e+o.e,n:t.n+o.n}),{p:0,e:0,n:0});
-function weekStats(sRows,aRows,days){
+function weekStats(sRows,aRows,days,mRows){
   /* بنجمّع كل أسبوع (سبت→جمعة) في كارت، لكن أرقام كل قسم بتتحسب من يوم واحد: اليوم اللي فيه أكتر حضور متسجّل.
      أي تسجيلات في أيام تانية بتظهر كملاحظة، مش بتتجمّع على الأرقام. */
   const d0=ago(days),R={},act={},cid=new Map(),secOfC=c=>(S.classes.find(x=>x.id===c)||{}).section;
@@ -956,6 +956,12 @@ function weekStats(sRows,aRows,days){
     if(r.att_date<d0)continue;const c=cid.get(r.servee_id),s=c&&secOfC(c);if(!s||!WSEC[s]||(S.rc&&c!==S.rc))continue;
     const o=rec(s,r.att_date);put(o.cl[c]=o.cl[c]||{},r.servee_id,r.status);o.n++;if(r.status==='present')o.pr++;
   }
+  const M={};
+  for(const r of mRows||[]){
+    if(r.att_date<d0||r.status!=='present')continue;const c=cid.get(r.servee_id),s=c&&secOfC(c);if(!s||!WSEC[s]||(S.rc&&c!==S.rc))continue;
+    const k=wkStart(r.att_date);(((M[k]=M[k]||{})[s]=M[k][s]||{})[r.att_date]=M[k][s][r.att_date]||new Set()).add(r.servee_id);
+  }
+  const msOf=(k,s)=>{const days3=(M[k]||{})[s];if(!days3)return null;const d=Object.keys(days3).sort((a,b)=>days3[b].size-days3[a].size||b.localeCompare(a))[0],cs=new Set(S.classes.filter(c=>c.section===s&&(!S.rc||c.id===S.rc)).map(c=>c.id));let n=0;for(const c of cs)n+=(act[c]||[]).length;return n?{d,p:days3[d].size,e:0,n}:null};
   const L=attList().filter(p=>!S.rc||srvClasses(p.id).some(c=>c.id===S.rc)),sec=new Map(L.map(p=>[p.id,srvSection(p)]));
   for(const r of aRows||[]){
     if(r.att_date<d0)continue;const s=sec.get(r.servant_id);if(!s||!WSEC[s])continue;
@@ -969,14 +975,108 @@ function weekStats(sRows,aRows,days){
       const cl=Object.keys(o.cl).map(c=>{const i2=act[c]||[],m=o.cl[c],P=i2.filter(i=>m[i]==='present'),E=i2.filter(i=>m[i]==='excused'),A=i2.filter(i=>m[i]!=='present'&&m[i]!=='excused');return{c:S.classes.find(x=>x.id===c),p:P.length,e:E.length,n:i2.length,P,E,A}}).filter(x=>x.c&&x.n).sort((a,b)=>clsSort(a.c,b.c));
       const SP=L.filter(p=>sec.get(p.id)===s);
       const sa=Object.keys(o.sa).length&&SP.length?(()=>{const P=SP.filter(p=>o.sa[p.id]==='present').map(p=>p.id),E=SP.filter(p=>o.sa[p.id]==='excused').map(p=>p.id),A=SP.filter(p=>o.sa[p.id]!=='present'&&o.sa[p.id]!=='excused').map(p=>p.id);return{p:P.length,e:E.length,n:SP.length,P,E,A}})():null;
-      by[s]={date:main,others:ds.filter(d=>d!==main).map(d=>({d,n:days2[d].n})),sv:wkSum(cl),sa,cl};
+      by[s]={ms:msOf(k,s),date:main,others:ds.filter(d=>d!==main).map(d=>({d,n:days2[d].n})),sv:wkSum(cl),sa,cl};
     }
     const bs=Object.values(by),sas=bs.map(b=>b.sa).filter(Boolean),dates=[...new Set(bs.map(b=>b.date))].sort();
     return{k,last:dates[dates.length-1]||k,dates,sv:wkSum(bs.map(b=>b.sv)),sa:sas.length?wkSum(sas):null,by};
   });
 }
+/* ===== تقرير شهري مطبوع (PDF): بيتفتح في صفحة جديدة وبيطلب الطباعة، واختار «حفظ كـ PDF» ===== */
+const MON_CSS=`@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:#17302b;background:#f3f5f2;margin:0;line-height:1.7}
+.wrap{max-width:820px;margin:0 auto;padding:18px}header{background:#17302b;color:#fff;border-radius:12px;padding:22px;margin-bottom:16px}header h1{margin:0;font-size:26px}header p{margin:4px 0 0;color:#d9a441}
+section{background:#fff;border:1px solid #d5ddd8;border-radius:12px;padding:16px 18px;margin-bottom:16px}tr{break-inside:avoid}h2,h3{break-after:avoid}
+h2{margin:0 0 10px;font-size:20px;display:flex;align-items:center;gap:10px}h2 span{background:#d9a441;color:#17302b;border-radius:50%;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;font-size:16px}
+h3{font-size:15px;margin:16px 0 6px;color:#17302b;border-right:4px solid #d9a441;padding-right:8px}
+table{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0}th{background:#f3f5f2;color:#5d6f6a;text-align:right;padding:7px 8px;font-size:13px}td{padding:7px 8px;border-top:1px solid #e3e9e5;vertical-align:middle}tbody tr:nth-child(even){background:#fafbfa}
+small{color:#5d6f6a}.note{color:#5d6f6a;font-size:13px}.kps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px}.kp{border:1px solid #d5ddd8;border-radius:10px;padding:10px 6px;text-align:center;background:#fbfcfb}.kp b{display:block;font-size:24px}.kp span{font-size:12.5px;color:#5d6f6a}
+.kp.g{background:#e8f4ec;border-color:#bfdcc9}.kp.m{background:#fbf3df;border-color:#ecd9a6}.kp.b{background:#f9e3df;border-color:#efc3bc}
+.bar{height:9px;background:#e6ebe8;border-radius:6px;overflow:hidden;min-width:70px}.bar i{display:block;height:100%}.bar i.g{background:#3f9a63}.bar i.m{background:#d9a441}.bar i.b{background:#a33b2e}
+.rg{display:inline-block;min-width:26px;text-align:center;border-radius:8px;padding:1px 6px;background:#eef1ef;font-weight:700}.rg.m{background:#fbf3df;color:#8a6414}.rg.b{background:#f9e3df;color:#a33b2e}
+.lock{background:#f9e3df;color:#a33b2e;border-radius:8px;padding:1px 8px;font-size:13px}.chart{width:100%;max-width:520px;display:block;margin:6px auto}
+footer{text-align:center;color:#5d6f6a;font-size:12.5px;padding:6px}@media print{body{background:#fff}.wrap{padding:0}}@media(max-width:560px){.kps{grid-template-columns:repeat(2,1fr)}}.sign{display:flex;justify-content:space-between;margin-top:26px;color:#5d6f6a;font-size:14px}.sign div{width:42%;border-top:1px solid #aab5af;padding-top:6px;text-align:center}`;
+function monthReportHtml(days){
+  const W=weekStats(S.ah,S.sa,days,S.mah).slice().reverse();
+  if(!W.length)return null;
+  const secs=S.sec?[S.sec]:Object.keys(WSEC),E=esc,pc=o=>o&&o.n?Math.round(100*o.p/o.n):null,col=v=>v===null?'':v>=60?'g':v>=35?'m':'b';
+  const bar=v=>v===null?'—':`<div class="bar"><i class="${col(v)}" style="width:${v}%"></i></div>`;
+  const tbl=(h,r,c='')=>`<table class="${c}"><thead><tr>${h.map(x=>`<th>${E(x)}</th>`).join('')}</tr></thead><tbody>${r.map(a=>`<tr>${a.map(x=>`<td>${x}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const kp=(v,l,c='')=>`<div class="kp ${c}"><b>${v}</b><span>${l}</span></div>`,sec=(n,t,b)=>`<section><h2><span>${n}</span>${t}</h2>${b}</section>`;
+  const pct=o=>{const v=pc(o);return v===null?'—':v+'%'},sh=n=>String(n||'').split(' ').slice(0,3).join(' ');
+  let body='';
+  secs.forEach(sc=>{
+    const rows=W.map(w=>w.by[sc]?{d:w.by[sc].date,sv:w.by[sc].sv,ms:w.by[sc].ms,sa:w.by[sc].sa,cl:w.by[sc].cl}:null).filter(Boolean);
+    if(!rows.length)return;
+    const avg=f=>{const a=rows.map(f).filter(v=>v!==null);return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null};
+    const aS=avg(r=>pc(r.sv)),aM=avg(r=>pc(r.ms)),aA=avg(r=>pc(r.sa));
+    const wk=tbl(['الاجتماع','المخدومين','','القداس','الخدام'],rows.map(r=>[fdate(r.d),`<b>${r.sv.p}</b> / ${r.sv.n} <small>(${pct(r.sv)})</small>`,bar(pc(r.sv)),r.ms?`${r.ms.p} / ${r.ms.n} <small>(${pct(r.ms)})</small>`:'—',r.sa?`${r.sa.p} / ${r.sa.n}`:'—']),'rt');
+    const cm={};rows.forEach(r=>r.cl.forEach(o=>{const m=cm[o.c.id]=cm[o.c.id]||{c:o.c,p:0,n:0,k:0};m.p+=o.p;m.n+=o.n;m.k++}));
+    const cls=Object.values(cm).sort((a,b)=>clsSort(a.c,b.c)).map(m=>{const v=m.n?Math.round(100*m.p/m.n):0;return [E(cLabel(m.c)),Math.round(m.n/m.k),Math.round(m.p/m.k),bar(v),`<b>${v}%</b>`]});
+    const idsS=new Set(S.servees.filter(x=>x.active&&x.class_id&&(S.classes.find(c=>c.id===x.class_id)||{}).section===sc).map(x=>x.id));
+    const ab=(S.ah===null?[]:absList()).filter(o=>idsS.has(o.x.id));
+    const fu=(S.fu||[]).filter(f=>idsS.has(f.servee_id)&&String(f.created_at||f.followup_date||'').slice(0,10)>=ago(days)&&!String(f.note||'').startsWith('[تلقائي]'));
+    const fk={};fu.forEach(f=>{fk[f.kind]=(fk[f.kind]||0)+1});
+    const mi=S.servees.filter(x=>idsS.has(x.id));const comp=[['هاتف أب/أم',x=>x.father_phone||x.mother_phone],['تاريخ الميلاد',x=>x.birth_date],['العنوان',x=>x.address],['المدرسة',x=>x.school],['أب الاعتراف',x=>x.confession_father],['الخادم المسؤول',x=>x.servant_id]].map(([n,f])=>{const v=mi.length?Math.round(100*mi.filter(f).length/mi.length):0;return [n,`${mi.filter(f).length} / ${mi.length}`,bar(v),`<b>${v}%</b>`]});
+    body+=`<section><h2><span>●</span>خدمة ${WSEC[sc].n} · ملخص الفترة</h2><div class="kps">${kp(aS===null?'—':aS+'%','متوسط حضور الاجتماع',col(aS))}${kp(aM===null?'—':aM+'%','متوسط حضور القداس')}${kp(aA===null?'—':aA+'%','متوسط حضور الخدام')}${kp(ab.length,'محتاجين افتقاد','b')}</div></section>`;
+    body+=sec(1,'الحضور أسبوعيًا',wk)+sec(2,'متوسط الحضور لكل فصل',tbl(['الفصل','عدد','متوسط الحضور','','%'],cls,'rt'));
+    body+=sec(3,'الغياب والافتقاد',`<p>افتقادات الفترة: <b>${fu.length}</b>${Object.keys(fk).length?' ('+Object.entries(fk).map(([k,n])=>(FK[k]||k)+' '+n).join(' · ')+')':''} · غايبين ${ABS_TH}+ اجتماعات: <b>${ab.length}</b></p>${ab.length?tbl(['الاسم','الفصل','غياب','الخادم'],ab.slice(0,25).map(({x,st})=>[E(sh(x.full_name)),E(cname(x.class_id)),`<span class="rg ${st.streak>=5?'b':'m'}">${st.streak}</span>`,E(svServants(x).map(p=>sh(p.full_name).split(' ').slice(0,2).join(' ')).join(' · ')||'—')]),'rt')+(ab.length>25?`<p class="note">… و${ab.length-25} كمان</p>`:''):''}`);
+    body+=sec(4,'اكتمال البيانات',tbl(['البيان','موجود','','%'],comp,'rt'));
+  });
+  const a=W[0].dates[0],z=W[W.length-1].last;
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير خدمة إعدادي</title><style>${MON_CSS}</style></head><body><div class="wrap"><header><h1>التقرير الشهري · خدمة إعدادي${S.sec?' · '+SEC[S.sec]:''}</h1><p>من ${fdate(a)} إلى ${fdate(z)} · ${W.length} أسبوع</p></header>${body}<div class="sign"><div>أمين الخدمة</div><div>أبونا</div></div><footer>أُعدّ من التطبيق بتاريخ ${fdate(today())}</footer></div></body></html>`;
+}
+function monthReport(){
+  const h=monthReportHtml(35);if(!h)return toast('مفيش حضور متسجّل في الفترة دي');
+  const w=window.open('','_blank');if(!w)return toast('المتصفح قفل النافذة، اسمح بالنوافذ المنبثقة وجرّب تاني');
+  w.document.open();w.document.write(h);w.document.close();setTimeout(()=>{try{w.focus();w.print()}catch(_){}},600);
+}
+/* ===== إنذار مبكر + تقييم الخدام (بيتحسبوا من الحضور والقداس والافتقاد المتسجّلين) ===== */
+function riskList(H){
+  const fuRecent=new Set((S.fu||[]).filter(f=>String(f.created_at||f.followup_date||'').slice(0,10)>=ago(14)&&!String(f.note||'').startsWith('[تلقائي]')).map(f=>f.servee_id));
+  const out=[];
+  for(const x of S.servees){
+    if(!x.active||!x.class_id)continue;
+    const st=servStat(x,H);if(!st.sessions)continue;
+    const ms=S.mah&&S.mah.length?massStat(x,S.mah,S.servees,90):null,why=[];let sc=0;
+    if(st.streak>=2){sc+=Math.min(60,st.streak*20);why.push('غايب '+st.streak+' اجتماعات ورا بعض')}
+    if(st.sessions>=3&&st.pct!==null&&st.pct<40){sc+=Math.round((100-st.pct)*.2);why.push('حضور '+st.pct+'% بس')}
+    if(ms&&ms.streak>=2){sc+=15;why.push('منقطع عن القداس '+ms.streak+' مرات')}
+    if(st.streak>=2&&!fuRecent.has(x.id)){sc+=10;why.push('مفيش افتقاد آخر أسبوعين')}
+    if(!x.servant_id&&st.streak>=2){sc+=5;why.push('من غير خادم')}
+    if(st.streak<2&&sc<45)continue;
+    out.push({x,sc:Math.min(100,sc),st,why});
+  }
+  return out.sort((a,b)=>b.sc-a.sc||b.st.streak-a.st.streak);
+}
+function riskCard(H){
+  if(S.ah===null)return '';
+  const L=riskList(H),lv=s=>s>=70?['عالي','b']:s>=45?['متوسط','m']:['تنبيه',''];
+  const n=k=>L.filter(o=>lv(o.sc)[1]===k).length;
+  return `<div class="card"><h2>🚨 إنذار مبكر (${L.length})</h2><p class="empty" style="padding:0 0 6px">مخدومين بدأوا يبعدوا قبل ما ينقطعوا: غياب متكرر، انقطاع عن القداس، أو مفيش افتقاد. الدرجة من 100.</p>
+  <div class="cnt"><span>🔴 عالي ${n('b')}</span><span>🟠 متوسط ${n('m')}</span><span>⚪ تنبيه ${n('')}</span></div>
+  ${L.slice(0,30).map(o=>{const[l,c]=lv(o.sc);return `<div class="row"><div class="who">${av(o.x,40)}<div>${esc(o.x.full_name)}<small>${esc(cname(o.x.class_id))} · ${o.why.map(esc).join(' · ')}</small><small>الخادم المسؤول: ${respName(o.x)}</small></div></div><div class="acts"><span class="rg ${c}">${o.sc}</span>${absContact(o.x)}<button class="s" data-a="fuOpen" data-id="${o.x.id}">افتقاد</button></div></div>`}).join('')||'<div class="empty">مفيش حد في خطر دلوقتي ✓</div>'}${L.length>30?`<p class="empty">… و${L.length-30} كمان</p>`:''}</div>`;
+}
+function servantScores(days,H){
+  const d0=ago(days),fu=(S.fu||[]).filter(f=>String(f.created_at||f.followup_date||'').slice(0,10)>=d0&&!String(f.note||'').startsWith('[تلقائي]'));
+  const secDates={};(S.sa||[]).forEach(r=>{if(r.att_date<d0)return;const p=S.profiles.find(q=>q.id===r.servant_id),sc=p&&srvSection(p);if(sc)(secDates[sc]=secDates[sc]||new Set()).add(r.att_date)});
+  return attList().map(p=>{
+    const sc=srvSection(p),nd=(secDates[sc]||new Set()).size,pr=(S.sa||[]).filter(r=>r.servant_id===p.id&&r.att_date>=d0&&r.status==='present').length;
+    const mine=S.servees.filter(x=>x.active&&x.class_id&&svServants(x).some(q=>q.id===p.id));
+    const sts=mine.map(x=>({x,st:servStat(x,H)})).filter(o=>o.st.sessions),avg=sts.length?Math.round(sts.reduce((a,o)=>a+(o.st.pct||0),0)/sts.length):null;
+    const need=sts.filter(o=>o.st.streak>=ABS_TH),done=need.filter(o=>fu.some(f=>f.servee_id===o.x.id)).length,myFu=fu.filter(f=>f.servant_id===p.id).length;
+    const att=nd?Math.round(100*pr/nd):null,fuP=need.length?Math.round(100*done/need.length):100;
+    const parts=[[att,.4],[avg,.4],[fuP,.2]].filter(a=>a[0]!==null),w=parts.reduce((a,b)=>a+b[1],0),score=parts.length?Math.round(parts.reduce((a,b)=>a+b[0]*b[1],0)/w):null;
+    return{p,att,avg,kids:mine.length,need:need.length,done,myFu,score};
+  }).filter(o=>o.kids||o.att!==null).sort((a,b)=>(b.score??-1)-(a.score??-1));
+}
+function servantEvalCard(days,H){
+  if(S.ah===null||!S.profiles.length)return '';
+  const L=servantScores(days,H),cl=v=>v===null?'':v>=70?'g':v>=45?'m':'b';
+  const avg=(()=>{const a=L.map(o=>o.score).filter(v=>v!==null);return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null})();
+  return `<div class="card"><h2>⭐ تقييم الخدام (${L.length})</h2><p class="empty" style="padding:0 0 6px">التقييم = حضور الخادم (40%) + حضور مخدوميه (40%) + افتقاد الغايبين بتوعه (20%) في آخر ${days} يوم. المتوسط: <b>${avg===null?'—':avg}</b></p>
+  ${L.map(o=>`<div class="row"><div>${esc(o.p.full_name||'؟')}<small>حضوره ${o.att===null?'—':o.att+'%'} · حضور مخدوميه ${o.avg===null?'—':o.avg+'%'} (${o.kids}) · افتقد ${o.done} من ${o.need} غايب · افتقاداته ${o.myFu}</small></div><span class="rg ${cl(o.score)}" style="font-size:16px">${o.score===null?'—':o.score}</span></div>`).join('')||'<div class="empty">مفيش بيانات كفاية</div>'}</div>`;
+}
 function weekRepCard(days){
-  const W=weekStats(S.ah,S.sa,days);
+  const W=weekStats(S.ah,S.sa,days,S.mah);
   const hd=`<div class="card"><h2>التقرير الأسبوعي <small>حضور الاجتماع بتاريخ التسجيل</small></h2>`;
   if(!W.length)return hd+'<div class="empty">مفيش حضور متسجّل في الفترة دي.</div></div>';
   const avg=f=>{const a=W.map(f).filter(x=>x!==null&&x!==undefined);return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null};
@@ -986,11 +1086,11 @@ function weekRepCard(days){
   const svNames=b=>`<h3 style="margin:10px 0 0">المخدومين</h3>`+ST3.map(([k,t])=>vl(t,b.cl.flatMap(o=>o[k].map(i=>[sname(i),cLabel(o.c)])).sort(ar))).join('');
   const saNames=b=>b.sa?`<h3 style="margin:14px 0 0">الخدام</h3>`+ST3.map(([k,t])=>vl(t,b.sa[k].map(i=>[pname(i),'']).sort(ar))).join(''):'';
   const pr=(t,o)=>`<div class="row"><div>${t}<small>${o?`حاضر ${o.p} من ${o.n}${o.e?' · معتذر '+o.e:''}`:'لسه ما اتسجّلش'}</small></div><div style="width:40%;text-align:left">${o&&o.n?wkPct(o)+'%'+bar(wkPct(o)):'—'}</div></div>`;
-  return hd+`<div class="cnt"><span>${W.length} أسبوع</span><span>متوسط المخدومين ${aS===null?'—':aS+'%'}</span><span>متوسط الخدام ${aA===null?'—':aA+'%'}</span></div><button class="s on" data-a="exp" data-id="weekly" style="margin:8px 0">تصدير التقرير الأسبوعي (Excel/CSV)</button> <button class="s" data-a="exp" data-id="weeklyNames" style="margin:8px 0">تصدير الأسماء (CSV)</button></div>`
+  return hd+`<div class="cnt"><span>${W.length} أسبوع</span><span>متوسط المخدومين ${aS===null?'—':aS+'%'}</span><span>متوسط الخدام ${aA===null?'—':aA+'%'}</span></div><button class="s on" data-a="monthPdf" style="margin:8px 0">📄 تقرير شهري (PDF)</button> <button class="s on" data-a="exp" data-id="weekly" style="margin:8px 0">تصدير التقرير الأسبوعي (Excel/CSV)</button> <button class="s" data-a="exp" data-id="weeklyNames" style="margin:8px 0">تصدير الأسماء (CSV)</button></div>`
     +W.map(w=>{
       const ks=Object.keys(w.by),multi=ks.length>1,diff=w.dates.length>1;
       const body=ks.map(s=>{const b=w.by[s];
-        return `<div style="margin-top:8px">${multi?`<b>${WSEC[s].n}${diff?' · '+fdate(b.date):''}</b>`:''}${pr('المخدومين',b.sv)}${pr('الخدام',b.sa)}${b.others.length?`<small style="display:block;color:var(--mut)">تسجيلات تانية في الأسبوع ده (مش محسوبة): ${b.others.map(x=>fdate(x.d)+' ('+x.n+')').join(' · ')}</small>`:''}<details class="mre"><summary class="s">فتح الأسماء (${b.sv.p} مخدوم · ${b.sa?b.sa.p:0} خادم)</summary>${svNames(b)}${saNames(b)}</details></div>`}).join('');
+        return `<div style="margin-top:8px">${multi?`<b>${WSEC[s].n}${diff?' · '+fdate(b.date):''}</b>`:''}${pr('المخدومين · الاجتماع',b.sv)}${b.ms?pr('المخدومين · القداس · '+fdate(b.ms.d),b.ms):''}${pr('الخدام',b.sa)}${b.others.length?`<small style="display:block;color:var(--mut)">تسجيلات تانية في الأسبوع ده (مش محسوبة): ${b.others.map(x=>fdate(x.d)+' ('+x.n+')').join(' · ')}</small>`:''}<details class="mre"><summary class="s">فتح الأسماء (${b.sv.p} مخدوم · ${b.sa?b.sa.p:0} خادم)</summary>${svNames(b)}${saNames(b)}</details></div>`}).join('');
       return `<div class="card"><h2>${w.dates.map(d=>fdate(d)).join(' و ')}</h2>${multi?pr('الإجمالي · المخدومين',w.sv)+pr('الإجمالي · الخدام',w.sa):''}${body}</div>`}).join('');
 }
 function weeklyNameRows(days){
@@ -1028,7 +1128,7 @@ function vRep(){
     const L=attList().map(p=>{const r=S.sa.filter(x=>x.servant_id===p.id&&x.att_date>=d0),pr=r.filter(x=>x.status==='present').length;return{p,pr,ab:r.filter(x=>x.status==='absent').length,ex:r.filter(x=>x.status==='excused').length,n:r.length,pct:pr+r.filter(x=>x.status==='absent').length?Math.round(pr*100/(pr+r.filter(x=>x.status==='absent').length)):null}}).sort((a,b)=>(a.pct??101)-(b.pct??101));
     sv=`<div class="card"><h2>حضور الخدام (${L.length})</h2><button class="s" data-a="exp" data-id="servants" style="margin-bottom:8px">تصدير Excel (CSV)</button>${L.map(o=>`<div class="row"><div>${esc(o.p.full_name||'بدون اسم')}${o.p.role==='secretary'?'<span class="bd">أمين</span>':''}${isAdmin()?badge(o.p.section):''}<small>حاضر ${o.pr} · غايب ${o.ab} · معتذر ${o.ex}</small></div><div style="width:40%;text-align:left">${o.pct===null?'—':o.pct+'%'}${bar(o.pct)}</div></div>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div>`}
   return `<div class="card"><h2>تقارير الحضور</h2><div class="two"><select data-a="rc"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.rc)}</select><select data-a="rd">${[[28,'آخر 4 أسابيع'],[56,'آخر 8 أسابيع'],[90,'آخر 90 يوم']].map(([n,l])=>`<option value="${n}"${days===n?' selected':''}>${l}</option>`).join('')}</select></div></div>
-  ${weekRepCard(days)}<div class="card"><h2>الفصول</h2><button class="s" data-a="exp" data-id="servees" style="margin-bottom:8px">تصدير Excel (CSV)</button>${crow.map(o=>`<div class="row"><div>${esc(cLabel(o.c))}<small>${o.act.length} مخدوم · ${o.ds.length} اجتماع</small></div><div style="width:40%;text-align:left">${o.avg===null?'—':o.avg+'%'}${bar(o.avg)}</div></div>`).join('')||'<div class="empty">مفيش فصول.</div>'}</div>${det}${sv}${massRepCards(days,cls)}`;
+  ${weekRepCard(days)}${canManage()?riskCard(H)+servantEvalCard(days,H):''}<div class="card"><h2>الفصول</h2><button class="s" data-a="exp" data-id="servees" style="margin-bottom:8px">تصدير Excel (CSV)</button>${crow.map(o=>`<div class="row"><div>${esc(cLabel(o.c))}<small>${o.act.length} مخدوم · ${o.ds.length} اجتماع</small></div><div style="width:40%;text-align:left">${o.avg===null?'—':o.avg+'%'}${bar(o.avg)}</div></div>`).join('')||'<div class="empty">مفيش فصول.</div>'}</div>${det}${sv}${massRepCards(days,cls)}`;
 }
 function dl(name,rows){
   const q=x=>{let t=String(x??'');if(/^[=+\-@]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"'};
@@ -1270,7 +1370,7 @@ function vMsgNew(){
   <div id="sm_se" style="display:none"><select id="sm_st" data-a="msgst"><option value="all">${S.sec?'كل أمناء خدمة '+SEC[S.sec]:'كل أمناء الخدمة'}</option><option value="selected">أمين بعينه</option></select><div id="sm_sew" class="pkbox" style="display:none">${S.profiles.filter(p=>p.role==='secretary'&&p.active).map(p=>`<label class="pk"><input type="checkbox" class="smsec" value="${p.id}"><span class="nm">${esc(p.full_name)}</span>${p.section?`<span class="bd">${SEC[p.section]}</span>`:''}</label>`).join('')||'<div class="empty">مفيش أمناء خدمة.</div>'}</div></div>
   <div id="sm_pa" style="display:none"><select id="sm_pt" data-a="msgpt"><option value="all">${isAdmin()?(S.sec?'كل أولياء أمور '+SEC[S.sec]:'كل أولياء الأمور'):'كل أولياء أمور قسمي'}</option><option value="class">أولياء أمور فصل</option><option value="servee">أولياء أمور مخدوم معيّن</option><option value="one">ولي أمر معيّن</option></select>
   <div id="sm_pcw" style="display:none"><select id="sm_pcl"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select></div>
-  <div id="sm_psw" style="display:none"><select id="sm_ps"><option value="">اختار المخدوم</option>${S.servees.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.full_name)} — ${esc(cname(x.class_id))}</option>`).join('')}</select></div>
+  <div id="sm_psw" style="display:none"><input type="search" data-sf="sm_ps" placeholder="ابحث بالاسم..." autocomplete="off" aria-label="بحث"><select id="sm_ps"><option value="">اختار المخدوم</option>${S.servees.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.full_name)} — ${esc(cname(x.class_id))}</option>`).join('')}</select></div>
   <div id="sm_puw" style="display:none"><select id="sm_pu"><option value="">اختار ولي الأمر</option>${pr.map(p=>`<option value="${p.id}">${esc(p.full_name)}</option>`).join('')}</select></div></div>
   <input id="sm_t" maxlength="80" placeholder="العنوان (اختياري)" value="${esc(st.title)}"><textarea id="sm_b" rows="5" maxlength="1000" placeholder="نص الرسالة">${esc(st.body)}</textarea>
   <p class="empty">اكتب <b>{name}</b> وهتتبدّل بأول اسمين من اسم كل مستلم، و<b>{servee}</b> باسم ابنه (لأولياء الأمور). بتوصل كإشعار على الموبايل وجوه التطبيق (🔔)، وتقدر تشوف مين قراها.</p>
@@ -1326,7 +1426,7 @@ function vComp(){
   const create=mg?`<div class="card"><h2>مسابقة جديدة</h2><input id="mt" placeholder="اسم المسابقة (مثال: مسابقة الحفظ)"><select id="mc"><option value="">اختار الفصل</option>${opts(S.classes,cLabel)}</select><div class="two"><input id="ms" type="date" value="${td}" aria-label="تبدأ"><input id="me" type="date" aria-label="تنتهي"></div><button class="p" data-a="compAdd">إضافة المسابقة</button></div>`:'';
   const sel=`<select data-a="pc">${cs.map(c=>`<option value="${c.id}"${cur&&c.id===cur.id?' selected':''}>${esc(c.title)}${c.class_id?' · '+esc(cname(c.class_id)):''}${c.ends_on&&c.ends_on<td?' (انتهت)':''}</option>`).join('')}</select>`;
   if(!cs.length)return create+'<div class="card"><h2>المسابقات</h2><div class="empty">لسه مفيش مسابقات.'+(mg?'':' كلّم الأمين يضيف مسابقة.')+'</div></div>';
-  return create+`<div class="card"><h2>إعطاء نقاط</h2>${sel}<select id="pcs"><option value="">اختار المخدوم</option>${opts(cand,x=>x.full_name)}</select><div class="two"><select id="pv">${PV.map(n=>`<option value="${n}">${n>0?'+':''}${n}</option>`).join('')}</select><input id="pr" placeholder="السبب (اختياري)"></div><button class="p" data-a="givePts">تسجيل النقاط</button></div>
+  return create+`<div class="card"><h2>إعطاء نقاط</h2>${sel}<input type="search" data-sf="pcs" placeholder="ابحث بالاسم..." autocomplete="off" aria-label="بحث"><select id="pcs"><option value="">اختار المخدوم</option>${opts(cand,x=>x.full_name)}</select><div class="two"><select id="pv">${PV.map(n=>`<option value="${n}">${n>0?'+':''}${n}</option>`).join('')}</select><input id="pr" placeholder="السبب (اختياري)"></div><button class="p" data-a="givePts">تسجيل النقاط</button></div>
   <div class="card"><h2>لوحة الشرف${cur?' · '+esc(cur.title):''}</h2>${top.map((o,i)=>`<div class="row"><div>${medal[i]||(i+1)+'.'} ${esc(sname(o.id))}</div><b>${o.n}</b></div>`).join('')||'<div class="empty">لسه مفيش نقاط في المسابقة دي.</div>'}</div>
   <div class="card"><h2>آخر النقاط</h2>${rows.slice(0,20).map(x=>`<div class="row"><div>${esc(sname(x.servee_id))}<small>${x.reason?esc(x.reason)+' · ':''}${new Date(x.created_at).toLocaleDateString('ar-EG')}${mg&&pname(x.given_by)!=='؟'?' · '+esc(pname(x.given_by)):''}</small></div><div class="acts"><b style="color:${x.points>0?'#1b7a43':'var(--red)'}">${x.points>0?'+':''}${x.points}</b>${canManage()?`<button class="s d" data-a="ptDel" data-id="${x.id}">حذف</button>`:''}</div></div>`).join('')||'<div class="empty">مفيش نقاط لسه.</div>'}</div>
   ${cur&&(isAdmin()||(isSec()&&cur.class_id))?`<div class="card"><button class="s d" data-a="compDel" data-id="${cur.id}">حذف مسابقة «${esc(cur.title)}»</button></div>`:''}`;
@@ -1421,7 +1521,7 @@ function vAdd(){
   <select id="ur" data-a="newrole">${Object.entries(ROLES).filter(([k])=>isAdmin()||k==='servant'||k==='parent').map(([k,n])=>`<option value="${k}"${k==='servant'?' selected':''}>${n}</option>`).join('')}</select>
   <div id="usc" style="display:none"><select id="usec"><option value="">اختار قسم أمين الخدمة</option><option value="boys"${S.sec==='boys'?' selected':''}>بنين</option><option value="girls"${S.sec==='girls'?' selected':''}>بنات</option></select></div>
   <div id="uc"><select id="ucl"><option value="">اختار فصل الخادم</option>${opts(S.classes,cLabel)}</select></div>
-  <div id="ue" style="display:none"><select id="use"><option value="">اختار المخدوم</option>${opts(S.servees,s=>s.full_name)}</select></div>
+  <div id="ue" style="display:none"><input type="search" data-sf="use" placeholder="ابحث بالاسم..." autocomplete="off" aria-label="بحث"><select id="use"><option value="">اختار المخدوم</option>${opts(S.servees,s=>s.full_name)}</select></div>
   <button class="p" data-a="addUser">إنشاء الحساب</button><p class="empty">هيتعمل باسورد مؤقت يتغيّر أول دخول. لو ولي الأمر عنده أكتر من ابن، اربط الباقي من تبويب المستخدمين.</p></div>`;
 }
 function invLinkCard(){
@@ -1580,11 +1680,21 @@ function absList(cid){
   const H=histInfo(90);
   return S.servees.filter(x=>x.active&&x.class_id&&(!cid||x.class_id===cid)).map(x=>({x,st:servStat(x,H)})).filter(o=>o.st.streak>=ABS_TH).sort((a,b)=>b.st.streak-a.st.streak||a.x.full_name.localeCompare(b.x.full_name,'ar'));
 }
+/* أزرار التواصل للغايب: المخدوم نفسه لو عنده رقم، وأولياء الأمور (الأب ثم الأم) برسالة مخصوصة لهم — كتير من المخدومين رقمهم ناقص وبس رقم الأب أو الأم */
+function absContact(x){
+  const own=normPhone(x.phone||''),fa=normPhone(x.father_phone||''),mo=normPhone(x.mother_phone||'');
+  const b=(ph,msg,l)=>`<a class="s" target="_blank" rel="noopener" style="${LK}" href="${waUrl(ph,msg)}">💬 ${l}</a>`,c=ph=>`<a class="s" style="${LK}" href="tel:${ph}">📞</a>`;
+  let h='';
+  if(own)h+=c(own)+b(own,MSG.abs(x),'المخدوم');
+  if(fa)h+=(own?'':c(fa))+b(fa,MSGP.abs(x),'الأب');
+  if(mo&&mo!==fa)h+=(own||fa?'':c(mo))+b(mo,MSGP.abs(x),'الأم');
+  return h||nb({s:x.id,m:MSGP.abs(x)},'أولياء أمور '+x.full_name,MSGP.abs(x))||'<small style="color:var(--red)">مفيش رقم</small>';
+}
 function absCard(L,max,showAll){
   if(S.ah===null)return'';
   const fu=S.fu||[],open=id=>fu.find(f=>f.servee_id===id&&f.status==='open');
   const rows=L.slice(0,max).map(({x,st})=>{const o=open(x.id);
-    return `<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))} · ${absLine(st)}</small><small>الخادم المسؤول: ${respName(x)}</small><small>${o?'<span class="bd" style="background:#fde9b8;margin:0">بند افتقاد مفتوح</span>':'لسه ما اتفتقدش'}</small></div></div><div class="acts">${qc(x.phone,MSG.abs(x),{s:x.id,m:MSGP.abs(x)},'أولياء أمور '+x.full_name)}<button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`}).join('');
+    return `<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))} · ${absLine(st)}</small><small>الخادم المسؤول: ${respName(x)}</small><small>${o?'<span class="bd" style="background:#fde9b8;margin:0">بند افتقاد مفتوح</span>':'لسه ما اتفتقدش'}</small></div></div><div class="acts">${absContact(x)}<button class="s" data-a="fuOpen" data-id="${x.id}">سجّل افتقاد</button><button class="s on" data-a="pf" data-id="${x.id}">الملف</button></div></div>`}).join('');
   return `<div class="card" style="border-color:${L.length?'var(--red)':'var(--line)'}"><h2>⚠️ محتاجين افتقاد (${L.length})</h2><p class="empty" style="margin:0 0 4px;padding:0">غابوا ${ABS_TH} اجتماعات ورا بعض أو أكتر. بيتفتح لهم بند افتقاد وبيوصل إشعار للخادم أوتوماتيك.</p>${rows||'<div class="empty">مفيش حد غايب '+ABS_TH+' اجتماعات ورا بعض. ✓</div>'}${showAll&&L.length>max?`<button class="s" data-a="tab" data-id="follow" style="width:100%;margin-top:8px">عرض الكل (${L.length})</button>`:''}</div>`;
 }
 /* زمايل الخادم في الفصل (دالة سيرفر عشان الخادم ما يقرأش جدول المستخدمين) */
@@ -1798,6 +1908,7 @@ app.addEventListener('click',async e=>{
     if(!ok(r))return;await sb.from('followups').update({status:'done'}).eq('servee_id',sid).eq('status','open').like('note','[تلقائي]%');
     await loadFu();render();return toast('اتسجّل');
   }
+  if(a==='monthPdf'){return monthReport()}
   if(a==='fuOpen'){S.fuf=id;render();return window.scrollTo(0,0)}
   if(a==='saveFu'){
     const r=await sb.from('followups').insert({servee_id:S.fuf,servant_id:(canManage()&&v('fw'))||S.p.id,kind:v('fk'),status:v('fs'),note:document.getElementById('fn').value.trim()||null,followup_date:v('fd')||today()});
@@ -2125,6 +2236,11 @@ document.getElementById('pf').addEventListener('change',async e=>{
   }catch(_){toast('الصورة دي مش مقبولة، جرّب صورة تانية')}
 });
 app.addEventListener('input',e=>{
+  {const t=e.target;if(t&&t.dataset&&t.dataset.sf){const sel=document.getElementById(t.dataset.sf);if(sel){
+    if(!sel._all)sel._all=[...sel.options].map(o=>({v:o.value,t:o.textContent}));
+    const k=nz(t.value||'').trim(),keep=sel.value,L=sel._all.filter((o,i)=>i===0||!k||nz(o.t).includes(k)),m=L.slice(1);
+    sel.innerHTML=L.map((o,i)=>`<option value="${esc(o.v)}"${(i===0&&!m.length&&k)?'':''}>${i===0&&k?(m.length?'اختار ('+m.length+' نتيجة)':'مفيش نتيجة'):esc(o.t)}</option>`).join('');
+    sel.value=m.length===1?m[0].v:(L.some(o=>o.v===keep)?keep:'');return}}}
   {const t=e.target;if(t&&t.dataset&&t.dataset.a==='spfind'){const sel=document.getElementById('spsv');if(sel)sel.innerHTML=spOpts(t.value);return}}
   const b=e.target;if(b&&b.dataset&&b.dataset.a==='rpdraft'){S.rpd=b.value;return}
   if(b&&b.dataset&&b.dataset.a==='msgfind'){const q=nz(b.value);document.querySelectorAll('.smlbl').forEach(l=>l.style.display=(!q||l.dataset.n.includes(q))?'flex':'none');return}
