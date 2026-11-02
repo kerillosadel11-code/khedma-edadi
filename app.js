@@ -946,32 +946,33 @@ const fdm=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{day:'numeric',m
 const wkDay=(k,sec)=>{const t=new Date(k+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+WSEC[sec].off);return t.toISOString().slice(0,10)};
 const wkSum=a=>a.reduce((t,o)=>({p:t.p+o.p,e:t.e+o.e,n:t.n+o.n}),{p:0,e:0,n:0});
 function weekStats(sRows,aRows,days){
-  const d0=ago(days),W={},act={},cid=new Map();
+  /* بنجمّع كل أسبوع (سبت→جمعة) في كارت، لكن أرقام كل قسم بتتحسب من يوم واحد: اليوم اللي فيه أكتر حضور متسجّل.
+     أي تسجيلات في أيام تانية بتظهر كملاحظة، مش بتتجمّع على الأرقام. */
+  const d0=ago(days),R={},act={},cid=new Map(),secOfC=c=>(S.classes.find(x=>x.id===c)||{}).section;
   S.servees.forEach(x=>{if(x.active&&x.class_id){cid.set(x.id,x.class_id);(act[x.class_id]=act[x.class_id]||[]).push(x.id)}});
-  const wk=k=>W[k]||(W[k]={k,cl:{},sa:null,all:new Set(),dt:{boys:new Set(),girls:new Set()}});
+  const rec=(s,d)=>{const k=wkStart(d);return ((R[k]=R[k]||{})[s]=R[k][s]||{})[d]||(R[k][s][d]={cl:{},sa:{},n:0,pr:0})};
   const put=(m,id,st)=>{if(WR[st]&&(!m[id]||WR[st]>WR[m[id]]))m[id]=st};
-  const secOfC=c=>(S.classes.find(x=>x.id===c)||{}).section;
   for(const r of sRows||[]){
-    if(r.att_date<d0)continue;const c=cid.get(r.servee_id);if(!c||(S.rc&&c!==S.rc))continue;
-    const w=wk(wkStart(r.att_date));w.all.add(r.att_date);put(w.cl[c]=w.cl[c]||{},r.servee_id,r.status);const s=secOfC(c);if(w.dt[s])w.dt[s].add(r.att_date);
+    if(r.att_date<d0)continue;const c=cid.get(r.servee_id),s=c&&secOfC(c);if(!s||!WSEC[s]||(S.rc&&c!==S.rc))continue;
+    const o=rec(s,r.att_date);put(o.cl[c]=o.cl[c]||{},r.servee_id,r.status);o.n++;if(r.status==='present')o.pr++;
   }
-  const L=attList().filter(p=>!S.rc||srvClasses(p.id).some(c=>c.id===S.rc)),ids=new Set(L.map(p=>p.id));
+  const L=attList().filter(p=>!S.rc||srvClasses(p.id).some(c=>c.id===S.rc)),sec=new Map(L.map(p=>[p.id,srvSection(p)]));
   for(const r of aRows||[]){
-    if(r.att_date<d0||!ids.has(r.servant_id))continue;
-    const w=wk(wkStart(r.att_date));w.all.add(r.att_date);put(w.sa=w.sa||{},r.servant_id,r.status);
-    const p=L.find(q=>q.id===r.servant_id),s=p&&srvSection(p);if(s&&w.dt[s])w.dt[s].add(r.att_date);
+    if(r.att_date<d0)continue;const s=sec.get(r.servant_id);if(!s||!WSEC[s])continue;
+    const o=rec(s,r.att_date);put(o.sa,r.servant_id,r.status);o.n++;if(r.status==='present')o.pr++;
   }
-  return Object.values(W).sort((a,b)=>b.k.localeCompare(a.k)).map(w=>{
-    const cl=Object.keys(w.cl).map(c=>{const i2=act[c]||[],m=w.cl[c];const P=i2.filter(i=>m[i]==='present'),E=i2.filter(i=>m[i]==='excused'),A=i2.filter(i=>m[i]!=='present'&&m[i]!=='excused');return{c:S.classes.find(x=>x.id===c),p:P.length,e:E.length,n:i2.length,P,E,A}}).filter(o=>o.c&&o.n).sort((a,b)=>clsSort(a.c,b.c));
-    const cnt=P=>{if(!w.sa)return null;const a=P.filter(p=>w.sa[p.id]==='present').map(p=>p.id),b=P.filter(p=>w.sa[p.id]==='excused').map(p=>p.id),c=P.filter(p=>w.sa[p.id]!=='present'&&w.sa[p.id]!=='excused').map(p=>p.id);return{p:a.length,e:b.length,n:P.length,P:a,E:b,A:c}};
+  return Object.keys(R).sort().reverse().map(k=>{
     const by={};
     for(const s of Object.keys(WSEC)){
-      const cs=cl.filter(o=>o.c.section===s),P=L.filter(p=>srvSection(p)===s);
-      if(!cs.length&&!(w.sa&&P.some(p=>w.sa[p.id])))continue;
-      by[s]={dates:[...w.dt[s]].sort(),sv:wkSum(cs),sa:P.length?cnt(P):null,cl:cs};
+      const days2=R[k][s];if(!days2)continue;
+      const ds=Object.keys(days2).sort(),main=ds.slice().sort((a,b)=>days2[b].pr-days2[a].pr||b.localeCompare(a))[0],o=days2[main];
+      const cl=Object.keys(o.cl).map(c=>{const i2=act[c]||[],m=o.cl[c],P=i2.filter(i=>m[i]==='present'),E=i2.filter(i=>m[i]==='excused'),A=i2.filter(i=>m[i]!=='present'&&m[i]!=='excused');return{c:S.classes.find(x=>x.id===c),p:P.length,e:E.length,n:i2.length,P,E,A}}).filter(x=>x.c&&x.n).sort((a,b)=>clsSort(a.c,b.c));
+      const SP=L.filter(p=>sec.get(p.id)===s);
+      const sa=Object.keys(o.sa).length&&SP.length?(()=>{const P=SP.filter(p=>o.sa[p.id]==='present').map(p=>p.id),E=SP.filter(p=>o.sa[p.id]==='excused').map(p=>p.id),A=SP.filter(p=>o.sa[p.id]!=='present'&&o.sa[p.id]!=='excused').map(p=>p.id);return{p:P.length,e:E.length,n:SP.length,P,E,A}})():null;
+      by[s]={date:main,others:ds.filter(d=>d!==main).map(d=>({d,n:days2[d].n})),sv:wkSum(cl),sa,cl};
     }
-    const dates=[...w.all].sort();
-    return{k:w.k,last:dates[dates.length-1]||w.k,dates,sv:wkSum(cl),sa:cnt(L),cl,by};
+    const bs=Object.values(by),sas=bs.map(b=>b.sa).filter(Boolean),dates=[...new Set(bs.map(b=>b.date))].sort();
+    return{k,last:dates[dates.length-1]||k,dates,sv:wkSum(bs.map(b=>b.sv)),sa:sas.length?wkSum(sas):null,by};
   });
 }
 function weekRepCard(days){
@@ -987,14 +988,14 @@ function weekRepCard(days){
   const pr=(t,o)=>`<div class="row"><div>${t}<small>${o?`حاضر ${o.p} من ${o.n}${o.e?' · معتذر '+o.e:''}`:'لسه ما اتسجّلش'}</small></div><div style="width:40%;text-align:left">${o&&o.n?wkPct(o)+'%'+bar(wkPct(o)):'—'}</div></div>`;
   return hd+`<div class="cnt"><span>${W.length} أسبوع</span><span>متوسط المخدومين ${aS===null?'—':aS+'%'}</span><span>متوسط الخدام ${aA===null?'—':aA+'%'}</span></div><button class="s on" data-a="exp" data-id="weekly" style="margin:8px 0">تصدير التقرير الأسبوعي (Excel/CSV)</button> <button class="s" data-a="exp" data-id="weeklyNames" style="margin:8px 0">تصدير الأسماء (CSV)</button></div>`
     +W.map(w=>{
-      const ks=Object.keys(w.by),one=ks.length===1;
-      const body=ks.map(s=>{const b=w.by[s],h=`${WSEC[s].n} · ${b.dates.map(d=>fdate(d)).join(' و ')||'—'}`;
-        return `<div style="margin-top:8px"><b>${h}</b>${pr('المخدومين',b.sv)}${pr('الخدام',b.sa)}<details class="mre"><summary class="s">فتح الأسبوع: الأسماء (${b.sv.p} مخدوم · ${b.sa?b.sa.p:0} خادم)</summary>${svNames(b)}${saNames(b)}</details></div>`}).join('');
-      return `<div class="card"><h2>${w.dates.map(d=>fdate(d)).join(' و ')}</h2>${one?'':pr('الإجمالي · المخدومين',w.sv)+pr('الإجمالي · الخدام',w.sa)}${body}</div>`}).join('');
+      const ks=Object.keys(w.by),multi=ks.length>1,diff=w.dates.length>1;
+      const body=ks.map(s=>{const b=w.by[s];
+        return `<div style="margin-top:8px">${multi?`<b>${WSEC[s].n}${diff?' · '+fdate(b.date):''}</b>`:''}${pr('المخدومين',b.sv)}${pr('الخدام',b.sa)}${b.others.length?`<small style="display:block;color:var(--mut)">تسجيلات تانية في الأسبوع ده (مش محسوبة): ${b.others.map(x=>fdate(x.d)+' ('+x.n+')').join(' · ')}</small>`:''}<details class="mre"><summary class="s">فتح الأسماء (${b.sv.p} مخدوم · ${b.sa?b.sa.p:0} خادم)</summary>${svNames(b)}${saNames(b)}</details></div>`}).join('');
+      return `<div class="card"><h2>${w.dates.map(d=>fdate(d)).join(' و ')}</h2>${multi?pr('الإجمالي · المخدومين',w.sv)+pr('الإجمالي · الخدام',w.sa):''}${body}</div>`}).join('');
 }
 function weeklyNameRows(days){
   const rows=[['تاريخ الاجتماع (تاريخ التسجيل)','القسم','النوع','الفصل','الاسم','الحالة']],ST=[['P','حاضر'],['E','معتذر'],['A','غايب']];
-  for(const w of weekStats(S.ah,S.sa,days))for(const s of Object.keys(w.by)){const b=w.by[s],d=b.dates.join(' و ');
+  for(const w of weekStats(S.ah,S.sa,days))for(const s of Object.keys(w.by)){const b=w.by[s],d=b.date;
     if(b.sa)ST.forEach(([k,t])=>b.sa[k].forEach(i=>rows.push([d,WSEC[s].n,'خادم','',pname(i),t])));
     b.cl.forEach(o=>ST.forEach(([k,t])=>o[k].forEach(i=>rows.push([d,WSEC[s].n,'مخدوم',cLabel(o.c),sname(i),t]))));}
   return rows;
@@ -1004,12 +1005,11 @@ function weeklyRows(days){
     M=weekStats(S.mah,S.sma,days),mm=Object.fromEntries(M.map(w=>[w.k,w]));
   const add=(date,sec,t,n,o)=>rows.push([date,sec,t,n,o?o.p:'',o?o.e:'',o?o.n:'',o&&o.n?wkPct(o):'']);
   for(const w of weekStats(S.ah,S.sa,days)){
-    const d=w.dates.join(' و ');
-    add(d,'الكل','اجتماع','كل المخدومين',w.sv);add(d,'الكل','اجتماع','الخدام',w.sa);
-    for(const s of Object.keys(w.by)){const b=w.by[s],bd=b.dates.join(' و ');
-      add(bd,WSEC[s].n,'اجتماع','كل المخدومين',b.sv);add(bd,WSEC[s].n,'اجتماع','الخدام',b.sa);
-      b.cl.forEach(o=>add(bd,WSEC[s].n,'اجتماع',cname(o.c.id),o));}
-    const q=mm[w.k];if(q){const qd=q.dates.join(' و ');add(qd,'الكل','قداس','كل المخدومين',q.sv);add(qd,'الكل','قداس','الخدام',q.sa)}
+    add(w.dates.join(' و '),'الكل','اجتماع','كل المخدومين',w.sv);add(w.dates.join(' و '),'الكل','اجتماع','الخدام',w.sa);
+    for(const s of Object.keys(w.by)){const b=w.by[s];
+      add(b.date,WSEC[s].n,'اجتماع','كل المخدومين',b.sv);add(b.date,WSEC[s].n,'اجتماع','الخدام',b.sa);
+      b.cl.forEach(o=>add(b.date,WSEC[s].n,'اجتماع',cname(o.c.id),o));}
+    const q=mm[w.k];if(q){add(q.dates.join(' و '),'الكل','قداس','كل المخدومين',q.sv);add(q.dates.join(' و '),'الكل','قداس','الخدام',q.sa)}
   }
   return rows;
 }
