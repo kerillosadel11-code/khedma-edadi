@@ -681,7 +681,7 @@ function massRepCards(days,cls){
   return cl+sv;
 }
 /* ===== توزيعة الأسبوع: مهام الخدام (فقرة / مسابقة / متابعة) + مين خلّص ومين اعتذر ===== */
-const DK={segment:'تحضير فقرة',competition:'تجهيز مسابقة',followup:'متابعة مخدومين',other:'أخرى'};
+const DK={segment:'تحضير فقرة',lesson:'شرح الدرس',competition:'تجهيز مسابقة',followup:'متابعة مخدومين',other:'أخرى'};
 const DS={todo:'لسه',doing:'جاري',done:'خلّص',declined:'اعتذر'};
 const DC={todo:'#eee',doing:'#fde9b8',done:'#cfeedd',declined:'#f3d6d2'};
 const dutyOpen=x=>x.status==='todo'||x.status==='doing';
@@ -725,8 +725,10 @@ function vDutyMgr(){
   let ht='';try{ht=localStorage.getItem('khedma_dtime')||''}catch(_){}
   const sname_=p=>esc(p.full_name||'بدون اسم')+(isAdmin()&&p.section?badge(p.section):'');
   const form=`<div class="card"><h2>توزيعة جديدة</h2>
-    <select id="du_sv"><option value="">اختار الخادم</option>${opts(sv,p=>(p.full_name||'بدون اسم')+(isAdmin()&&p.section?' · '+SEC[p.section]:''))}</select>
-    <select id="du_k">${Object.entries(DK).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select>
+    <div class="acts" style="justify-content:space-between;margin-bottom:4px"><b id="du_cnt">اختار الخدام (0)</b><span><button class="s" data-a="dutyAll">اختيار الكل</button><button class="s" data-a="dutyNone">مسح</button></span></div>
+    <input type="search" data-a="msgfind" placeholder="ابحث باسم الخادم" autocomplete="off" aria-label="بحث">
+    <div class="pkbox">${sv.map(p=>`<label class="pk smlbl" data-n="${esc(nz(p.full_name))}"><input type="checkbox" class="duck" data-a="dutyCk" value="${p.id}"><span class="nm">${esc(p.full_name||'بدون اسم')}</span>${isAdmin()&&p.section?`<span class="bd">${esc(SEC[p.section]||'')}</span>`:''}</label>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div>
+    <select id="du_k" data-a="dutyKind">${Object.entries(DK).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select>
     <input id="du_t" maxlength="120" placeholder="المطلوب (مثال: فقرة قصة القديس مار مينا)">
     <textarea id="du_n" rows="2" maxlength="1000" placeholder="تفاصيل (اختياري): الأدوات، المدة، أسماء المخدومين..."></textarea>
     <select id="du_c"><option value="">الفصل (اختياري)</option>${opts(S.classes,cLabel)}</select>
@@ -2068,12 +2070,14 @@ app.addEventListener('click',async e=>{
     if(!ok(r))return;await loadExtra();return render();
   }
   if(a==='dutyAdd'){
-    const sv=v('du_sv'),t=v('du_t'),d=v('du_d'),h=v('du_h');
-    if(!sv)return toast('اختار الخادم');if(!t)return toast('اكتب المطلوب');if(!d)return toast('اختار تاريخ الاجتماع');if(!h)return toast('اختار ساعة الاجتماع');
-    const r=await sb.from('duties').insert({assigned_to:sv,kind:v('du_k'),title:t,details:document.getElementById('du_n').value.trim()||null,class_id:v('du_c')||null,meet_date:d,meet_time:h});
+    const svs=[...document.querySelectorAll('.duck:checked')].map(x=>x.value),t=v('du_t'),d=v('du_d'),h=v('du_h'),k=v('du_k');
+    if(!svs.length)return toast('اختار خادم واحد على الأقل');if(!t)return toast(k==='lesson'?'اكتب اسم الدرس':'اكتب المطلوب');if(!d)return toast('اختار تاريخ الاجتماع');if(!h)return toast('اختار ساعة الاجتماع');
+    const det=document.getElementById('du_n').value.trim()||null,cl=v('du_c')||null;
+    const r=await sb.from('duties').insert(svs.map(sv=>({assigned_to:sv,kind:k,title:t,details:det,class_id:cl,meet_date:d,meet_time:h})));
     if(!ok(r))return;try{localStorage.setItem('khedma_dtime',h)}catch(_){}
-    S.dd=d;await loadDuty();render();return toast('اتوزّعت، وبعتنا إشعار للخادم');
+    S.dd=d;await loadDuty();render();return toast(svs.length>1?'اتوزّعت على '+svs.length+' خدام، وبعتنا إشعار لكل واحد':'اتوزّعت، وبعتنا إشعار للخادم');
   }
+  if(a==='dutyAll'||a==='dutyNone'){document.querySelectorAll('.duck').forEach(x=>{if(a==='dutyNone'||x.closest('.smlbl').style.display!=='none')x.checked=a==='dutyAll'});const c=document.getElementById('du_cnt');if(c)c.textContent='اختار الخدام ('+document.querySelectorAll('.duck:checked').length+')';return}
   if(a==='dutySt'){
     const[did,st]=id.split('|');let reason=null;
     if(st==='declined'){reason=prompt('اكتب سبب الاعتذار (هيوصل لأبونا ولأمين الخدمة):');if(reason===null)return;if(!reason.trim())return toast('لازم تكتب السبب');}
@@ -2162,6 +2166,8 @@ app.addEventListener('change',async e=>{
   if(b.dataset.a==='satDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='prepDate'){S.pd=b.value||today();return render()}
   if(b.dataset.a==='dutyDate'){S.dd=b.value;return render()}
+  if(b.dataset.a==='dutyKind'){const t=document.getElementById('du_t');if(t)t.placeholder=b.value==='lesson'?'اسم الدرس':'المطلوب (مثال: فقرة قصة القديس مار مينا)';return}
+  if(b.dataset.a==='dutyCk'){const c=document.getElementById('du_cnt');if(c)c.textContent='اختار الخدام ('+document.querySelectorAll('.duck:checked').length+')';return}
   if(b.dataset.a==='attDate'){S.date=b.value||today();await loadAtt();return render()}
   if(b.dataset.a==='filter'){S.f=b.value;S.lim=50;return render()}
   if(b.dataset.a==='annscope'){const x=b.value;const w=document.getElementById('ascw'),c=document.getElementById('aclw');if(w)w.style.display=(x==='section'&&isAdmin())?'block':'none';if(c)c.style.display=x==='class'?'block':'none';return}
