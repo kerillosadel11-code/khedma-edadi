@@ -1115,8 +1115,42 @@ function weeklyRows(days){
   }
   return rows;
 }
+/* ===== كارت اليوم في التقارير: حضور الخدام والمخدومين في يوم واحد (اجتماع أو قداس) ===== */
+const DY_ST=[['ok','حاضر'],['no','غايب'],['ex','معتذر'],['pe','لسه ما اتسجلش']];
+const dyNames=(g)=>g.map(([c,t,a])=>a.length?`<div class="dy-g"><div class="dy-gh ${c}"><b>${a.length}</b> ${t}</div><div class="dy-ng">${a.map(n=>`<div class="dy-n ${c}">${esc(n)}</div>`).join('')}</div></div>`:'').join('')||'<div class="empty">مفيش أسماء.</div>';
+const dyTg=(inner)=>`<details class="dy-d"><summary class="dy-tg">الأسماء <i>▾</i></summary><div class="dy-nm">${inner}</div></details>`;
+const dySort=a=>a.slice().sort((x,y)=>String(x).localeCompare(String(y),'ar'));
+function dayCard(){
+  const M=isMass(),k=M?'mass':'meeting',SV=(M?S.mah:S.ah)||[],SA=(M?S.sma:S.sa)||[];
+  S.rdy=S.rdy||{};
+  let d=S.rdy[k];
+  if(!d){d=today();if(!SV.some(r=>r.att_date===d)&&!SA.some(r=>r.att_date===d)){const all=[...SV,...SA].map(r=>r.att_date).filter(Boolean).sort();if(all.length)d=all[all.length-1]}}
+  const cnt=(g)=>`<div class="dy-sum"><span class="dy-sm ok">✅ حاضر ${g.ok.length}</span><span class="dy-sm no">❌ غايب ${g.no.length}</span><span class="dy-sm ex">معتذر ${g.ex.length}</span><span class="dy-sm pe">لسه ${g.pe.length}</span></div>`;
+  let sv='';
+  if(canManage()){
+    const m={};SA.forEach(r=>{if(r.att_date===d)m[r.servant_id]=r.status});
+    const g={ok:[],no:[],ex:[],pe:[]};
+    attList().forEach(p=>{const s=m[p.id],n=p.full_name||'بدون اسم';(s==='present'?g.ok:s==='absent'?g.no:s==='excused'?g.ex:g.pe).push(n)});
+    for(const x in g)g[x]=dySort(g[x]);
+    sv=`<h2 class="dy-h">حضور الخدام</h2>${cnt(g)}${dyTg(dyNames(DY_ST.map(([c,t])=>[c,t,g[c]])))}`;
+  }
+  const rows=SV.filter(r=>r.att_date===d),ms={};rows.forEach(r=>{ms[r.servee_id]=r.status});
+  let tp=0,tn=0;
+  const cl=S.classes.map(c=>{
+    const act=S.servees.filter(x=>x.active&&x.class_id===c.id);if(!act.length)return '';
+    const g={ok:[],no:[],ex:[],pe:[]};
+    act.forEach(x=>{const s=ms[x.id];(s==='present'?g.ok:s==='absent'?g.no:s==='excused'?g.ex:g.pe).push(x.full_name||'بدون اسم')});
+    for(const x in g)g[x]=dySort(g[x]);
+    const rec=g.ok.length+g.no.length+g.ex.length,den=act.length-g.ex.length,p=rec&&den>0?Math.round(g.ok.length*100/den):null;
+    if(rec){tp+=g.ok.length;tn+=den}
+    const cls=p===null?'':p>=80?'hi':p>=60?'mid':'lo';
+    return `<div class="dy-c"><div class="dy-ch"><div><b>${esc(cLabel(c))}</b><small>${rec?`حاضر ${g.ok.length} من ${act.length}${g.ex.length?' · معتذر '+g.ex.length:''}`:'لسه ما اتسجّلش'}</small></div>${p===null?'':`<span class="dy-pc ${cls}">${p}%</span>`}</div>${p===null?'':`<div class="dy-bar ${cls}"><span style="width:${p}%"></span></div>`}${dyTg(dyNames(DY_ST.map(([c2,t])=>[c2,t,g[c2]])))}</div>`;
+  }).join('');
+  const att=`<div class="dy-sec"><h2 class="dy-h">حضور المخدومين</h2><span class="dy-tot">${tn?tp+' من '+tn:'—'}</span></div>${cl||'<div class="empty">مفيش فصول.</div>'}`;
+  return `<div class="card"><h2 style="margin-bottom:8px">يوم · ${fdate(d)}</h2><input type="date" data-a="rday" value="${d}" max="${today()}">${sv}${att}</div>`;
+}
 function vRep(){
-  if(S.ah===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
+  if(S.ah===null||(isMass()&&(S.mahDays||0)<90))return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
   const days=S.rd||56,H=histInfo(days),cls=S.classes.filter(c=>!S.rc||c.id===S.rc);
   const crow=cls.map(c=>{const act=S.servees.filter(x=>x.active&&x.class_id===c.id),ds=[...(H.datesByC[c.id]||[])].sort();
     const pcts=ds.map(d=>act.length?Math.round(act.filter(x=>(H.byS[x.id]||{})[d]==='present').length*100/act.length):0);
@@ -1129,8 +1163,9 @@ function vRep(){
   if(canManage()&&S.profiles.length){const d0=new Date(Date.now()-days*864e5).toISOString().slice(0,10);
     const L=attList().map(p=>{const r=S.sa.filter(x=>x.servant_id===p.id&&x.att_date>=d0),pr=r.filter(x=>x.status==='present').length;return{p,pr,ab:r.filter(x=>x.status==='absent').length,ex:r.filter(x=>x.status==='excused').length,n:r.length,pct:pr+r.filter(x=>x.status==='absent').length?Math.round(pr*100/(pr+r.filter(x=>x.status==='absent').length)):null}}).sort((a,b)=>(a.pct??101)-(b.pct??101));
     sv=`<div class="card"><h2>حضور الخدام (${L.length})</h2><button class="s" data-a="exp" data-id="servants" style="margin-bottom:8px">تصدير Excel (CSV)</button>${L.map(o=>`<div class="row"><div>${esc(o.p.full_name||'بدون اسم')}${o.p.role==='secretary'?'<span class="bd">أمين</span>':''}${isAdmin()?badge(o.p.section):''}<small>حاضر ${o.pr} · غايب ${o.ab} · معتذر ${o.ex}</small></div><div style="width:40%;text-align:left">${o.pct===null?'—':o.pct+'%'}${bar(o.pct)}</div></div>`).join('')||'<div class="empty">مفيش خدام.</div>'}</div>`}
-  return `<div class="card"><h2>تقارير الحضور</h2><div class="two"><select data-a="rc"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.rc)}</select><select data-a="rd">${[[28,'آخر 4 أسابيع'],[56,'آخر 8 أسابيع'],[90,'آخر 90 يوم']].map(([n,l])=>`<option value="${n}"${days===n?' selected':''}>${l}</option>`).join('')}</select></div></div>
-  ${weekRepCard(days)}${canManage()?riskCard(H)+servantEvalCard(days,H):''}<div class="card"><h2>الفصول</h2><button class="s" data-a="exp" data-id="servees" style="margin-bottom:8px">تصدير Excel (CSV)</button>${crow.map(o=>`<div class="row"><div>${esc(cLabel(o.c))}<small>${o.act.length} مخدوم · ${o.ds.length} اجتماع</small></div><div style="width:40%;text-align:left">${o.avg===null?'—':o.avg+'%'}${bar(o.avg)}</div></div>`).join('')||'<div class="empty">مفيش فصول.</div>'}</div>${det}${sv}${massRepCards(days,cls)}`;
+  const MS=isMass();
+  return `${MK_TABS()}${dayCard()}<div class="card"><h2>تقارير الحضور</h2><div class="two"><select data-a="rc"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.rc)}</select><select data-a="rd">${[[28,'آخر 4 أسابيع'],[56,'آخر 8 أسابيع'],[90,'آخر 90 يوم']].map(([n,l])=>`<option value="${n}"${days===n?' selected':''}>${l}</option>`).join('')}</select></div></div>
+  ${MS?massRepCards(days,cls):`${weekRepCard(days)}${canManage()?riskCard(H)+servantEvalCard(days,H):''}<div class="card"><h2>الفصول</h2><button class="s" data-a="exp" data-id="servees" style="margin-bottom:8px">تصدير Excel (CSV)</button>${crow.map(o=>`<div class="row"><div>${esc(cLabel(o.c))}<small>${o.act.length} مخدوم · ${o.ds.length} اجتماع</small></div><div style="width:40%;text-align:left">${o.avg===null?'—':o.avg+'%'}${bar(o.avg)}</div></div>`).join('')||'<div class="empty">مفيش فصول.</div>'}</div>${det}${sv}`}`;
 }
 function dl(name,rows){
   const q=x=>{let t=String(x??'');if(/^[=+\-@]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"'};
@@ -2187,6 +2222,7 @@ app.addEventListener('change',async e=>{
   if(b.dataset.a==='psts'){S.pstS=b.value;return render()}
   if(b.dataset.a==='pc'){S.pc=b.value;return render()}
   if(b.dataset.a==='th'){S.th=+b.value;return render()}
+  if(b.dataset.a==='rday'){S.rdy=S.rdy||{};S.rdy[isMass()?'mass':'meeting']=b.value||today();return render()}
   if(b.dataset.a==='rc'){S.rc=b.value;return render()}
   if(b.dataset.a==='saDate'){S.sad=b.value||today();return render()}
   if(b.dataset.a==='spStatus'){S.sps=b.value;return render()}
