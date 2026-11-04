@@ -1,7 +1,7 @@
 /* الحسابات: خزنة البنين/البنات + الرحلات والمؤتمرات
    ملف مستقل بيتحمّل بعد app.js ومش محتاج تعديل في app.js. */
 (function(){
-const F={ld:false,busy:false,uid:null,v:'box',k:'income',acc:null,ev:null,accs:[],bal:[],cats:[],tx:[],evs:[],dues:[],evtx:[],err:null};
+const F={ld:false,busy:false,uid:null,v:'box',k:'income',acc:null,ev:null,edit:null,accs:[],bal:[],cats:[],tx:[],evs:[],dues:[],evtx:[],err:null};
 const canFin=()=>S.p&&(S.p.role==='admin'||S.p.role==='secretary');
 const money=n=>Number(n||0).toLocaleString('ar-EG',{maximumFractionDigits:2})+' ج';
 const KIND={income:'إيراد',expense:'مصروف',transfer_in:'تحويل داخل',transfer_out:'تحويل خارج'};
@@ -51,12 +51,23 @@ function vFin(){
 }
 const accSel=()=>isAdmin()&&F.accs.length>1?`<select data-fa="acc">${F.accs.map(a=>`<option value="${a.id}"${a.id===F.acc?' selected':''}>${esc(a.name)}</option>`).join('')}</select>`:'';
 function catOpts(kind){return `<option value="">البند</option>`+F.cats.filter(c=>c.kind===kind).sort((a,b)=>(b.name==='رصيد أول المدة')-(a.name==='رصيد أول المدة')).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+function txEdit(t){
+  const cats=F.cats.filter(c=>c.kind===t.kind);
+  if(t.category_id&&!cats.some(c=>c.id===t.category_id)){const c=F.cats.find(x=>x.id===t.category_id);if(c)cats.push(c)}
+  return `<div class="row" style="display:block"><b>تعديل ${esc(KIND[t.kind])}</b>
+  <input id="x_amt" type="text" inputmode="decimal" placeholder="المبلغ (جنيه)" value="${esc(String(t.amount))}">
+  <select id="x_cat"><option value="">البند</option>${cats.map(c=>`<option value="${c.id}"${c.id===t.category_id?' selected':''}>${esc(c.name)}</option>`).join('')}</select>
+  <input id="x_date" type="date" value="${esc(t.tx_date||today())}">
+  <input id="x_note" placeholder="ملاحظة (اختياري)" value="${esc(t.note||'')}">
+  <div class="two"><button class="p" data-fa="saveedit" data-id="${t.id}">حفظ</button><button class="s" data-fa="canceledit">إلغاء التعديل</button></div></div>`;
+}
 function txRow(t){
+  if(F.edit===t.id&&!t.voided)return txEdit(t);
   const inn=t.kind==='income'||t.kind==='transfer_in';
   const ev=t.event_id?evOf(t.event_id):null;
   const meta=[t.tx_date,catName(t.category_id),t.servee_id?sname(t.servee_id):'',ev?ev.title:'',t.note||''].filter(Boolean).map(esc).join(' · ');
   return `<div class="row ${t.voided?'off':''}"><div><b style="color:${inn?'#1b7a3d':'#b3261e'}">${inn?'+':'−'} ${money(t.amount)}</b> ${esc(KIND[t.kind])}${t.voided?' <span class="bd" style="background:#fde9b8">ملغاة</span>':''}${F.accs.length>1?badge(t.section):''}<small>${meta}${t.voided&&t.void_reason?' · سبب الإلغاء: '+esc(t.void_reason):''}</small></div>
-  <div class="acts">${!t.voided&&(t.kind==='income'||t.kind==='expense')?`<button class="s d" data-fa="void" data-id="${t.id}">إلغاء</button>`:''}</div></div>`;
+  <div class="acts">${!t.voided&&(t.kind==='income'||t.kind==='expense')?`<button class="s" data-fa="edit" data-id="${t.id}">تعديل</button><button class="s d" data-fa="void" data-id="${t.id}">إلغاء</button>`:''}</div></div>`;
 }
 function vBox(){
   const bal=F.bal.map(b=>`<div class="card"><h2>${esc(b.name)}</h2><div style="font-size:26px;font-weight:700">${money(b.balance)}</div><small>دخل ${money(b.total_in)} · خرج ${money(b.total_out)}${Number(b.opening_balance)?' · رصيد افتتاحي '+money(b.opening_balance):''}</small></div>`).join('');
@@ -107,13 +118,20 @@ async function insTx(row){
   return ok(r);
 }
 const ACT={
-  v:b=>{F.v=b.dataset.id;F.ev=null;window.render()},
-  back:()=>{F.ev=null;window.render()},
+  v:b=>{F.v=b.dataset.id;F.ev=null;F.edit=null;window.render()},
+  back:()=>{F.ev=null;F.edit=null;window.render()},
   acc:b=>{F.acc=b.value;window.render()},
   kind:b=>{F.k=b.value;window.render()},
   async addtx(){
     const amt=num(val('f_amt'));if(!(amt>0))return toast('اكتب المبلغ');
     if(await insTx({account_id:F.acc,kind:F.k,amount:amt,category_id:val('f_cat')||null,tx_date:val('f_date')||today(),note:val('f_note')||null})){toast('اتسجّلت');await refresh()}
+  },
+  edit:b=>{F.edit=b.dataset.id;window.render()},
+  canceledit:()=>{F.edit=null;window.render()},
+  async saveedit(b){
+    const amt=num(val('x_amt'));if(!(amt>0))return toast('اكتب المبلغ');
+    const row={amount:amt,category_id:val('x_cat')||null,tx_date:val('x_date')||today(),note:val('x_note')||null};
+    if(ok(await sb.from('finance_tx').update(row).eq('id',b.dataset.id))){F.edit=null;toast('اتعدّلت');await refresh()}
   },
   async void(b){
     const why=prompt('سبب الإلغاء؟');if(why===null)return;
@@ -167,7 +185,7 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
 const orig=window.render;
 window.render=function(){
   if(!canFin()||S.cards)return orig();
-  if(F.uid!==S.p.id){F.uid=S.p.id;F.ld=false;F.acc=null;F.ev=null}
+  if(F.uid!==S.p.id){F.uid=S.p.id;F.ld=false;F.acc=null;F.ev=null;F.edit=null}
   const fin=S.tab==='fin';
   if(fin)S.tab='home';
   orig();
