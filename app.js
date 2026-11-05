@@ -84,10 +84,13 @@ async function hydratePhotos(){
 }
 const acid=()=>S.classes.some(c=>c.id===S.ac)?S.ac:(S.classes[0]||{}).id;
 /* حضور المخدومين: اختيار «كل الفصول» */
-const attAll=()=>S.ac==='all'&&S.classes.length>1;
-const attCid=()=>attAll()?'all':acid();
-const attServees=cid=>cid==='all'?S.servees.filter(x=>x.active&&x.class_id).sort((a,b)=>String(cname(a.class_id)).localeCompare(String(cname(b.class_id)),'ar')||String(a.full_name||'').localeCompare(String(b.full_name||''),'ar')):S.servees.filter(x=>x.class_id===cid&&x.active);
-const attSel=cid=>`<select data-a="attClass">${S.classes.length>1?`<option value="all"${cid==='all'?' selected':''}>كل الفصول</option>`:''}${opts(S.classes,cLabel,cid==='all'?null:cid)}</select>`;
+/* الخادم يسجّل حضور أي مخدوم في أي فصل: aCl/aSv = كل الفصول/المخدومين (للخادم)، وS.classes/S.servees = فصوله هو بس */
+const aCl=()=>S.allCl||S.classes,aSv=()=>S.allSv||S.servees;
+const attAcid=()=>{const L=aCl();return L.some(c=>c.id===S.ac)?S.ac:(S.classes[0]||L[0]||{}).id};
+const attAll=()=>S.ac==='all'&&aCl().length>1;
+const attCid=()=>attAll()?'all':attAcid();
+const attServees=cid=>cid==='all'?aSv().filter(x=>x.active&&x.class_id).sort((a,b)=>String(cname(a.class_id)).localeCompare(String(cname(b.class_id)),'ar')||String(a.full_name||'').localeCompare(String(b.full_name||''),'ar')):aSv().filter(x=>x.class_id===cid&&x.active);
+const attSel=cid=>`<select data-a="attClass">${aCl().length>1?`<option value="all"${cid==='all'?' selected':''}>كل الفصول</option>`:''}${opts(aCl(),cLabel,cid==='all'?null:cid)}</select>`;
 const clsTag=(x,cid)=>cid==='all'?`<small>${esc(cname(x.class_id))}</small>`:'';
 const opts=(a,l,sel)=>a.map(x=>`<option value="${x.id}"${x.id===sel?' selected':''}>${esc(l(x))}</option>`).join('');
 
@@ -183,6 +186,10 @@ async function load(){
   else{
     const r=await Promise.all([sb.from('classes').select('*').order('created_at'),loadServees(),sb.from('class_servants').select('*')]);
     r.forEach(ok);[S.classes,S.servees,S.cs]=r.map(x=>x.data||[]);S.profiles=[];S.pl=[];
+    /* الخادم بيشوف كل الفصول والمخدومين للحضور؛ باقي الشاشات («فصلي»...) على فصوله بس */
+    S.allCl=S.classes;S.allSv=S.servees;
+    const mine=new Set((S.cs||[]).filter(x=>x.servant_id===S.p.id).map(x=>x.class_id));
+    S.classes=S.allCl.filter(c=>mine.has(c.id));S.servees=S.allSv.filter(x=>mine.has(x.class_id));
   }
   S.inv=[];if(canManage()){const ri=await sb.from('invites').select('*').order('created_at',{ascending:false});S.inv=ri.error?[]:(ri.data||[]).filter(i=>!secOn()||!i.section||i.section===S.sec)}
   S.ah=null;S.fu=null;S.ahDays=0;S.mahDays=0;S.mah=[];S._cms=null;S.phFail=new Set();
@@ -231,7 +238,7 @@ function secBar(){
   return `<div class="secbar">${[['','الكل (بنين وبنات)'],['boys','خدمة بنين'],['girls','خدمة بنات']].map(([k,n])=>`<button class="s${S.sec===k?' on':''}" data-a="sec" data-id="${k}">${n}</button>`).join('')}</div>`;
 }
 
-const cname=id=>{const c=S.classes.find(c=>c.id===id);return c?cLabel(c):'بدون فصل'};
+const cname=id=>{const c=aCl().find(c=>c.id===id);return c?cLabel(c):'بدون فصل'};
 const pname=id=>(S.profiles.find(c=>c.id===id)||{}).full_name||'؟';
 const sname=id=>(S.servees.find(c=>c.id===id)||{}).full_name||'؟';
 
@@ -587,7 +594,7 @@ function buildImport(text,cid){
 }
 function vAtt(){
   if(isMass())return vAttMass();
-  if(!S.classes.length)return '<div class="card"><div class="empty">مفيش فصل مربوط بيك لسه. اطلب من أبونا يربطك بفصل.</div></div>';
+  if(!aCl().length)return '<div class="card"><div class="empty">مفيش فصول لسه.</div></div>';
   const cid=attCid(),L=attServees(cid),A=Object.fromEntries(S.att.map(a=>[a.servee_id,a.status]));
   const P=L.filter(x=>A[x.id]==='present').length,B=L.filter(x=>A[x.id]==='absent').length,E=L.filter(x=>A[x.id]==='excused').length,N=Object.fromEntries(S.att.map(a=>[a.servee_id,a.note||'']));
   return `<div class="card">${MK_TABS()}<h2>حضور المخدومين</h2>
@@ -641,7 +648,7 @@ function massStat(x,rows,sv,days){
   return{sessions:n,present:pr,absent:ab,excused:ex,pct:n?Math.round(pr*100/n):null,streak,last,m,dates};
 }
 function vAttMass(){
-  if(!S.classes.length)return '<div class="card"><div class="empty">مفيش فصل مربوط بيك لسه. اطلب من أبونا يربطك بفصل.</div></div>';
+  if(!aCl().length)return '<div class="card"><div class="empty">مفيش فصول لسه.</div></div>';
   const cid=attCid(),L=attServees(cid),A=Object.fromEntries(S.matt.map(a=>[a.servee_id,a.status])),N=Object.fromEntries(S.matt.map(a=>[a.servee_id,a.note||'']));
   const P=L.filter(x=>A[x.id]==='present').length,B=L.filter(x=>A[x.id]==='absent').length,E=L.filter(x=>A[x.id]==='excused').length;
   return `<div class="card">${MK_TABS()}<h2>حضور القداس · المخدومين</h2>
@@ -1870,7 +1877,7 @@ app.addEventListener('click',async e=>{
   if(a==='restAbs'){
     if(!confirm('تسجيل كل اللي لسه ما اتحضروش كغايبين؟'))return;
     const mm=isMass();let data=0,error=null;
-    for(const c of (attAll()?S.classes:[{id:acid()}])){const r=await sb.rpc(mm?'kh_mass_mark_rest':'kh_mark_rest',{p_class:c.id,p_date:S.date});if(r.error){error=r.error;break}data+=(+r.data||0)}
+    for(const c of (attAll()?aCl():[{id:attAcid()}])){const r=await sb.rpc(mm?'kh_mass_mark_rest':'kh_mark_rest',{p_class:c.id,p_date:S.date});if(r.error){error=r.error;break}data+=(+r.data||0)}
     if(error)return toast(mm?mErr(error):rpcErr(error));
     await loadAtt();render();return toast('اتسجّل غياب '+data+' مخدوم');
   }
