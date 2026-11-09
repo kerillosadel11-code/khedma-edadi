@@ -189,6 +189,9 @@ async function load(){
     /* الخادم بيشوف كل الفصول والمخدومين للحضور؛ باقي الشاشات («فصلي»...) على فصوله بس */
     S.allCl=S.classes;S.allSv=S.servees;
     const mine=new Set((S.cs||[]).filter(x=>x.servant_id===S.p.id).map(x=>x.class_id));
+    /* حضور القسم: الخادم بياخد حضور كل فصول ومخدومين قسمه (بنين أو بنات) مش فصوله بس */
+    const mySecs=new Set([S.p.section,...S.allCl.filter(c=>mine.has(c.id)).map(c=>c.section)].filter(Boolean));
+    if(mySecs.size){S.allCl=S.allCl.filter(c=>mySecs.has(c.section)||mine.has(c.id));const clIds=new Set(S.allCl.map(c=>c.id));S.allSv=S.allSv.filter(x=>clIds.has(x.class_id))}
     S.classes=S.allCl.filter(c=>mine.has(c.id));S.servees=S.allSv.filter(x=>mine.has(x.class_id));
   }
   S.inv=[];if(canManage()){const ri=await sb.from('invites').select('*').order('created_at',{ascending:false});S.inv=ri.error?[]:(ri.data||[]).filter(i=>!secOn()||!i.section||i.section===S.sec)}
