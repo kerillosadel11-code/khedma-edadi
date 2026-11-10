@@ -820,6 +820,21 @@ function vPrep(){
 /* سجل الحضور بيتحمّل عند الحاجة بس (مش مع كل فتحة) عشان نقل البيانات على Supabase */
 const HIST_TABS={home:90,classes:90,mycls:90,mysv:90,follow:90,rep:90,ana:90},MASS_TABS=new Set(['rep','ana']);
 async function loadFu(){const f=await fetchAll(()=>sb.from('followups').select('*').order('followup_date',{ascending:false}).order('created_at',{ascending:false}));S.fu=fSv(f.error?[]:(f.data||[]))}
+/* رسالة شكر للمنتظمين (مخدومين + خدام): واتساب أو إشعار في التطبيق */
+function tkCard(){
+  const th=S.tkth||80,H=histInfo(90),M=[];
+  S.servees.filter(x=>x.active&&x.class_id&&(!S.f||x.class_id===S.f)).forEach(x=>{const st=servStat(x,H);if(st.sessions>=3&&st.pct!==null&&st.pct>=th)M.push({x,st})});
+  M.sort((a,b)=>b.st.pct-a.st.pct||String(a.x.full_name||'').localeCompare(String(b.x.full_name||''),'ar'));
+  const V=canManage()?servList().map(p=>({p,st:srvStats(p.id)})).filter(o=>o.st.n>=3&&o.st.pct!==null&&o.st.pct>=th).sort((a,b)=>b.st.pct-a.st.pct):[];
+  const mrow=({x,st})=>{const kid=normPhone(x.phone||''),par=normPhone(x.father_phone||x.mother_phone||''),ph=kid||par;
+    const msg=kid?'أهلاً يا '+fst(x.full_name)+'، شكرًا على التزامك وحضورك المنتظم معانا. ربنا يباركك ويفرّح قلبك. خدمة إعدادي':'أهلاً بحضرتك، حابين نشكر '+fst(x.full_name)+' على التزامه وحضوره المنتظم معانا. ربنا يباركه ويبارككم. خدمة إعدادي';
+    return `<div class="row"><div class="who">${av(x,40)}<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))} · حضور ${st.pct}% (${st.present} من ${st.sessions})</small></div></div><div class="acts">${ph?`<a class="s" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="${waUrl(ph,msg)}">واتساب</a>`:''}${nb({s:x.id,m:'أهلاً بحضرتك، حابين نشكر '+fst(x.full_name)+' على التزامه وحضوره المنتظم معانا. ربنا يباركه ويبارككم. خدمة إعدادي'},'أولياء أمور '+x.full_name)}</div></div>`};
+  const vrow=({p,st})=>{const ph=normPhone(p.phone||p.contact_phone||''),msg='أهلاً يا '+fst(p.full_name)+'، شكرًا على تعبك وانتظامك في الخدمة. ربنا يعوّض تعبك ويباركك. خدمة إعدادي';
+    return `<div class="row"><div class="who">${av(p,40)}<div>${esc(p.full_name||'بدون اسم')}<small>حضور ${st.pct}% (${st.P} من ${st.n})</small></div></div><div class="acts">${ph?`<a class="s" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="${waUrl(ph,msg)}">واتساب</a>`:''}${nb({u:p.id,m:msg},p.full_name||'')}</div></div>`};
+  return `<div class="card"><h2>🙏 رسالة شكر للمنتظمين</h2><small style="display:block;margin-bottom:6px">اللي نسبة حضورهم عالية في آخر 3 شهور. اختار واتساب (برسالة جاهزة) أو إشعار جوه التطبيق.</small><select data-a="tkth">${[70,80,90].map(n=>`<option value="${n}"${th===n?' selected':''}>حضور ${n}% فأكتر</option>`).join('')}</select>
+  <details class="mre" style="margin-top:8px"><summary class="s">المخدومين المنتظمين (${M.length})</summary>${M.map(mrow).join('')||'<div class="empty">مفيش حد بالنسبة دي.</div>'}</details>
+  ${canManage()?`<details class="mre" style="margin-top:8px"><summary class="s">الخدام المنتظمين (${V.length})</summary>${V.map(vrow).join('')||'<div class="empty">مفيش حد بالنسبة دي.</div>'}</details>`:''}</div>`;
+}
 async function loadSFu(){const r=await fetchAll(()=>sb.from('servant_followups').select('*').order('followup_date',{ascending:false}).order('created_at',{ascending:false}));
   if(r.error){S.sfu=[];S.sfuErr=/PGRST205|servant_followups|42P01/.test(JSON.stringify(r.error))?'محتاج تشغّل ملف 46_servant_followups.sql على Supabase':'تعذّر تحميل افتقاد الخدام: '+r.error.message}else{S.sfu=r.data||[];S.sfuErr=''}}
 const sfTodayRows=(id,k)=>(S.sfu||[]).filter(z=>z.servant_id===id&&z.kind===k&&String(z.followup_date).slice(0,10)===today());
@@ -1003,7 +1018,7 @@ function vFollow(){
   const recent=fu.filter(f=>S.servees.some(x=>x.id===f.servee_id)).slice(0,30);
   const pk=S.servees.filter(x=>x.active&&(!S.f||x.class_id===S.f)).sort((p,q)=>(p.full_name||'').localeCompare(q.full_name||'','ar'));
   const pickCard=`<div class="card"><h2>افتقاد أي مخدوم</h2><small style="display:block;margin-bottom:6px">لو عايز تفتقد حد من غير ما يكون غايب.</small><input type="search" data-sf="fupick" placeholder="ابحث بالاسم..." autocomplete="off" aria-label="بحث"><select id="fupick"><option value="">اختار المخدوم</option>${pk.map(x=>`<option value="${x.id}">${esc(x.full_name)}${x.class_id?' · '+esc(cname(x.class_id)):''}</option>`).join('')}</select><small>نوع الافتقاد</small><select id="fupk">${FKF.map(k=>`<option value="${k}">${FK[k]}</option>`).join('')}</select>${canManage()?`<small>مين اللي قام بالافتقاد</small><select id="fupw">${fuStaff().map(p=>`<option value="${p.id}"${p.id===S.p.id?' selected':''}>${esc(p.full_name||'بدون اسم')}</option>`).join('')}</select>`:`<small>القائم بالافتقاد: ${esc(S.p.full_name||'أنا')}</small>`}<textarea id="fupn" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="fuQuick">حفظ الافتقاد</button><button class="s" data-a="fuPick" style="margin-top:8px">فتح نموذج كامل (تاريخ / متابعة)</button></div>`;
-  return form+fuRepCard()+pickCard+sfCard()+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
+  return form+fuRepCard()+pickCard+sfCard()+tkCard()+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
   <div class="card"><h2>آخر الافتقادات (${recent.length})</h2>${recent.map(f=>`<div class="row"><div>${esc(sname(f.servee_id))}<small>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}${fwho(f)}</small>${f.note?`<small>${esc(f.note)}</small>`:''}</div><div class="acts"><span class="bd">${FS[f.status]||esc(f.status)}</span>${f.status==='open'?`<button class="s" data-a="fuDone" data-id="${f.id}">تم</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش افتقادات متسجلة.</div>'}</div>`;
 }
 /* ===== التقرير الأسبوعي: الأسبوع بيبدأ سبت · اجتماع البنين الخميس · اجتماع البنات الأربع ===== */
@@ -2311,6 +2326,7 @@ app.addEventListener('change',async e=>{
   if(b.dataset.a==='pstf'){S.pstR=b.value;return render()}
   if(b.dataset.a==='psts'){S.pstS=b.value;return render()}
   if(b.dataset.a==='pc'){S.pc=b.value;return render()}
+  if(b.dataset.a==='tkth'){S.tkth=+b.value;return render()}
   if(b.dataset.a==='th'){S.th=+b.value;return render()}
   if(b.dataset.a==='rday'){S.rdy=S.rdy||{};S.rdy[isMass()?'mass':'meeting']=b.value||today();return render()}
   if(b.dataset.a==='rc'){S.rc=b.value;return render()}
