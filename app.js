@@ -969,6 +969,9 @@ function vSecAtt(){
   return `<div class="card"><h2>حضور الأمناء</h2><input type="date" data-a="saDate" value="${d}" max="${today()}"><div class="cnt"><span>حاضر ${P}</span><span>غايب ${B}</span><span>معتذر ${E}</span><span>لسه ${L.length-P-B-E}</span></div>${only}${S.sarErr?`<p class="err">${esc(S.sarErr)}</p>`:''}<small>الأمين بيسجّل حضور زمايله وحضوره هو. الضغطة على نفس الزرار تاني بتمسح التسجيل.</small></div>
   <div class="card"><h2>الأمناء (${L.length})</h2>${L.map(row).join('')||'<div class="empty">مفيش أمناء مفعّلين.</div>'}</div>`;
 }
+/* تقرير الافتقاد الأسبوعي (من SQL ملف 30): عرض + نسخ + مشاركة واتساب */
+const fuRepCard=()=>{if(!canManage())return'';const t=S.fur;
+  return `<div class="card"><h2>📊 تقرير الافتقاد الأسبوعي</h2><small style="display:block;margin-bottom:8px">من أول الأسبوع (السبت) لحد النهارده، وبيجيلك كإشعار تلقائي كل جمعة.</small>${t?`<div style="white-space:pre-wrap;line-height:1.9;background:#f7f9f7;border:1px solid var(--line);border-radius:8px;padding:10px">${esc(t)}</div><div class="acts" style="margin-top:8px"><button class="s on" data-a="fuRepCopy">نسخ</button><a class="s" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="https://wa.me/?text=${encodeURIComponent(t)}">واتساب</a><button class="s" data-a="fuRepX">إخفاء</button></div>`:`<button class="p" data-a="fuRep">${S.furBusy?'جاري التحضير...':'اعرض تقرير الأسبوع'}</button>`}</div>`};
 function vFollow(){
   if(S.ah===null)return '<div class="card"><div class="empty">جاري التحميل...</div></div>';
   const H=histInfo(90),th=S.th||3,fu=S.fu||[],lastFu=id=>fu.find(f=>f.servee_id===id);
@@ -982,7 +985,7 @@ function vFollow(){
   const recent=fu.filter(f=>S.servees.some(x=>x.id===f.servee_id)).slice(0,30);
   const pk=S.servees.filter(x=>x.active&&(!S.f||x.class_id===S.f)).sort((p,q)=>(p.full_name||'').localeCompare(q.full_name||'','ar'));
   const pickCard=`<div class="card"><h2>افتقاد أي مخدوم</h2><small style="display:block;margin-bottom:6px">لو عايز تفتقد حد من غير ما يكون غايب.</small><input type="search" data-sf="fupick" placeholder="ابحث بالاسم..." autocomplete="off" aria-label="بحث"><select id="fupick"><option value="">اختار المخدوم</option>${pk.map(x=>`<option value="${x.id}">${esc(x.full_name)}${x.class_id?' · '+esc(cname(x.class_id)):''}</option>`).join('')}</select><small>نوع الافتقاد</small><select id="fupk">${FKF.map(k=>`<option value="${k}">${FK[k]}</option>`).join('')}</select>${canManage()?`<small>مين اللي قام بالافتقاد</small><select id="fupw">${fuStaff().map(p=>`<option value="${p.id}"${p.id===S.p.id?' selected':''}>${esc(p.full_name||'بدون اسم')}</option>`).join('')}</select>`:`<small>القائم بالافتقاد: ${esc(S.p.full_name||'أنا')}</small>`}<textarea id="fupn" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="fuQuick">حفظ الافتقاد</button><button class="s" data-a="fuPick" style="margin-top:8px">فتح نموذج كامل (تاريخ / متابعة)</button></div>`;
-  return form+pickCard+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
+  return form+fuRepCard()+pickCard+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
   <div class="card"><h2>آخر الافتقادات (${recent.length})</h2>${recent.map(f=>`<div class="row"><div>${esc(sname(f.servee_id))}<small>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}${fwho(f)}</small>${f.note?`<small>${esc(f.note)}</small>`:''}</div><div class="acts"><span class="bd">${FS[f.status]||esc(f.status)}</span>${f.status==='open'?`<button class="s" data-a="fuDone" data-id="${f.id}">تم</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش افتقادات متسجلة.</div>'}</div>`;
 }
 /* ===== التقرير الأسبوعي: الأسبوع بيبدأ سبت · اجتماع البنين الخميس · اجتماع البنات الأربع ===== */
@@ -2004,6 +2007,9 @@ app.addEventListener('click',async e=>{
     const r=await sb.from('followups').insert({servee_id:S.fuf,servant_id:(canManage()&&v('fw'))||S.p.id,kind:v('fk'),status:v('fs'),note:document.getElementById('fn').value.trim()||null,followup_date:v('fd')||today()});
     if(!ok(r))return;if(v('fs')==='done')await sb.from('followups').update({status:'done'}).eq('servee_id',S.fuf).eq('status','open').like('note','[تلقائي]%');S.fuf=null;await loadFu();render();return toast('اتسجّل');
   }
+  if(a==='fuRep'){S.furBusy=true;render();const r=await sb.rpc('kh_followup_report_text',{p_section:isAdmin()?(S.sec||''):''});S.furBusy=false;if(r.error){render();return toast('تعذّر عمل التقرير (شغّل ملف 30 في Supabase؟)')}S.fur=r.data||'';return render()}
+  if(a==='fuRepX'){S.fur=null;return render()}
+  if(a==='fuRepCopy'){try{await navigator.clipboard.writeText(S.fur||'');toast('اتنسخ')}catch(_){toast('مقدرتش أنسخ، حدّد النص وانسخه يدوي')}return}
   if(a==='fuDone'){const r=await sb.from('followups').update({status:'done'}).eq('id',id);if(!ok(r))return;await loadFu();return render()}
   if(a==='exp'){
     const H=histInfo(S.rd||56),d=today();
