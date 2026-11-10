@@ -391,9 +391,17 @@ function srvFiltered(){
   const q=nz(S.sq);
   return S.profiles.filter(p=>(p.role==='servant'||p.role==='secretary')&&(!S.ssec||p.section===S.ssec||srvClasses(p.id).some(c=>c.section===S.ssec))&&(!S.sfc||(S.sfc==='_none'?!srvClasses(p.id).length:S.cs.some(x=>x.servant_id===p.id&&x.class_id===S.sfc)))&&(!q||nz(p.full_name).includes(q)||(p.phone||'').includes(S.sq.trim())));
 }
+/* عدد المخدومين المسئول عنهم كل خادم (بنفس منطق svServants: المعيّن عليه، أو كل المخدومين غير المعيّنين في فصله) */
+let _sl={a:null,b:null,c:null,m:null};
+function srvLoad(){
+  if(_sl.a===S.servees&&_sl.b===S.cs&&_sl.c===S.profiles&&_sl.m)return _sl.m;
+  const m=new Map();
+  S.servees.forEach(x=>{if(!x.active||!x.class_id)return;svServants(x).forEach(q=>m.set(q.id,(m.get(q.id)||0)+1))});
+  _sl={a:S.servees,b:S.cs,c:S.profiles,m};return m;
+}
 function srvRow(p){
-  const cl=srvClasses(p.id),open=S.sso===p.id,ph=normPhone(p.contact_phone||p.phone);
-  const head=`<div class="row ${p.active?'':'off'}" style="border-top:0"><div class="who">${av(p)}<div>${esc(p.full_name||'بدون اسم')}${p.role==='secretary'?'<span class="bd">أمين خدمة'+(p.section?' '+SEC[p.section]:'')+'</span>':''}${p.pending&&!p.active?'<span class="bd" style="background:#fde9b8">مستني موافقة</span>':!p.active?'<span class="bd" style="background:#f3d6d2">موقوف</span>':''}<small>${cl.length?cl.map(c=>esc(cLabel(c))).join(' · '):'<span style="color:var(--red)">غير مربوط بفصل</span>'}</small></div></div><div class="acts"><button class="s${open?' on':''}" data-a="srvOpen" data-id="${p.id}">${open?'إخفاء':'التفاصيل'}</button></div></div>`;
+  const cl=srvClasses(p.id),open=S.sso===p.id,ph=normPhone(p.contact_phone||p.phone),nResp=srvLoad().get(p.id)||0;
+  const head=`<div class="row ${p.active?'':'off'}" style="border-top:0"><div class="who">${av(p)}<div>${esc(p.full_name||'بدون اسم')}${p.role==='servant'?`<span class="bd" style="background:#dcefe3">مسئول عن ${nResp} مخدوم</span>`:''}${p.role==='secretary'?'<span class="bd">أمين خدمة'+(p.section?' '+SEC[p.section]:'')+'</span>':''}${p.pending&&!p.active?'<span class="bd" style="background:#fde9b8">مستني موافقة</span>':!p.active?'<span class="bd" style="background:#f3d6d2">موقوف</span>':''}<small>${cl.length?cl.map(c=>esc(cLabel(c))).join(' · '):'<span style="color:var(--red)">غير مربوط بفصل</span>'}</small></div></div><div class="acts"><button class="s${open?' on':''}" data-a="srvOpen" data-id="${p.id}">${open?'إخفاء':'التفاصيل'}</button></div></div>`;
   if(!open)return `<div class="srv">${head}</div>`;
   const st=srvStats(p.id),np=S.lp.filter(x=>x.created_by===p.id).length,free=S.classes.filter(c=>!cl.some(x=>x.id===c.id));
   const det=`<div class="srvd">
