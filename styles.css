@@ -219,3 +219,7 @@ details.card summary{cursor:pointer}
 @keyframes spOut{to{opacity:0;visibility:hidden}}
 @media (prefers-reduced-motion:reduce){#splash{animation:spOut .3s ease 1.4s forwards}.sp-logo,.sp-name,.sp-dots{animation:none;opacity:1;transform:none}.sp-line{animation:none;width:min(46vw,200px)}.sp-dots i{animation:none}}
 @media print{#splash{display:none}}
+
+.bd.tap{cursor:pointer;border:1px solid #9cc7ab;background:#dcefe3;user-select:none}.bd.tap:after{content:" ▾"}.bd.tap.o:after{content:" ▴"}
+.names{background:#f7f9f7;border:1px solid var(--line);border-radius:8px;margin:2px 0 8px;padding:4px 10px}
+.names div{padding:5px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:15px}.names div:first-child{border-top:0}.names small{color:var(--mut)}

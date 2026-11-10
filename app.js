@@ -424,8 +424,9 @@ function srvLoad(){
 }
 function srvRow(p){
   const cl=srvClasses(p.id),open=S.sso===p.id,ph=normPhone(p.contact_phone||p.phone),nResp=srvLoad().get(p.id)||0;
-  const head=`<div class="row ${p.active?'':'off'}" style="border-top:0"><div class="who">${av(p)}<div>${esc(p.full_name||'بدون اسم')}${p.role==='servant'?`<span class="bd" style="background:#dcefe3">مسئول عن ${nResp} مخدوم</span>`:''}${p.role==='secretary'?'<span class="bd">أمين خدمة'+(p.section?' '+SEC[p.section]:'')+'</span>':''}${p.pending&&!p.active?'<span class="bd" style="background:#fde9b8">مستني موافقة</span>':!p.active?'<span class="bd" style="background:#f3d6d2">موقوف</span>':''}<small>${cl.length?cl.map(c=>esc(cLabel(c))).join(' · '):'<span style="color:var(--red)">غير مربوط بفصل</span>'}</small></div></div><div class="acts"><button class="s${open?' on':''}" data-a="srvOpen" data-id="${p.id}">${open?'إخفاء':'التفاصيل'}</button></div></div>`;
-  if(!open)return `<div class="srv">${head}</div>`;
+  const head=`<div class="row ${p.active?'':'off'}" style="border-top:0"><div class="who">${av(p)}<div>${esc(p.full_name||'بدون اسم')}${p.role==='servant'?`<span class="bd tap${S.sno&&S.sno[p.id]?' o':''}" role="button" tabindex="0" data-a="srvNames" data-id="${p.id}">مسئول عن ${nResp} مخدوم</span>`:''}${p.role==='secretary'?'<span class="bd">أمين خدمة'+(p.section?' '+SEC[p.section]:'')+'</span>':''}${p.pending&&!p.active?'<span class="bd" style="background:#fde9b8">مستني موافقة</span>':!p.active?'<span class="bd" style="background:#f3d6d2">موقوف</span>':''}<small>${cl.length?cl.map(c=>esc(cLabel(c))).join(' · '):'<span style="color:var(--red)">غير مربوط بفصل</span>'}</small></div></div><div class="acts"><button class="s${open?' on':''}" data-a="srvOpen" data-id="${p.id}">${open?'إخفاء':'التفاصيل'}</button></div></div>`;
+  const names=p.role==='servant'&&S.sno&&S.sno[p.id]?`<div class="names">${S.servees.filter(x=>x.active&&x.class_id&&svServants(x).some(q=>q.id===p.id)).sort((a,b)=>String(a.full_name||'').localeCompare(String(b.full_name||''),'ar')).map(x=>`<div>${esc(x.full_name)}<small>${esc(cname(x.class_id))}</small></div>`).join('')||'<div><small>مفيش مخدومين</small></div>'}</div>`:'';
+  if(!open)return `<div class="srv">${head}${names}</div>`;
   const st=srvStats(p.id),np=S.lp.filter(x=>x.created_by===p.id).length,free=S.classes.filter(c=>!cl.some(x=>x.id===c.id));
   const det=`<div class="srvd">
   <div class="cnt">${p.phone?`<span dir="ltr">${esc(p.phone)}</span>`:'<span>مفيش رقم تليفون</span>'}${ph?`<a href="tel:${ph}">اتصال</a><a href="https://wa.me/2${ph}" target="_blank" rel="noopener">واتساب</a>`:''}${nb({u:p.id},p.full_name||'')}</div>
@@ -437,7 +438,7 @@ function srvRow(p){
   <div class="cnt">${st.n?`<span>حاضر ${st.P}</span><span>غايب ${st.A}</span><span>معتذر ${st.E}</span><span>نسبة الحضور ${st.pct}%</span>`:'<span>لسه مفيش حضور متسجّل</span>'}</div>
   <div class="cnt"><span>تحضيرات الدروس: ${np}</span></div>
   <div class="acts" style="justify-content:flex-start"><button class="s" data-a="sphoto" data-id="${p.id}">صورة</button><button class="s" data-a="srvEdit" data-id="${p.id}">تعديل البيانات</button><button class="s" data-a="resetPw" data-id="${p.id}">باسورد جديد</button><button class="s${p.pending&&!p.active?' on':''}" data-a="togUser" data-id="${p.id}">${p.pending&&!p.active?'موافقة':(p.active?'إيقاف':'تفعيل')}</button>${(isAdmin()&&p.role!=='admin')||(isSec()&&p.role==='servant')?`<button class="s d" data-a="delUser" data-id="${p.id}">حذف</button>`:''}</div></div>`;
-  return `<div class="srv open">${head}${det}</div>`;
+  return `<div class="srv open">${head}${names}${det}</div>`;
 }
 function srvEditCard(){
   const p=S.profiles.find(x=>x.id===S.sed);if(!p)return'';
@@ -2208,6 +2209,7 @@ app.addEventListener('click',async e=>{
     if(!ok(r))return;S.sed=null;await load();render();return toast('تم الحفظ');
   }
   if(a==='classOpen'){S.cso=S.cso===id?null:id;return render()}
+  if(a==='srvNames'){S.sno=S.sno||{};S.sno[id]=!S.sno[id];return render()}
   if(a==='srvOpen'){S.sso=S.sso===id?null:id;return render()}
   if(a==='sec'){
     if(!isAdmin()||S.sec===id)return;
