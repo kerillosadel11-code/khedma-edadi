@@ -820,6 +820,20 @@ function vPrep(){
 /* سجل الحضور بيتحمّل عند الحاجة بس (مش مع كل فتحة) عشان نقل البيانات على Supabase */
 const HIST_TABS={home:90,classes:90,mycls:90,mysv:90,follow:90,rep:90,ana:90},MASS_TABS=new Set(['rep','ana']);
 async function loadFu(){const f=await fetchAll(()=>sb.from('followups').select('*').order('followup_date',{ascending:false}).order('created_at',{ascending:false}));S.fu=fSv(f.error?[]:(f.data||[]))}
+async function loadSFu(){const r=await fetchAll(()=>sb.from('servant_followups').select('*').order('followup_date',{ascending:false}).order('created_at',{ascending:false}));
+  if(r.error){S.sfu=[];S.sfuErr=/PGRST205|servant_followups|42P01/.test(JSON.stringify(r.error))?'محتاج تشغّل ملف 46_servant_followups.sql على Supabase':'تعذّر تحميل افتقاد الخدام: '+r.error.message}else{S.sfu=r.data||[];S.sfuErr=''}}
+const sfTodayRows=(id,k)=>(S.sfu||[]).filter(z=>z.servant_id===id&&z.kind===k&&String(z.followup_date).slice(0,10)===today());
+const sfBtn=(id,k)=>{const on=sfTodayRows(id,k).length>0;return `<button class="s${on?' on':''}" data-a="fuSrv" data-k="${k}" data-id="${id}" aria-pressed="${on}">${on?'✓ ':''}${FK[k]}</button>`};
+function sfCard(){
+  if(!canManage())return '';
+  if(S.sfu===undefined){if(!S._sfp){S._sfp=1;loadSFu().then(()=>{S._sfp=0;render()}).catch(()=>{S._sfp=0;S.sfu=[]})}return '<div class="card"><h2>افتقاد الخدام</h2><div class="empty">جاري التحميل...</div></div>'}
+  const last=id=>(S.sfu||[]).find(z=>z.servant_id===id);
+  const L=servList().map(p=>({p,lf:last(p.id)})).sort((a,b)=>{const x=a.lf?String(a.lf.followup_date):'',y=b.lf?String(b.lf.followup_date):'';return x===y?String(a.p.full_name||'').localeCompare(String(b.p.full_name||''),'ar'):x<y?-1:1});
+  const rows=L.map(({p,lf})=>{const ph=normPhone(p.phone||p.contact_phone||''),cl=srvClasses(p.id).map(c=>esc(cLabel(c))).join(' · ');
+    const msg='أهلاً يا '+fst(p.full_name)+'، وحشتنا في الخدمة وحبّينا نطمّن عليك. ربنا يباركك ويحفظك. خدمة إعدادي';
+    return `<div class="row"><div class="who">${av(p,40)}<div>${esc(p.full_name||'بدون اسم')}<small>${cl||'غير مربوط بفصل'}</small>${lf?`<small>آخر افتقاد: ${FK[lf.kind]||''} ${fdate(String(lf.followup_date).slice(0,10))}${lf.by_id?fwho({servant_id:lf.by_id}):''}</small>`:'<small>لسه ما اتفتقدش</small>'}</div></div><div class="acts">${sfBtn(p.id,'call')}${sfBtn(p.id,'visit')}${sfBtn(p.id,'whatsapp')}${ph?`<a class="s" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="${waUrl(ph,msg)}">رسالة واتساب</a><a class="s" style="text-decoration:none;display:inline-block" href="tel:${ph}">اتصال</a>`:''}</div></div>`}).join('');
+  return `<div class="card"><h2>افتقاد الخدام (${L.length})</h2><small style="display:block;margin-bottom:6px">الأقدم افتقادًا في الأول. دوس على نوع الافتقاد يتعلّم، ودوس عليه تاني يتلغي. "رسالة واتساب" بتفتح الواتساب برسالة جاهزة.</small>${S.sfuErr?`<div class="empty" style="color:var(--red)">${esc(S.sfuErr)}</div>`:''}${rows||'<div class="empty">مفيش خدام.</div>'}</div>`;
+}
 /* كاش على الجهاز (IndexedDB): السجل القديم بيتحفظ، وكل فتحة بعد كده بنجيب آخر 3 أسابيع بس */
 const KV={db:null,
   open(){return KV.db||(KV.db=new Promise((res,rej)=>{try{const r=indexedDB.open('khedma_cache',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}}))},
@@ -989,7 +1003,7 @@ function vFollow(){
   const recent=fu.filter(f=>S.servees.some(x=>x.id===f.servee_id)).slice(0,30);
   const pk=S.servees.filter(x=>x.active&&(!S.f||x.class_id===S.f)).sort((p,q)=>(p.full_name||'').localeCompare(q.full_name||'','ar'));
   const pickCard=`<div class="card"><h2>افتقاد أي مخدوم</h2><small style="display:block;margin-bottom:6px">لو عايز تفتقد حد من غير ما يكون غايب.</small><input type="search" data-sf="fupick" placeholder="ابحث بالاسم..." autocomplete="off" aria-label="بحث"><select id="fupick"><option value="">اختار المخدوم</option>${pk.map(x=>`<option value="${x.id}">${esc(x.full_name)}${x.class_id?' · '+esc(cname(x.class_id)):''}</option>`).join('')}</select><small>نوع الافتقاد</small><select id="fupk">${FKF.map(k=>`<option value="${k}">${FK[k]}</option>`).join('')}</select>${canManage()?`<small>مين اللي قام بالافتقاد</small><select id="fupw">${fuStaff().map(p=>`<option value="${p.id}"${p.id===S.p.id?' selected':''}>${esc(p.full_name||'بدون اسم')}</option>`).join('')}</select>`:`<small>القائم بالافتقاد: ${esc(S.p.full_name||'أنا')}</small>`}<textarea id="fupn" rows="2" placeholder="ملاحظات (اختياري)"></textarea><button class="p" data-a="fuQuick">حفظ الافتقاد</button><button class="s" data-a="fuPick" style="margin-top:8px">فتح نموذج كامل (تاريخ / متابعة)</button></div>`;
-  return form+fuRepCard()+pickCard+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
+  return form+fuRepCard()+pickCard+sfCard()+`<div class="card"><h2>محتاجين افتقاد (${L.length})</h2><div class="two"><select data-a="filter"><option value="">كل الفصول</option>${opts(S.classes,cLabel,S.f)}</select><select data-a="th">${[2,3,4].map(n=>`<option value="${n}"${th===n?' selected':''}>غياب ${n} مرات ورا بعض</option>`).join('')}</select></div>${rows||'<div class="empty">مفيش حد محتاج افتقاد بالمعيار ده. ✓</div>'}</div>
   <div class="card"><h2>آخر الافتقادات (${recent.length})</h2>${recent.map(f=>`<div class="row"><div>${esc(sname(f.servee_id))}<small>${FK[f.kind]||esc(f.kind)} · ${fdate(f.followup_date)}${fwho(f)}</small>${f.note?`<small>${esc(f.note)}</small>`:''}</div><div class="acts"><span class="bd">${FS[f.status]||esc(f.status)}</span>${f.status==='open'?`<button class="s" data-a="fuDone" data-id="${f.id}">تم</button>`:''}</div></div>`).join('')||'<div class="empty">لسه مفيش افتقادات متسجلة.</div>'}</div>`;
 }
 /* ===== التقرير الأسبوعي: الأسبوع بيبدأ سبت · اجتماع البنين الخميس · اجتماع البنات الأربع ===== */
@@ -1968,6 +1982,16 @@ app.addEventListener('click',async e=>{
     if(!ok(r)){delete b.dataset.busy;return}
     await sb.from('followups').update({status:'done'}).eq('servee_id',id).eq('status','open').like('note','[تلقائي]%');
     await loadFu();render();keep();return toast('اتسجّل افتقاد '+FK[k]);
+  }
+  if(a==='fuSrv'){
+    const k=b.dataset.k,p=S.profiles.find(z=>z.id===id);if(!p||b.dataset.busy)return;b.dataset.busy='1';
+    const had=sfTodayRows(id,k);
+    if(had.length){const r=await sb.from('servant_followups').delete().in('id',had.map(z=>z.id)).select('id');
+      if(!ok(r)){delete b.dataset.busy;return}if(!(r.data||[]).length){delete b.dataset.busy;return toast('معرفتش ألغي الافتقاد (مفيش صلاحية)')}
+      await loadSFu();render();return toast('اتلغى افتقاد '+FK[k]);}
+    const r=await sb.from('servant_followups').insert({servant_id:id,by_id:S.p.id,kind:k,followup_date:today()});
+    if(!ok(r)){delete b.dataset.busy;return}
+    await loadSFu();render();return toast('اتسجّل افتقاد '+FK[k]+' لـ '+fst(p.full_name));
   }
   if(a==='copyInv'){try{await navigator.clipboard.writeText(S.invLink.url);toast('اتنسخ')}catch(_){toast('انسخ اللينك يدويًا')}return}
   if(a==='dismissInv'){S.invLink=null;return render()}
