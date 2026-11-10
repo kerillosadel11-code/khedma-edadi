@@ -321,7 +321,7 @@ const svAssigned=s=>s.servant_id?S.profiles.find(p=>p.id===s.servant_id):null;
 const svServants=s=>{const a=svAssigned(s);return a?[a]:classServants(s.class_id)};
 const assignSel=s=>{const cl=classServants(s.class_id),a=svAssigned(s);const L=a&&!cl.some(p=>p.id===a.id)?cl.concat([a]):cl;return `<select data-a="assignSv" data-id="${s.id}" aria-label="الخادم المسئول" style="margin:6px 0 0"><option value="">${cl.length?'— خدام الفصل كلهم (بدون تعيين) —':'مفيش خدام في الفصل'}</option>${L.map(p=>`<option value="${p.id}"${s.servant_id===p.id?' selected':''}>${esc(p.full_name||'؟')}</option>`).join('')}</select>`};
 function svRow(s){
-  return `<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}${badge(s.section)}${S.sc&&spOpenSet().has(s.id)?'<span class="bd" style="background:#fbe9c2">💛 حالة خاصة</span>':''}${s.active?'':'<span class="bd" style="background:#f3d6d2">مؤرشف</span>'}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}${!s.active&&s.archive_reason?' · '+esc(s.archive_reason):''}</small>${canManage()&&s.class_id?`<small>${svAssigned(s)?'الخادم المسئول':'خدام الفصل'}: ${svServants(s).map(p=>esc(p.full_name||'؟')).join(' · ')||'<span style="color:var(--red)">مفيش خادم مربوط بالفصل</span>'}</small>`:''}${s.active?fuBadge(s.id):''}</div></div><div class="acts"><button class="s on" data-a="pf" data-id="${s.id}">الملف</button><button class="s" data-a="editServee" data-id="${s.id}">تعديل</button><details class="mre"><summary class="s">المزيد ⋯</summary><div class="acts">${canManage()&&s.active?`<button class="s" data-a="parInv" data-id="${s.id}">دعوة ولي أمر</button>`:''}${s.active?`<button class="s" data-a="fuServee" data-k="call" data-id="${s.id}">افتقاد هاتفي</button><button class="s" data-a="fuServee" data-k="visit" data-id="${s.id}">افتقاد منزلي</button><button class="s" data-a="fuServee" data-k="whatsapp" data-id="${s.id}">افتقاد واتس اب</button>`:''}${isAdmin()&&s.active?`<button class="s" data-a="mkServeeAcc" data-id="${s.id}">${S.profiles.some(p=>p.self_servee_id===s.id)?'باسورد جديد للمخدوم':'حساب دخول للمخدوم'}</button>`:''}<button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button>${s.active?`<button class="s" data-a="archServee" data-id="${s.id}">أرشفة</button>`:`<button class="s on" data-a="restServee" data-id="${s.id}">استرجاع</button>`}${canManage()?`<button class="s d" data-a="delServee" data-id="${s.id}">حذف</button>`:''}</div></details></div></div>`;
+  return `<div class="row ${s.active?'':'off'}"><div class="who">${av(s)}<div>${esc(s.full_name)}${badge(s.section)}${S.sc&&spOpenSet().has(s.id)?'<span class="bd" style="background:#fbe9c2">💛 حالة خاصة</span>':''}${s.active?'':'<span class="bd" style="background:#f3d6d2">مؤرشف</span>'}<small>${esc(cname(s.class_id))}${s.phone?' · '+esc(s.phone):''}${!s.active&&s.archive_reason?' · '+esc(s.archive_reason):''}</small>${canManage()&&s.class_id?`<small>${svAssigned(s)?'الخادم المسئول':'خدام الفصل'}: ${svServants(s).map(p=>esc(p.full_name||'؟')).join(' · ')||'<span style="color:var(--red)">مفيش خادم مربوط بالفصل</span>'}</small>`:''}${s.active?fuBadge(s.id):''}</div></div><div class="acts"><button class="s on" data-a="pf" data-id="${s.id}">الملف</button><button class="s" data-a="editServee" data-id="${s.id}">تعديل</button><details class="mre"><summary class="s">المزيد ⋯</summary><div class="acts">${canManage()&&s.active?`<button class="s" data-a="parInv" data-id="${s.id}">دعوة ولي أمر</button>`:''}${s.active?fuBtn(s.id,'call')+fuBtn(s.id,'visit')+fuBtn(s.id,'whatsapp'):''}${isAdmin()&&s.active?`<button class="s" data-a="mkServeeAcc" data-id="${s.id}">${S.profiles.some(p=>p.self_servee_id===s.id)?'باسورد جديد للمخدوم':'حساب دخول للمخدوم'}</button>`:''}<button class="s" data-a="photo" data-id="${s.id}">صورة</button><button class="s" data-a="card" data-id="${s.id}">كارت</button>${s.active?`<button class="s" data-a="archServee" data-id="${s.id}">أرشفة</button>`:`<button class="s on" data-a="restServee" data-id="${s.id}">استرجاع</button>`}${canManage()?`<button class="s d" data-a="delServee" data-id="${s.id}">حذف</button>`:''}</div></details></div></div>`;
 }
 /* ===== كشف الأسماء المتشابهة: إملاء مختلف (ى/ي، ذ/ز، ص/س...) أو حرف زيادة/ناقص أو اسم رابع ناقص/زيادة ===== */
 const dupFold=t=>nz(t).replace(/ـ/g,'').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/ء/g,'').replace(/ذ/g,'ز').replace(/ظ/g,'ض').replace(/ص/g,'س').replace(/ط/g,'ت').replace(/عبد\s+/g,'عبد').replace(/\s+/g,' ').trim();
@@ -924,6 +924,9 @@ const FK={call:'هاتفي',visit:'منزلي',whatsapp:'واتس اب',message:
 const fuBadge=id=>{if(!S.fu)return'';const f=S.fu.find(z=>z.servee_id===id&&z.status==='done'&&!String(z.note||'').startsWith('[تلقائي]'));if(!f)return'';
   const d=Math.round((new Date(today()+'T00:00:00')-new Date(String(f.followup_date).slice(0,10)+'T00:00:00'))/864e5),t=d<=0?'النهارده':d===1?'امبارح':'من '+d+' يوم';
   return `<small><span class="bd" style="background:${d<=0?'#dcefe3':'#eef1ee'}">✅ اتفتقد ${FK[f.kind]||''} · ${t}</span>${fwho(f)}</small>`};
+/* افتقادات النهارده (يدوي، تم) من نوع معيّن لمخدوم: بتحدد الزرار يتلوّن ولا لأ، والضغط عليه تاني بيلغيها (زي الحضور والغياب) */
+const fuTodayRows=(id,k)=>(S.fu||[]).filter(z=>z.servee_id===id&&z.kind===k&&z.status==='done'&&!String(z.note||'').startsWith('[تلقائي]')&&String(z.followup_date).slice(0,10)===today());
+const fuBtn=(id,k)=>{const on=fuTodayRows(id,k).length>0;return `<button class="s${on?' on':''}" data-a="fuServee" data-k="${k}" data-id="${id}" aria-pressed="${on}">${on?'✓ ':''}افتقاد ${FK[k]}</button>`};
 const fwho=f=>{const n=pname(f.servant_id);return n&&n!=='؟'?' · '+esc(n):''};
 const fuStaff=()=>{const L=attList();return(S.p&&!L.some(p=>p.id===S.p.id)?[S.p].concat(L):L).slice().sort((a,b)=>String(a.full_name||'').localeCompare(String(b.full_name||''),'ar'))};
 const bar=p=>`<div style="height:8px;background:var(--line);border-radius:4px;min-width:60px"><div style="width:${p||0}%;height:8px;background:var(--gold);border-radius:4px"></div></div>`;
@@ -1951,10 +1954,19 @@ app.addEventListener('click',async e=>{
   if(a==='parInv')return mkParInv(id);
   if(a==='fuServee'){
     const k=b.dataset.k,x=S.servees.find(z=>z.id===id);if(!x)return;
-    if(!confirm('تسجيل افتقاد '+FK[k]+' لـ '+x.full_name+'؟'))return;
+    if(b.dataset.busy)return;b.dataset.busy='1';
+    const keep=()=>{const nb=document.querySelector('[data-a="fuServee"][data-id="'+id+'"]');const d=nb&&nb.closest('details');if(d)d.open=true};
+    const had=fuTodayRows(id,k);
+    if(had.length){ /* مسجّل النهارده -> إلغاء */
+      const r=await sb.from('followups').delete().in('id',had.map(z=>z.id)).select('id');
+      if(!ok(r)){delete b.dataset.busy;return}
+      if(!(r.data||[]).length){delete b.dataset.busy;return toast('معرفتش ألغي الافتقاد (مفيش صلاحية)')}
+      await loadFu();render();keep();return toast('اتلغى افتقاد '+FK[k]);
+    }
     const r=await sb.from('followups').insert({servee_id:id,servant_id:S.p.id,kind:k,status:'done',note:null,followup_date:today()});
-    if(!ok(r))return;await sb.from('followups').update({status:'done'}).eq('servee_id',id).eq('status','open').like('note','[تلقائي]%');
-    await loadFu();render();return toast('اتسجّل افتقاد '+FK[k]);
+    if(!ok(r)){delete b.dataset.busy;return}
+    await sb.from('followups').update({status:'done'}).eq('servee_id',id).eq('status','open').like('note','[تلقائي]%');
+    await loadFu();render();keep();return toast('اتسجّل افتقاد '+FK[k]);
   }
   if(a==='copyInv'){try{await navigator.clipboard.writeText(S.invLink.url);toast('اتنسخ')}catch(_){toast('انسخ اللينك يدويًا')}return}
   if(a==='dismissInv'){S.invLink=null;return render()}
