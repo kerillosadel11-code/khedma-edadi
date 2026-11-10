@@ -202,3 +202,20 @@ details.card summary{cursor:pointer}
 .dy-pc.hi{background:#e3f4ea;color:#1b7a43}.dy-pc.mid{background:#fbf1da;color:#8a6212}.dy-pc.lo{background:#f9e3df;color:var(--red)}
 .dy-bar{height:6px;border-radius:99px;background:#e8ece9;margin-top:8px;overflow:hidden}
 .dy-bar span{display:block;height:100%;background:#2e9e5b;border-radius:99px}.dy-bar.mid span{background:#d9a441}.dy-bar.lo span{background:var(--red)}
+
+/* شاشة البداية */
+#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#f7f7f7;padding:24px;animation:spOut .6s ease 2.9s forwards}
+.sp-logo{width:min(80vw,420px);height:auto;opacity:0;transform:scale(.88) translateY(8px);animation:spLogo .9s cubic-bezier(.2,.8,.2,1) .15s forwards}
+.sp-name{font-weight:700;font-size:clamp(28px,8vw,40px);color:var(--ink);opacity:0;transform:translateY(14px);animation:spUp .7s ease .85s forwards}
+.sp-line{height:3px;width:0;border-radius:3px;background:var(--gold);animation:spLine .8s ease 1.3s forwards}
+.sp-dots{display:flex;gap:7px;margin-top:14px;opacity:0;animation:spFade .4s ease 1.5s forwards}
+.sp-dots i{width:8px;height:8px;border-radius:50%;background:var(--gold);animation:spDot 1s ease-in-out infinite}
+.sp-dots i:nth-child(2){animation-delay:.15s}.sp-dots i:nth-child(3){animation-delay:.3s}
+@keyframes spLogo{to{opacity:1;transform:none}}
+@keyframes spUp{to{opacity:1;transform:none}}
+@keyframes spLine{to{width:min(46vw,200px)}}
+@keyframes spFade{to{opacity:1}}
+@keyframes spDot{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-6px);opacity:1}}
+@keyframes spOut{to{opacity:0;visibility:hidden}}
+@media (prefers-reduced-motion:reduce){#splash{animation:spOut .3s ease 1.4s forwards}.sp-logo,.sp-name,.sp-dots{animation:none;opacity:1;transform:none}.sp-line{animation:none;width:min(46vw,200px)}.sp-dots i{animation:none}}
+@media print{#splash{display:none}}
