@@ -137,6 +137,9 @@ async function joinGo(){
   if(!x.pending){await sb.auth.signOut();const {error}=await sb.auth.signInWithPassword({email:ph+'@'+EMAIL_DOMAIN,password:p1});if(!error)return boot();return login()}
   app.innerHTML=joinWrap(`<h1>تم التسجيل ✅</h1><p>رقم الدخول بتاعك: <b dir="ltr">${esc(x.login)}</b></p><p>حسابك دلوقتي مستني موافقة أمين الخدمة. أول ما يوافق تقدر تدخل بنفس الرقم والباسورد اللي اخترتهم.</p><a href="#" data-a="joinhome">صفحة الدخول</a>`);
 }
+/* تسجيل آخر فتح للبرنامج (مرة كل 10 دقايق على الأكتر) */
+let _touchAt=0;
+function touchSeen(){if(!S.p||Date.now()-_touchAt<6e5)return;_touchAt=Date.now();try{Promise.resolve(sb.rpc('kh_touch')).catch(()=>{})}catch(_){}}
 async function boot(){
   const jt=joinTok();if(jt)return joinScreen(jt);
   const {data:{user}}=await sb.auth.getUser();
@@ -148,7 +151,7 @@ async function boot(){
   if(p.role==='admin'||p.role==='secretary'||p.role==='servant'){await load();render()}
   else{await loadParent();app.innerHTML=head()+vParent()}
   applyNav();
-  askPush();
+  askPush();touchSeen();
 }
 async function loadParent(){
   const l=await sb.from('parent_links').select('servee_id').eq('parent_id',S.p.id);ok(l);
@@ -448,9 +451,27 @@ function srvList(){
   const L=srvFiltered().sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ar'));
   return `<h2>الخدام (${L.length})</h2>`+(L.map(srvRow).join('')||'<div class="empty">مفيش خدام بالشكل ده.'+''+'</div>');
 }
+/* تقرير آخر دخول: خدام بنين لوحدهم وخدام بنات لوحدهم */
+function seenAgo(t){
+  if(!t)return '<span style="color:var(--red)">لسه ما فتحش</span>';
+  const d=new Date(t),n=new Date(),days=Math.floor((new Date(n.getFullYear(),n.getMonth(),n.getDate())-new Date(d.getFullYear(),d.getMonth(),d.getDate()))/864e5),
+    tm=d.toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'});
+  return days<=0?'النهارده '+tm:days===1?'امبارح '+tm:'من '+days+' يوم · '+d.toLocaleDateString('ar-EG',{day:'numeric',month:'long'});
+}
+function seenCard(){
+  if(!canManage())return '';
+  const secOf=p=>p.section||(srvClasses(p.id).find(c=>c.section)||{}).section||'',
+    all=S.profiles.filter(p=>(p.role==='servant'||p.role==='secretary')&&p.active),wk=Date.now()-7*864e5;
+  const grp=sec=>all.filter(p=>secOf(p)===sec).sort((a,b)=>(b.last_seen_at?+new Date(b.last_seen_at):0)-(a.last_seen_at?+new Date(a.last_seen_at):0)||String(a.full_name||'').localeCompare(String(b.full_name||''),'ar'));
+  const row=p=>`<div class="row"><div class="who">${av(p,36)}<div>${esc(p.full_name||'بدون اسم')}<small>${seenAgo(p.last_seen_at)}</small></div></div></div>`;
+  const sect=(sec,L)=>{const late=L.filter(p=>!p.last_seen_at||+new Date(p.last_seen_at)<wk).length;return `<details class="mre" style="margin-top:8px"><summary class="s">خدام ${SEC[sec]} (${L.length})${late?' · ما فتحوش من أسبوع: '+late:''}</summary>${L.map(row).join('')||'<div class="empty">مفيش خدام.</div>'}</details>`};
+  const none=all.filter(p=>!secOf(p));
+  const nothing=all.every(p=>!p.last_seen_at)?'<div class="empty">التسجيل بيبدأ من أول ما كل خادم يفتح البرنامج بعد التحديث (لازم يكون ملف 47_last_seen.sql اتشغّل على Supabase).</div>':'';
+  return `<div class="card"><h2>🕘 آخر مرة فتحوا البرنامج</h2>${nothing}${sect('boys',grp('boys'))}${sect('girls',grp('girls'))}${none.length?`<details class="mre" style="margin-top:8px"><summary class="s">من غير قسم (${none.length})</summary>${none.map(row).join('')}</details>`:''}</div>`;
+}
 function vSrv(){
   const all=S.profiles.filter(p=>p.role==='servant'||p.role==='secretary'),free=all.filter(p=>p.active&&!srvClasses(p.id).length).length;
-  return credCard()+srvEditCard()+`<div class="card"><input id="srq" type="search" data-a="srvsearch" placeholder="ابحث باسم الخادم أو تليفونه" value="${esc(S.sq)}">
+  return credCard()+srvEditCard()+seenCard()+`<div class="card"><input id="srq" type="search" data-a="srvsearch" placeholder="ابحث باسم الخادم أو تليفونه" value="${esc(S.sq)}">
   <select data-a="srvfc"><option value="">كل الفصول</option><option value="_none"${S.sfc==='_none'?' selected':''}>غير مربوطين بفصل${free?' ('+free+')':''}</option>${opts(S.classes,cLabel,S.sfc)}</select>
   <p class="empty">الخدام الجداد بيتعملوا من تبويب "مستخدم جديد" أو "دعوات واتساب"، وبعدين تربطهم بفصل من هنا.</p></div>
   <div class="card" id="srl">${srvList()}</div>`;
@@ -847,7 +868,9 @@ function sfCard(){
   const rows=L.map(({p,lf})=>{const ph=normPhone(p.phone||p.contact_phone||''),cl=srvClasses(p.id).map(c=>esc(cLabel(c))).join(' · ');
     const msg='أهلاً يا '+fst(p.full_name)+'، وحشتنا في الخدمة وحبّينا نطمّن عليك. ربنا يباركك ويحفظك. خدمة إعدادي';
     return `<div class="row"><div class="who">${av(p,40)}<div>${esc(p.full_name||'بدون اسم')}<small>${cl||'غير مربوط بفصل'}</small>${lf?`<small>آخر افتقاد: ${FK[lf.kind]||''} ${fdate(String(lf.followup_date).slice(0,10))}${lf.by_id?fwho({servant_id:lf.by_id}):''}</small>`:'<small>لسه ما اتفتقدش</small>'}</div></div><div class="acts">${sfBtn(p.id,'call')}${sfBtn(p.id,'visit')}${sfBtn(p.id,'whatsapp')}${ph?`<a class="s" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="${waUrl(ph,msg)}">رسالة واتساب</a><a class="s" style="text-decoration:none;display:inline-block" href="tel:${ph}">اتصال</a>`:''}</div></div>`}).join('');
-  return `<div class="card"><h2>افتقاد الخدام (${L.length})</h2><small style="display:block;margin-bottom:6px">الأقدم افتقادًا في الأول. دوس على نوع الافتقاد يتعلّم، ودوس عليه تاني يتلغي. "رسالة واتساب" بتفتح الواتساب برسالة جاهزة.</small>${S.sfuErr?`<div class="empty" style="color:var(--red)">${esc(S.sfuErr)}</div>`:''}${rows||'<div class="empty">مفيش خدام.</div>'}</div>`;
+  const open=!!S.sfo,ttl=`<h2 data-a="sfToggle" role="button" tabindex="0" aria-expanded="${open}" style="cursor:pointer;margin:0;display:flex;justify-content:space-between;align-items:center">افتقاد الخدام (${L.length}) <span style="font-size:14px;color:var(--mut)">${open?'إخفاء ▴':'إظهار ▾'}</span></h2>`;
+  if(!open)return `<div class="card">${ttl}</div>`;
+  return `<div class="card">${ttl}<small style="display:block;margin:6px 0">الأقدم افتقادًا في الأول. دوس على نوع الافتقاد يتعلّم، ودوس عليه تاني يتلغي. "رسالة واتساب" بتفتح الواتساب برسالة جاهزة.</small>${S.sfuErr?`<div class="empty" style="color:var(--red)">${esc(S.sfuErr)}</div>`:''}${rows||'<div class="empty">مفيش خدام.</div>'}</div>`;
 }
 /* كاش على الجهاز (IndexedDB): السجل القديم بيتحفظ، وكل فتحة بعد كده بنجيب آخر 3 أسابيع بس */
 const KV={db:null,
@@ -1998,6 +2021,7 @@ app.addEventListener('click',async e=>{
     await sb.from('followups').update({status:'done'}).eq('servee_id',id).eq('status','open').like('note','[تلقائي]%');
     await loadFu();render();keep();return toast('اتسجّل افتقاد '+FK[k]);
   }
+  if(a==='sfToggle'){S.sfo=!S.sfo;return render()}
   if(a==='fuSrv'){
     const k=b.dataset.k,p=S.profiles.find(z=>z.id===id);if(!p||b.dataset.busy)return;b.dataset.busy='1';
     const had=sfTodayRows(id,k);
@@ -2434,7 +2458,7 @@ function startLive(){
     _live=sb.channel('nt-'+S.p.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+S.p.id},()=>catchUp()).subscribe(st=>{_rt=st==='SUBSCRIBED'});
   }catch(_){_liveUid=null}
 }
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.p){catchUp();startLive()}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.p){catchUp();startLive();touchSeen()}});
 window.addEventListener('online',()=>{if(S.p){catchUp();startLive()}});
 window.addEventListener('focus',()=>{if(S.p)catchUp()});
 setInterval(()=>{if(S.p&&!document.hidden)startLive()},20000);
