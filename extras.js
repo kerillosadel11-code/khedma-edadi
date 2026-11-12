@@ -54,9 +54,17 @@ function vRep(){
 /* ================= لوحة الشرف ================= */
 async function loadHon(){
   const H=X.hon;if(H.busy)return;H.busy=true;if(!H.month)H.month=mNow();
-  const r=await sb.rpc('kh_honor_board',{p_month:H.month+'-01'});
+  const [r,r2]=await Promise.all([sb.rpc('kh_honor_board',{p_month:H.month+'-01'}),sb.rpc('kh_honor_servants',{p_month:H.month+'-01'})]);
   H.busy=false;H.data=r.error?[]:(r.data||[]);if(r.error)fail(r.error,'تعذّر تحميل لوحة الشرف');
+  H.srv=r2.error?null:(r2.data||null);
   if(S.tab==='xhon')rp();
+}
+function srvRows(D,medal){
+  if(!D)return '<div class="empty">ترتيب الخدام مش متاح دلوقتي.</div>';
+  const top=D.top||[];
+  if(!top.length)return '<div class="empty">لسه مفيش نقاط للخدام الشهر ده.</div>';
+  return `<small style="display:block;padding:0 0 6px">${D.meetings} اجتماع · ${D.members} خادم. كل حضور = نقطة، وكل 4 حضور ورا بعض = +5 مكافأة.</small>`+
+    top.map((t,i)=>`<div class="row"><div>${medal[i]||(i+1)+'.'} ${esc(t.name||'بدون اسم')}<small>حضر ${t.days} مرة</small></div><b>${t.pts} نقطة</b></div>`).join('');
 }
 function vHon(){
   const H=X.hon;if(!H.month)H.month=mNow();
@@ -68,7 +76,8 @@ function vHon(){
     <div style="width:35%;text-align:left">${c.att_pct===null?'—':c.att_pct+'%'}${typeof bar==='function'?bar(c.att_pct):''}</div></div>`).join('');
   return `<div class="card"><h2>لوحة الشرف</h2><input type="month" id="x_hm" data-x="honMonth" value="${esc(H.month)}" max="${mNow()}">
   <p class="empty" style="padding:6px 0 0">الفصول مترتبة بنسبة الحضور. نقاط الأولاد: كل حضور = نقطة، وكل 4 حضور ورا بعض = +5 مكافأة.</p></div>
-  <div class="card"><h2>ترتيب الفصول</h2>${H.data===null?'<div class="empty">جاري التحميل...</div>':rows||'<div class="empty">مفيش فصول.</div>'}</div>`;
+  <div class="card"><h2>ترتيب الفصول</h2>${H.data===null?'<div class="empty">جاري التحميل...</div>':rows||'<div class="empty">مفيش فصول.</div>'}</div>
+  <div class="card"><h2>ترتيب الخدام</h2>${H.data===null?'<div class="empty">جاري التحميل...</div>':srvRows(H.srv,medal)}</div>`;
 }
 
 /* ================= الفعاليات ================= */
